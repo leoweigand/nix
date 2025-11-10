@@ -6,8 +6,8 @@ Two-machine setup with custom domain access, centralized authentication, and spl
 ## Infrastructure
 
 ### Hardware
-- **Raspberry Pi**: Runs critical services (Home Assistant, reverse proxy, auth)
-- **Main Server**: Runs standard homelab apps (Immich, Paperless-ngx, etc.)
+- **Raspberry Pi (guinan)**: Runs critical services (Home Assistant, reverse proxy, auth)
+- **Main Server (picard)**: Runs standard homelab apps (Immich, Paperless-ngx, etc.)
 - Both machines run NixOS
 
 ### Domain & DNS
@@ -20,7 +20,7 @@ Two-machine setup with custom domain access, centralized authentication, and spl
 
 ## Network Architecture
 
-### Reverse Proxy (Caddy on Pi)
+### Reverse Proxy (Caddy on guinan)
 - **Listens on**:
   - `:443` - External TLS connections (local network, Tailscale)
   - `:8080` - HTTP from Cloudflare Tunnel (localhost only)
@@ -28,15 +28,15 @@ Two-machine setup with custom domain access, centralized authentication, and spl
   - TLS termination (Let's Encrypt via DNS-01 challenge)
   - Request routing based on subdomain
   - Conditional authentication (via IP/header checks)
-  - Proxying to backend services on Pi and server
+  - Proxying to backend services on guinan and picard
 
-### Authentication (Authentik on Pi)
+### Authentication (Authentik on guinan)
 - Single instance for all services
 - Forward auth for apps without native OAuth
 - OAuth/OIDC provider for apps that support it
 - Passkey support for user authentication
 
-### Public Access (Cloudflare Tunnel on Pi)
+### Public Access (Cloudflare Tunnel on guinan)
 - Single tunnel serving all subdomains
 - Connects to Caddy via `http://localhost:8080`
 - No TLS between tunnel and Caddy (same machine)
@@ -44,15 +44,15 @@ Two-machine setup with custom domain access, centralized authentication, and spl
 ## Traffic Flow
 
 ### Local Network Access
-1. Client → Local DNS resolves to Pi local IP
-2. Client → Caddy on Pi (HTTPS)
+1. Client → Local DNS resolves to guinan local IP
+2. Client → Caddy on guinan (HTTPS)
 3. Caddy checks source IP (192.168.x.x range)
 4. If private IP: skip auth, proxy to backend
 5. Backend responds through Caddy
 
 ### Tailscale Access
-1. Client → Tailscale DNS resolves to Pi Tailscale IP
-2. Client → Caddy on Pi (HTTPS over Tailscale)
+1. Client → Tailscale DNS resolves to guinan Tailscale IP
+2. Client → Caddy on guinan (HTTPS over Tailscale)
 3. Caddy checks source IP (100.x.x.x range)
 4. If Tailscale IP: skip auth, proxy to backend
 5. Backend responds through Caddy
@@ -60,7 +60,7 @@ Two-machine setup with custom domain access, centralized authentication, and spl
 ### Public Access
 1. Client → Public DNS resolves to Cloudflare
 2. Client → Cloudflare (HTTPS)
-3. Cloudflare → Cloudflare Tunnel → Caddy on Pi (HTTP localhost)
+3. Cloudflare → Cloudflare Tunnel → Caddy on guinan (HTTP localhost)
 4. Caddy checks for `CF-Connecting-IP` header
 5. If from Cloudflare: require Authentik auth, then proxy to backend
 6. Backend responds through Caddy → Tunnel → Cloudflare → Client
@@ -68,7 +68,7 @@ Two-machine setup with custom domain access, centralized authentication, and spl
 ## Security Model
 
 ### Network Isolation
-- Backend services firewalled to only accept connections from Pi
+- Backend services firewalled to only accept connections from guinan
 - Services optionally bind to localhost only (defense in depth)
 - No direct IP/port access to applications
 
@@ -85,9 +85,9 @@ Two-machine setup with custom domain access, centralized authentication, and spl
 ## Future Considerations
 
 ### Performance
-- If Pi becomes a bottleneck, can deploy additional Caddy instance on server
+- If guinan becomes a bottleneck, can deploy additional Caddy instance on picard
 - Split DNS records by hosting machine
-- Both Caddy instances authenticate against same Authentik on Pi
+- Both Caddy instances authenticate against same Authentik on guinan
 
 ### Service Exposure
 - Start with all services private (no auth)

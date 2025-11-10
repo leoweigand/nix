@@ -5,46 +5,35 @@ This plan outlines the progressive setup of a Raspberry Pi with NixOS, starting 
 
 ## Milestones
 
-### Milestone 1: Backup Current System
+### Milestone 1: Backup Current System ✅
 **Goal:** Create a complete backup of the current Raspberry Pi SD card for disaster recovery.
 
-**Tasks:**
-- [ ] Create a complete SD card image backup
-- [ ] Verify the backup can be restored
-- [ ] Document the backup process
-- [ ] Store backup in a safe location
+**Status:** COMPLETED
 
-**Notes:**
-- Use `dd` or similar tool to create a complete disk image
-- Test restoration on a separate SD card if available
-- Keep backup accessible during NixOS setup
+**Completed Tasks:**
+- ✅ Created complete SD card image backup (3.8GB compressed)
+- ✅ Verified backup file exists
+- ✅ Documented backup process
+- ✅ Backup stored at: `raspberrypi-backup-20251107.img.gz`
 
 ---
 
-### Milestone 2: Initial NixOS Boot with SSH Access
+### Milestone 2: Initial NixOS Boot with SSH Access ✅
 **Goal:** Get NixOS installed and running with SSH access (critical since no external keyboard available).
 
-**Tasks:**
-- [ ] Download NixOS ARM image for Raspberry Pi
-- [ ] Prepare SD card with NixOS
-- [ ] Configure initial SSH access BEFORE first boot
-  - Add SSH keys to the image
-  - Enable SSH service in initial configuration
-  - Set up known network configuration (WiFi or Ethernet)
-- [ ] Flash SD card and perform first boot
-- [ ] Verify SSH connectivity
-- [ ] Create minimal initial configuration.nix
-- [ ] Test applying new configurations remotely
+**Status:** COMPLETED
 
-**Critical Requirements:**
-- SSH must work on first boot (no physical access to keyboard)
-- Network connectivity must be established automatically
-- SSH keys must be pre-configured
+**Completed Tasks:**
+- ✅ Downloaded NixOS ARM aarch64 image (24.11.719113)
+- ✅ Flashed SD card with NixOS
+- ✅ Booted Pi successfully
+- ✅ Established SSH connection
 
-**Notes:**
-- Consider using `nixos-generate` with proper config for ARM
-- May need to mount the SD card and modify files before first boot
-- Document the initial connection process (IP discovery, etc.)
+**Lessons Learned:**
+- Default NixOS SD images are minimal and require initial setup
+- Serial console (UART) configuration needed additional boot parameters
+- HDMI capture card useful for troubleshooting headless setups
+- SSH enabled by default but requires password to be set on first boot
 
 ---
 
@@ -109,23 +98,61 @@ This plan outlines the progressive setup of a Raspberry Pi with NixOS, starting 
 
 ---
 
+### Milestone 5: Development Environment (Optional)
+**Goal:** Set up nix-darwin on macOS for consistent tooling and easier NixOS development.
+
+**Tasks:**
+- [ ] Install Nix package manager on macOS
+- [ ] Set up nix-darwin configuration
+- [ ] Configure development tools and shells
+- [ ] Integrate with homelab workflow
+
+**Benefits:**
+- Consistent development environment
+- Access to nix-shell for tasks like image flashing
+- Better integration with NixOS configurations
+- Declarative macOS configuration management
+
+**Notes:**
+- Completely optional - not required for homelab operation
+- Can be done at any time
+- Wolfgang's repo has darwin configurations to reference
+
+---
+
 ## Current Status
-**Active Milestone:** None yet - planning phase
+**Active Milestone:** Milestone 3 - Remote Access & First Service
+
+**Completed Milestones:**
+- ✅ Milestone 1: Backup Current System
+- ✅ Milestone 2: Initial NixOS Boot with SSH Access
 
 **Next Steps:**
-1. Review and adjust plan based on specific needs
-2. Begin Milestone 1: Backup current system
-3. Research NixOS ARM installation specifics
+1. Copy initial-configuration.nix to the Pi
+2. Install and configure Tailscale
+3. Set up Caddy reverse proxy
+4. Deploy Home Assistant
 
 ---
 
 ## Notes & Learnings
 *This section will be updated as we progress through milestones*
 
-### Raspberry Pi Specifics
-- Model: (TBD)
-- Current OS: (TBD)
-- Network setup: (TBD)
+### Hardware & Naming
+- **Raspberry Pi (guinan)**:
+  - Model: Raspberry Pi 3 B+
+  - Previous OS: Raspbian (backed up)
+  - Network setup: Ethernet, DHCP with router reservation
+  - Hostname: guinan
+- **Main Server (picard)**:
+  - Hostname: picard
+  - Will run standard homelab apps (Immich, Paperless-ngx, etc.)
+
+### Backup Information
+- Original SD card backed up: 2025-11-07
+- Backup file: `raspberrypi-backup-20251107.img.gz`
+- Compressed size: 3.8GB (from 32GB card)
+- Restoration: `gunzip -c raspberrypi-backup-20251107.img.gz | sudo dd of=/dev/rdiskX bs=4m status=progress`
 
 ### NixOS Considerations
 - ARM architecture requires specific images
