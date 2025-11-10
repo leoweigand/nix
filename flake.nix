@@ -1,0 +1,37 @@
+{
+  description = "NixOS configurations for homelab infrastructure";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+
+    # 1Password integration for secret management
+    opnix = {
+      url = "github:brizzbuzz/opnix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
+
+  outputs = { self, nixpkgs, opnix, ... }@inputs: {
+    nixosConfigurations = {
+      # Riker - Hetzner VPS for development/testing
+      riker = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        specialArgs = { inherit inputs; };
+        modules = [
+          ./hosts/riker/configuration.nix
+          opnix.nixosModules.default
+        ];
+      };
+
+      # Picard - Future main homelab server
+      # picard = nixpkgs.lib.nixosSystem {
+      #   system = "x86_64-linux";
+      #   specialArgs = { inherit inputs; };
+      #   modules = [
+      #     ./hosts/picard/configuration.nix
+      #     opnix.nixosModules.default
+      #   ];
+      # };
+    };
+  };
+}
