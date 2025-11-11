@@ -39,7 +39,7 @@ fi
 # Deploy configuration
 echo "Deploying NixOS configuration with flake..."
 cd /etc/nixos-config
-nixos-rebuild switch --flake ".#$HOSTNAME"
+nix-shell -p git --run "nixos-rebuild switch --flake '.#$HOSTNAME'"
 
 echo ""
 echo "=== Setup Complete! ==="
