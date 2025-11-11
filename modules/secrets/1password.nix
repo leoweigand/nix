@@ -16,6 +16,13 @@
     wants = [ "network-online.target" ];
   };
 
+  # Ensure Tailscale's autoconnect waits for secrets to be available
+  # (The native tailscaled-autoconnect.service is created by services.tailscale.authKeyFile)
+  systemd.services.tailscaled-autoconnect = lib.mkIf config.services.tailscale.enable {
+    after = [ "opnix-secrets.service" ];
+    requires = [ "opnix-secrets.service" ];
+  };
+
   # The 1Password service account token should be set using:
   #   sudo opnix token set
   #
