@@ -7,6 +7,7 @@
     ../../modules/common.nix
     ../../modules/secrets/1password.nix
     ../../modules/tailscale.nix
+    ../../modules/services/paperless.nix
   ];
 
   # Hardware configuration (Hetzner VPS)
