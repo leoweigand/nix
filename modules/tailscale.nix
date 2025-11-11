@@ -25,8 +25,9 @@
 
   systemd.services.tailscale-autoconnect = {
     description = "Automatic connection to Tailscale";
-    after = [ "network-pre.target" "tailscale.service" ];
+    after = [ "network-pre.target" "tailscale.service" "opnix-secrets.service" ];
     wants = [ "network-pre.target" "tailscale.service" ];
+    requires = [ "opnix-secrets.service" ];  # Don't start until opnix-secrets succeeds
     wantedBy = [ "multi-user.target" ];
 
     serviceConfig = {
