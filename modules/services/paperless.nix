@@ -10,7 +10,7 @@
   # Data: /var/lib/paperless
   #
   # Dependencies:
-  # - PostgreSQL (automatically created via createLocally)
+  # - PostgreSQL (manually configured for NixOS 24.05)
   # - Redis (automatically configured)
   # - OpNix secrets (admin password, secret key)
   #
@@ -42,14 +42,24 @@
   };
 
   # --------------------------------------------------------------------------
+  # PostgreSQL Database Configuration
+  # --------------------------------------------------------------------------
+  # Note: database.createLocally option only available in NixOS 24.11+
+  # For 24.05, we manually configure PostgreSQL
+  services.postgresql = {
+    enable = true;
+    ensureDatabases = [ "paperless" ];
+    ensureUsers = [{
+      name = "paperless";
+      ensureDBOwnership = true;
+    }];
+  };
+
+  # --------------------------------------------------------------------------
   # Paperless Service Configuration
   # --------------------------------------------------------------------------
   services.paperless = {
     enable = true;
-
-    # Database: Automatically create local PostgreSQL database
-    # This creates the database, user, and configures paperless to use it
-    database.createLocally = true;
 
     # Admin credentials
     passwordFile = config.services.onepassword-secrets.secretPaths.paperlessAdminPassword;
