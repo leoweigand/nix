@@ -41,6 +41,10 @@ echo "Deploying NixOS configuration with flake..."
 cd /etc/nixos-config
 nix-shell -p git --run "nixos-rebuild switch --flake '.#$HOSTNAME'"
 
+# It seems opnix intially fails one time to initialise, so the tailscale service needs to be restarted
+systemctl restart tailscaled
+systemctl restart tailscale-autoconnect.service
+
 echo ""
 echo "=== Setup Complete! ==="
 echo "Tailscale should now be connected. Check with: tailscale status"
