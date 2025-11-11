@@ -31,9 +31,9 @@ echo "Cloning configuration repository..."
 if [ -d /etc/nixos-config ]; then
   echo "Configuration already exists, updating..."
   cd /etc/nixos-config
-  git pull
+  nix-shell -p git --run "git pull"
 else
-  git clone https://github.com/leoweigand/nix /etc/nixos-config
+  nix-shell -p git --run "git clone https://github.com/leoweigand/nix /etc/nixos-config"
 fi
 
 # Deploy configuration
