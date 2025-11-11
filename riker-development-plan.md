@@ -38,41 +38,51 @@ Use Hetzner VPS "riker" as a development/testing environment for the NixOS confi
 
 ## Milestones
 
-### Milestone 1: Basic Riker Setup & Tailscale
+### Milestone 1: Basic Riker Setup & Tailscale ✅ COMPLETE
 **Goal:** Establish secure remote access and basic configuration structure.
 
-**Tasks:**
-- [ ] Connect to riker and review current NixOS configuration
-- [ ] Set up initial directory structure locally
-  - [ ] Create `hosts/riker/` directory
-  - [ ] Create `modules/` directory structure
-  - [ ] Create `modules/secrets/` for 1Password integration
-- [ ] Create base configuration for riker
-  - [ ] User account (leo) with SSH keys
-  - [ ] Basic system packages
-  - [ ] Firewall configuration (port 22 initially)
-- [ ] Set up 1Password integration with opnix
-  - [ ] Create "Homelab" vault in 1Password
-  - [ ] Create 1Password Service Account for riker
-  - [ ] Generate Tailscale auth key (reusable + persistent)
-  - [ ] Store Tailscale auth key in 1Password
-  - [ ] Configure opnix module in NixOS
-- [ ] Install and configure Tailscale
-  - [ ] Add Tailscale service to configuration
-  - [ ] Configure Tailscale to use auth key from 1Password (via opnix)
-  - [ ] Configure Tailscale SSH feature
-  - [ ] Test connectivity from remote location via Tailscale
-  - [ ] Test SSH access via `ssh leo@riker` (MagicDNS)
-  - [ ] Verify services are only accessible via Tailscale
-- [ ] (Optional) Close public SSH access
-  - [ ] Remove port 22 from firewall allowedTCPPorts
-  - [ ] Rely on Tailscale SSH + Hetzner console as backup
+**Status:** Completed successfully with fully automated deployment
 
-**Notes:**
-- Services accessible ONLY via Tailscale (no public exposure)
-- Use Tailscale MagicDNS names (`riker`) instead of hardcoded IPs
-- Services bind to default interfaces, firewall restricts access
-- Keep port 22 open initially for safety during Tailscale setup
+**Tasks:**
+- [x] Connect to riker and review current NixOS configuration
+- [x] Set up initial directory structure locally
+  - [x] Create `hosts/riker/` directory
+  - [x] Create `modules/` directory structure
+  - [x] Create `modules/secrets/` for 1Password integration
+- [x] Create base configuration for riker
+  - [x] User account (leo) with SSH keys
+  - [x] Basic system packages (git, vim, htop, curl, wget, tmux, jq)
+  - [x] Firewall configuration (public SSH disabled)
+- [x] Set up 1Password integration with opnix
+  - [x] Create "Homelab" vault in 1Password
+  - [x] Create 1Password Service Account for riker
+  - [x] Generate Tailscale auth key (reusable + persistent)
+  - [x] Store Tailscale auth key in 1Password
+  - [x] Configure opnix module in NixOS
+- [x] Install and configure Tailscale
+  - [x] Add Tailscale service to configuration
+  - [x] Use native `services.tailscale.authKeyFile` (no custom service needed!)
+  - [x] Configure Tailscale SSH feature via `extraUpFlags`
+  - [x] Test connectivity from remote location via Tailscale
+  - [x] Test SSH access via `ssh riker` (MagicDNS)
+  - [x] Verify services are only accessible via Tailscale
+- [x] Close public SSH access
+  - [x] Set `services.openssh.openFirewall = false`
+  - [x] Rely on Tailscale SSH + Hetzner console as backup
+
+**Key Achievements:**
+- **Fully automated deployment:** Two-step process (cloud-config + setup script)
+- **Native Tailscale integration:** Eliminated custom service by using `authKeyFile`
+- **Proper secret management:** OpNix pattern established for future services
+- **Zero public exposure:** All access via Tailscale VPN only
+- **Reproducible:** Can recreate server in ~10-15 minutes
+
+**Lessons Learned:**
+- NixOS 24.05 required for opnix (Go 1.22+ dependency)
+- OpNix needs `network-online.target` to prevent DNS failures on boot
+- Native `services.tailscale.authKeyFile` is more reliable than custom services
+- Secret consumption pattern: `config.services.onepassword-secrets.secretPaths.<name>`
+- Flakes are essential for reproducible deployments
 
 ### Milestone 2: paperless-ngx Deployment
 **Goal:** Deploy first real service as a blueprint for future services.
@@ -144,33 +154,32 @@ Use Hetzner VPS "riker" as a development/testing environment for the NixOS confi
 ## Configuration Strategy
 
 ### Directory Structure
-**✓ DECIDED: Structured from the start**
+**✓ IMPLEMENTED**
 
 ```
 /Users/leo/git/nix/               # Git repository (local development)
+├── flake.nix                      # Flake configuration (NixOS 24.05 + opnix)
+├── flake.lock                     # Locked dependencies
+├── setup.sh                       # Automated deployment script
 ├── hosts/
-│   ├── riker/
-│   │   ├── configuration.nix      # Main entry point for riker
-│   │   └── hardware-configuration.nix  # Will be copied from riker
-│   └── picard/                    # Future
-│       └── configuration.nix
+│   └── riker/
+│       └── configuration.nix      # Main entry point for riker
 ├── modules/
-│   ├── common.nix                 # Shared config (users, packages, etc.)
-│   ├── tailscale.nix             # Tailscale service configuration
-│   ├── services/
-│   │   ├── paperless.nix         # paperless-ngx service module
-│   │   └── backups.nix           # Restic backup configuration
-│   └── secrets/
-│       └── 1password.nix         # opnix integration module
+│   ├── common.nix                 # Shared config (users, packages, SSH, etc.)
+│   ├── tailscale.nix             # Tailscale with native authKeyFile
+│   ├── secrets/
+│   │   └── 1password.nix         # opnix integration + service dependencies
+│   └── services/                  # Future: paperless, backups, etc.
 ├── initial-configuration.nix      # Old guinan config (reference)
 ├── plan.md                        # Original Raspberry Pi plan
-└── riker-development-plan.md      # This file
+├── riker-development-plan.md      # This file
+└── README.md                      # Deployment instructions
 ```
 
-**On riker (`/etc/nixos/`):**
-- Symlink to git repository: `/etc/nixos` → `/path/to/git/nix`
-- Or: Copy files from git repo to `/etc/nixos/` (simpler initially)
-- `configuration.nix` imports `hosts/riker/configuration.nix`
+**On riker (`/etc/nixos-config/`):**
+- Repository cloned to `/etc/nixos-config/` by setup script
+- Deployed via: `nixos-rebuild switch --flake .#riker`
+- Git ownership exception: `git config --global --add safe.directory /etc/nixos-config`
 
 ### Configuration Principles
 1. **Structured from start:** Simple but organized - easy to navigate and extend
@@ -178,15 +187,20 @@ Use Hetzner VPS "riker" as a development/testing environment for the NixOS confi
 3. **Document decisions:** Comment why, not just what
 4. **Test incrementally:** Small changes, frequent rebuilds
 5. **Secrets via 1Password:** Use opnix for secret management from the start
-6. **No flakes yet:** Keep it simple, introduce flakes later if needed
+6. **Flakes for reproducibility:** Pin dependencies and enable reproducible builds
+7. **Use native options:** Prefer built-in NixOS options over custom solutions
 
 ## Current Status
-**Active Milestone:** Ready to begin Milestone 1
+**Active Milestone:** Milestone 2 - paperless-ngx Deployment
+
+**Completed:**
+- ✅ Milestone 1: Basic Riker Setup & Tailscale (fully automated deployment)
 
 **Next Steps:**
-1. Connect to riker and review current state
-2. Create initial directory structure locally
-3. Begin Milestone 1 implementation
+1. Design service module structure for paperless-ngx
+2. Configure paperless-ngx with PostgreSQL and Redis
+3. Establish secret management pattern for service credentials
+4. Document deployment pattern as blueprint for future services
 
 ## Implementation Notes
 
@@ -200,8 +214,34 @@ Use Hetzner VPS "riker" as a development/testing environment for the NixOS confi
 ### Tailscale
 - All services accessible ONLY via Tailscale (no public exposure)
 - Use MagicDNS names (`riker`) instead of hardcoded IPs
-- Services bind to default interfaces, firewall restricts access
-- Tailscale SSH available (integrated with ACLs and MFA)
+- Native integration via `services.tailscale.authKeyFile`
+- Automatic authentication with auth key from 1Password/opnix
+- Tailscale SSH enabled via `extraUpFlags = ["--ssh"]`
+- Public SSH disabled (`services.openssh.openFirewall = false`)
+
+### Deployment Process
+**Automated two-step deployment:**
+
+1. **Cloud-config** (Hetzner): Install base NixOS via nixos-infect
+   ```yaml
+   runcmd:
+     - curl https://raw.githubusercontent.com/elitak/nixos-infect/master/nixos-infect | PROVIDER=hetznercloud NIX_CHANNEL=nixos-24.05 bash
+   ```
+
+2. **Setup script** (after reboot): Apply full configuration
+   ```bash
+   curl -sSL https://raw.githubusercontent.com/leoweigand/nix/main/setup.sh | \
+     OPNIX_TOKEN=ops_xxx HOSTNAME=riker bash
+   ```
+
+**What gets configured:**
+- User accounts with SSH keys
+- 1Password token → `/etc/opnix-token`
+- Repository cloned → `/etc/nixos-config/`
+- Flake deployment → `nixos-rebuild switch --flake .#riker`
+- OpNix fetches secrets from 1Password
+- Tailscale auto-connects and enables SSH
+- Firewall closes public SSH (Tailscale-only access)
 
 ### Host Information
 - **riker:** Hetzner VPS, x86_64, NixOS, development/testing environment
