@@ -16,9 +16,9 @@ This repository contains NixOS configurations for:
 - **Tailscale VPN**: Automatic connection with SSH access via MagicDNS
 - **Automated deployment**: Zero-touch server provisioning via cloud-init
 
-## Quick Start: Automated Deployment from Scratch
+## Quick Start: Two-Step Deployment
 
-This section covers how to **completely recreate a server** from scratch using just cloud-config. Perfect for testing or redeployment.
+This section covers how to **deploy a server from scratch** using a simple two-step process.
 
 ### Prerequisites
 
@@ -34,7 +34,7 @@ Before creating a new server, ensure you have:
   1. Go to 1Password → Settings → Developer → Service Accounts
   2. Create new Service Account with read access to `Homelab` vault
   3. Copy the service account token (starts with `ops_...`)
-  4. **Save this token securely** - you'll need it for the cloud-config
+  4. **Save this token securely** - you'll need it for step 2
 - **Tailscale Auth Key**: Store in 1Password:
   1. Generate a reusable auth key at https://login.tailscale.com/admin/settings/keys
   2. In 1Password `Homelab` vault, create item named `Tailscale`
@@ -42,9 +42,9 @@ Before creating a new server, ensure you have:
 
 #### 3. Repository
 - Push this configuration to a Git repository
-- Make sure the repository is publicly accessible or configure SSH keys for private repos
+- Make sure the repository is publicly accessible
 
-### Step-by-Step: Deploy New Server
+### Step 1: Create Server and Install NixOS
 
 #### 1. Create Server in Hetzner Cloud Console
 
@@ -53,102 +53,57 @@ Before creating a new server, ensure you have:
 3. **Image**: Ubuntu 22.04 (will be converted to NixOS)
 4. **Type**: Choose your server size (e.g., CPX11 for testing)
 5. **SSH Keys**: Select your SSH key
-6. **User Data**: Paste the cloud-config below (update the placeholders!)
+6. **User Data**: Paste the simple cloud-config below
 
-#### 2. Cloud-Config Template
+#### 2. Simple Cloud-Config
 
-```yaml
-#cloud-config
-
-# ==============================================================================
-# REPLACE THESE VALUES BEFORE DEPLOYING:
-# - YOUR_1PASSWORD_SERVICE_ACCOUNT_TOKEN: Your 1Password service account token (ops_...)
-# - YOUR_GIT_REPO_URL: Your git repository URL (e.g., https://github.com/username/nix-config)
-# - YOUR_HOSTNAME: The hostname for this server (must match a host in flake.nix)
-# ==============================================================================
-
-runcmd:
-  # Install NixOS using nixos-infect (converts Ubuntu to NixOS)
-  # Using nixos-24.05 for opnix compatibility (requires Go 1.22+)
-  - curl https://raw.githubusercontent.com/elitak/nixos-infect/master/nixos-infect | PROVIDER=hetznercloud NIX_CHANNEL=nixos-24.05 bash 2>&1 | tee /tmp/infect.log
-
-  # Wait for NixOS installation and reboot to complete
-  - sleep 60
-
-  # Clone configuration repository
-  - git clone YOUR_GIT_REPO_URL /tmp/nix-config
-
-  # Set up 1Password service account token
-  # This file must exist before opnix can fetch secrets
-  - echo "YOUR_1PASSWORD_SERVICE_ACCOUNT_TOKEN" > /etc/opnix-token
-  - chmod 600 /etc/opnix-token
-  - chown root:root /etc/opnix-token
-
-  # Deploy NixOS configuration using flakes
-  # This will:
-  # - Install all packages
-  # - Fetch secrets from 1Password via opnix
-  # - Configure Tailscale and connect automatically
-  # - Set up firewall (SSH via Tailscale only)
-  - cd /tmp/nix-config && nixos-rebuild switch --flake .#YOUR_HOSTNAME 2>&1 | tee /tmp/nixos-deploy.log
-```
-
-#### 3. Complete Example
-
-Here's a **ready-to-use example** for deploying **riker** (replace the token!):
+This minimal cloud-config just installs NixOS:
 
 ```yaml
 #cloud-config
 
 runcmd:
-  # Install NixOS 24.05
   - curl https://raw.githubusercontent.com/elitak/nixos-infect/master/nixos-infect | PROVIDER=hetznercloud NIX_CHANNEL=nixos-24.05 bash 2>&1 | tee /tmp/infect.log
-
-  # Wait for reboot
-  - sleep 60
-
-  # Clone configuration
-  - git clone https://github.com/leoweigand/nix-config /tmp/nix-config
-
-  # Set up 1Password token (REPLACE WITH YOUR ACTUAL TOKEN!)
-  - echo "ops_REPLACE_WITH_YOUR_TOKEN_HERE" > /etc/opnix-token
-  - chmod 600 /etc/opnix-token
-  - chown root:root /etc/opnix-token
-
-  # Deploy configuration
-  - cd /tmp/nix-config && nixos-rebuild switch --flake .#riker 2>&1 | tee /tmp/nixos-deploy.log
 ```
 
-#### 4. Monitor Deployment
+#### 3. Wait for Installation
 
-After creating the server:
+The server will:
+1. Run nixos-infect (~2-3 minutes)
+2. Automatically reboot into NixOS (~2 minutes)
+3. Be ready for step 2
 
-1. **Initial SSH** (during Ubuntu phase, before NixOS install):
-   ```bash
-   ssh root@<server-ip>
-   tail -f /tmp/infect.log
-   ```
+**Monitor progress** (optional):
+```bash
+# SSH during Ubuntu phase
+ssh root@<server-ip>
+tail -f /tmp/infect.log
+```
 
-2. **After nixos-infect reboot** (server will reboot automatically):
-   ```bash
-   # Wait ~2 minutes for reboot, then connect
-   ssh root@<server-ip>
-   tail -f /tmp/nixos-deploy.log
-   ```
+### Step 2: Apply Configuration
 
-3. **Check Tailscale connection**:
-   ```bash
-   ssh root@<server-ip>
-   tailscale status
-   ```
+After the server reboots into NixOS (~5 minutes after creation), run the setup script:
 
-4. **Connect via Tailscale** (once deployment completes):
-   ```bash
-   # Public SSH will be disabled, use Tailscale
-   ssh YOUR_HOSTNAME  # e.g., ssh riker
-   ```
+```bash
+# SSH to the server
+ssh root@<server-ip>
 
-#### 5. Verify Deployment
+# Run setup script (replace with your token and hostname)
+curl -sSL https://raw.githubusercontent.com/leoweigand/nix/main/setup.sh | \
+  OPNIX_TOKEN=ops_YOUR_TOKEN_HERE \
+  HOSTNAME=riker \
+  bash
+```
+
+**What the setup script does:**
+1. Creates `/etc/opnix-token` with your 1Password service account token
+2. Clones your configuration repository to `/etc/nixos-config`
+3. Runs `nixos-rebuild switch --flake .#HOSTNAME`
+4. Configures Tailscale, opnix, and all services
+
+**Timeline:** ~5-10 minutes for full deployment
+
+### Verify Deployment
 
 Once connected via Tailscale:
 
@@ -165,21 +120,21 @@ sudo ls -la /var/lib/opnix/secrets/
 nc -zv <public-ip> 22  # Should timeout/be refused
 ```
 
-### What Gets Configured Automatically
+### What Gets Configured
 
-When you deploy using cloud-config, the server will automatically:
+After running the setup script, the server will have:
 
-✅ Convert from Ubuntu to NixOS 24.05
-✅ Install all system packages and dependencies
-✅ Create your user account with SSH keys
-✅ Fetch Tailscale auth key from 1Password
-✅ Connect to Tailscale network with MagicDNS
-✅ Enable Tailscale SSH access
-✅ Close public SSH port 22 (Tailscale-only access)
-✅ Configure firewall rules
-✅ Enable automatic garbage collection
+✅ NixOS 24.05 (from nixos-infect)
+✅ All system packages and dependencies
+✅ User account (leo) with SSH keys and sudo access
+✅ 1Password integration via opnix
+✅ Tailscale VPN connected with MagicDNS
+✅ Tailscale SSH enabled
+✅ Public SSH port 22 closed (Tailscale-only access)
+✅ Firewall configured (only Tailscale UDP port open)
+✅ Automatic garbage collection enabled
 
-**Total time**: ~5-10 minutes from server creation to full deployment
+**Total time**: ~10-15 minutes from server creation to full deployment (mostly waiting for reboots)
 
 ## Manual Deployment
 

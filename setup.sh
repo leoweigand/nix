@@ -2,14 +2,14 @@
 set -e
 
 # NixOS Setup Script
-# Usage: curl -sSL https://raw.githubusercontent.com/leoweigand/nix-config/main/setup.sh | OPNIX_TOKEN=ops_xxx HOSTNAME=riker bash
+# Usage: curl -sSL https://raw.githubusercontent.com/leoweigand/nix/main/setup.sh | OPNIX_TOKEN=ops_xxx HOSTNAME=riker bash
 
 echo "=== NixOS Configuration Setup ==="
 
 # Check for required environment variables
 if [ -z "$OPNIX_TOKEN" ]; then
   echo "ERROR: OPNIX_TOKEN environment variable is required"
-  echo "Usage: curl -sSL https://raw.githubusercontent.com/leoweigand/nix-config/main/setup.sh | OPNIX_TOKEN=ops_xxx HOSTNAME=riker bash"
+  echo "Usage: curl -sSL https://raw.githubusercontent.com/leoweigand/nix/main/setup.sh | OPNIX_TOKEN=ops_xxx HOSTNAME=riker bash"
   exit 1
 fi
 
@@ -33,7 +33,7 @@ if [ -d /etc/nixos-config ]; then
   cd /etc/nixos-config
   git pull
 else
-  git clone https://github.com/leoweigand/nix-config /etc/nixos-config
+  git clone https://github.com/leoweigand/nix /etc/nixos-config
 fi
 
 # Deploy configuration
