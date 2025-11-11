@@ -92,7 +92,7 @@ ssh root@<server-ip>
 curl -sSL https://raw.githubusercontent.com/leoweigand/nix/main/setup.sh | \
   OPNIX_TOKEN=ops_YOUR_TOKEN_HERE \
   HOSTNAME=riker \
-  bash
+  nix-shell -p git --run "bash"
 ```
 
 **What the setup script does:**
