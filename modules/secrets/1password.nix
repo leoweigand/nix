@@ -9,6 +9,13 @@
     tokenFile = "/etc/opnix-token";
   };
 
+  # Ensure opnix-secrets waits for network to be fully ready
+  # This prevents DNS lookup failures on first boot
+  systemd.services.opnix-secrets = {
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+  };
+
   # The 1Password service account token should be set using:
   #   sudo opnix token set
   #
