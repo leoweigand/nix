@@ -81,7 +81,7 @@
       # Repository configuration
       # Format: s3:ENDPOINT/BUCKET/PREFIX (following Wolfgang's pattern)
       # ENDPOINT and BUCKET are in the URL, credentials come from environmentFile
-      repository = "s3:s3.us-west-001.backblazeb2.com/riker-backup/appdata";
+      repository = "s3:s3.eu-central-003.backblazeb2.com/leolab-backup/appdata";
       initialize = true;
       passwordFile = config.services.onepassword-secrets.secretPaths.resticPassword;
 
@@ -152,7 +152,7 @@
       # Repository configuration
       # Format: s3:ENDPOINT/BUCKET/PREFIX (following Wolfgang's pattern)
       # ENDPOINT and BUCKET are in the URL, credentials come from environmentFile
-      repository = "s3:s3.us-west-001.backblazeb2.com/riker-backup/documents";
+      repository = "s3:s3.eu-central-003.backblazeb2.com/leolab-backup/documents";
       initialize = true;
       passwordFile = config.services.onepassword-secrets.secretPaths.resticPassword;
 
