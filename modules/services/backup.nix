@@ -166,9 +166,6 @@ in
     };
   };
 
-      };
-    };
-
     systemd.services.restic-backups-appdata-s3 = {
       after = [ "opnix-secrets.service" ];
       requires = [ "opnix-secrets.service" ];
