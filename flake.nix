@@ -18,7 +18,7 @@
         system = "x86_64-linux";
         specialArgs = { inherit inputs; };
         modules = [
-          ./hosts/riker/configuration.nix
+          ./machines/riker/configuration.nix
           opnix.nixosModules.default
         ];
       };

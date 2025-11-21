@@ -20,15 +20,6 @@
   #     Schedule: Weekly on Sunday at 4:00 AM
   #     Retention: 4 weekly, 6 monthly
 
-  #
-  # Secrets (via OpNix):
-  #   - op://Homelab/Backblaze Backup/s3Credentials
-  #     Must contain (environment file format):
-  #       AWS_ACCESS_KEY_ID=xxx
-  #       AWS_SECRET_ACCESS_KEY=yyy
-  #       AWS_DEFAULT_REGION=us-west-004
-  #   - op://Homelab/Backblaze Backup/resticPassword
-  #
   # Recovery:
   #   export AWS_ACCESS_KEY_ID=xxx AWS_SECRET_ACCESS_KEY=yyy AWS_DEFAULT_REGION=us-west-004
   #   restic -r s3:s3.us-west-004.backblazeb2.com/riker-backups/appdata snapshots

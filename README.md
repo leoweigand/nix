@@ -15,7 +15,7 @@ NixOS config for my homelab infrastructure.
 .
 ├── flake.nix                    # Flake configuration with inputs and outputs
 ├── flake.lock                   # Locked flake dependencies
-├── hosts/
+├── machines/
 │   └── riker/
 │       └── configuration.nix    # Host-specific configuration
 ├── modules/
@@ -24,7 +24,8 @@ NixOS config for my homelab infrastructure.
 │   ├── secrets/
 │   │   └── 1password.nix       # 1Password/opnix integration
 │   └── services/
-│       └── (future services)
+│       ├── paperless
+│       └── (...)
 └── README.md
 ```
 

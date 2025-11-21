@@ -6,7 +6,7 @@
   # ============================================================================
   #
   # Purpose: Digital document organization with OCR and full-text search
-  # Access: http://riker:28981 (Tailscale only)
+  # Access: http://riker:28981
   # Data: /var/lib/paperless
   #
   # Dependencies:
@@ -105,13 +105,4 @@
     after = [ "opnix-secrets.service" ];
     requires = [ "opnix-secrets.service" ];
   };
-
-  # --------------------------------------------------------------------------
-  # Firewall Configuration
-  # --------------------------------------------------------------------------
-  # Paperless is accessible via Tailscale only.
-  # The trustedInterfaces setting in modules/tailscale.nix allows
-  # all traffic from tailscale0 interface.
-  #
-  # No public firewall ports needed.
 }
