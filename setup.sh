@@ -47,5 +47,12 @@ nixos-rebuild switch --extra-experimental-features "nix-command flakes" --flake 
 
 echo ""
 echo "=== Setup Complete! ==="
-echo "Tailscale should now be connected. Check with: tailscale status"
-echo "SSH will be disabled on public IP. Use Tailscale to connect: ssh $HOSTNAME"
+echo "Rebooting to fully initialize opnix secrets and Tailscale..."
+echo "After reboot:"
+echo "  - Tailscale will be connected (check: tailscale status)"
+echo "  - SSH on public IP will be disabled"
+echo "  - Connect via Tailscale: ssh $HOSTNAME"
+echo ""
+echo "Rebooting in 5 seconds..."
+sleep 5
+reboot
