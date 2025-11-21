@@ -31,9 +31,9 @@ echo "Cloning configuration repository..."
 if [ -d /etc/nixos-config ]; then
   echo "Configuration already exists, updating..."
   cd /etc/nixos-config
-  nix --extra-experimental-features "nix-command flakes" run nixpkgs#git -- pull
+  nix --extra-experimental-features "nix-command flakes" run github:nixos/nixpkgs/nixos-24.05#git -- pull
 else
-  nix --extra-experimental-features "nix-command flakes" run nixpkgs#git -- clone https://github.com/leoweigand/nix /etc/nixos-config
+  nix --extra-experimental-features "nix-command flakes" run github:nixos/nixpkgs/nixos-24.05#git -- clone https://github.com/leoweigand/nix /etc/nixos-config
 fi
 
 # Deploy configuration
@@ -41,7 +41,7 @@ echo "Deploying NixOS configuration with flake..."
 cd /etc/nixos-config
 
 # Run nixos-rebuild in a shell with git available (flakes need it)
-nix --extra-experimental-features "nix-command flakes" shell nixpkgs#git --command \
+nix --extra-experimental-features "nix-command flakes" shell github:nixos/nixpkgs/nixos-24.05#git --command \
   nixos-rebuild switch --extra-experimental-features "nix-command flakes" --flake ".#$HOSTNAME"
 
 echo ""
