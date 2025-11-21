@@ -26,23 +26,30 @@ echo "$OPNIX_TOKEN" | tee /etc/opnix-token > /dev/null
 chmod 600 /etc/opnix-token
 chown root:root /etc/opnix-token
 
-# Clone configuration repository using nix run to get git
+# First, enable experimental features and add git to system packages temporarily
+echo "Enabling experimental features and installing git..."
+mkdir -p /etc/nix
+cat > /etc/nix/nix.conf <<EOF
+experimental-features = nix-command flakes
+EOF
+
+# Install git to system profile so it's available
+nix-env -iA nixos.git
+
+# Clone configuration repository
 echo "Cloning configuration repository..."
 if [ -d /etc/nixos-config ]; then
   echo "Configuration already exists, updating..."
   cd /etc/nixos-config
-  nix --extra-experimental-features "nix-command flakes" run github:nixos/nixpkgs/nixos-24.05#git -- pull
+  git pull
 else
-  nix --extra-experimental-features "nix-command flakes" run github:nixos/nixpkgs/nixos-24.05#git -- clone https://github.com/leoweigand/nix /etc/nixos-config
+  git clone https://github.com/leoweigand/nix /etc/nixos-config
 fi
 
 # Deploy configuration
 echo "Deploying NixOS configuration with flake..."
 cd /etc/nixos-config
-
-# Run nixos-rebuild in a shell with git available (flakes need it)
-nix --extra-experimental-features "nix-command flakes" shell github:nixos/nixpkgs/nixos-24.05#git --command \
-  nixos-rebuild switch --extra-experimental-features "nix-command flakes" --flake ".#$HOSTNAME"
+nixos-rebuild switch --flake ".#$HOSTNAME"
 
 echo ""
 echo "=== Setup Complete! ==="
