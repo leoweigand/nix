@@ -38,9 +38,18 @@
   # Enable zram swap (compressed swap in RAM - good for VPS)
   zramSwap.enable = true;
 
-  # This value determines the NixOS release from which the default
-  # settings for stateful data, like file locations and database versions
-  # on your system were taken. It's perfectly fine and recommended to leave
-  # this value at the release version of your first install.
+  # Backups
+  backup = {
+    enable = true;
+    s3 = {
+      endpoint = "s3.eu-central-003.backblazeb2.com";
+      bucket = "leolab-backup";
+    };
+    secrets = {
+      s3Credentials = "op://Homelab/Backblaze Backup/s3Credentials";
+      resticPassword = "op://Homelab/Backblaze Backup/resticPassword";
+    };
+  };
+
   system.stateVersion = "23.11";
 }
