@@ -26,14 +26,8 @@ echo "$OPNIX_TOKEN" | tee /etc/opnix-token > /dev/null
 chmod 600 /etc/opnix-token
 chown root:root /etc/opnix-token
 
-# First, enable experimental features and add git to system packages temporarily
-echo "Enabling experimental features and installing git..."
-mkdir -p /etc/nix
-cat > /etc/nix/nix.conf <<EOF
-experimental-features = nix-command flakes
-EOF
-
-# Install git to system profile so it's available
+# Install git using traditional nix-env (doesn't need flakes)
+echo "Installing git..."
 nix-env -iA nixos.git
 
 # Clone configuration repository
@@ -46,10 +40,10 @@ else
   git clone https://github.com/leoweigand/nix /etc/nixos-config
 fi
 
-# Deploy configuration
+# Deploy configuration (git is now in PATH for flakes to use)
 echo "Deploying NixOS configuration with flake..."
 cd /etc/nixos-config
-nixos-rebuild switch --flake ".#$HOSTNAME"
+nixos-rebuild switch --extra-experimental-features "nix-command flakes" --flake ".#$HOSTNAME"
 
 echo ""
 echo "=== Setup Complete! ==="
