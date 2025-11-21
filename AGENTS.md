@@ -12,6 +12,29 @@ Let's document decisions in the README but only important high-level ones, not e
 
 ## Code Style
 
-**Comments**: Write comments as technical documentation, not addressing someone directly. Think of it as documentation that could be read by anyone.
-- ✅ Good: `# NetworkManager provides easier WiFi/network management`
-- ❌ Bad: `# Adjust to your network`
+**Comments**: Keep comments helpful and concise. Focus on the "why" and non-obvious details.
+
+**What to comment:**
+- Non-obvious technical constraints or workarounds
+- Cron/timer syntax (hard to read without explanation)
+- Exotic or unclear NixOS options
+- Shell command purposes (especially complex ones)
+- Security or timing implications
+- Group/permission meanings for learning purposes
+
+**What NOT to comment:**
+- Obvious section headers (`# User configuration`)
+- Self-explanatory standard NixOS options
+- Decorative comment borders or ASCII art
+- Verbose multi-line explanations restating the code
+
+**Examples:**
+- ✅ Good: `extraGroups = [ "wheel" ];  # wheel group provides sudo access`
+- ✅ Good: `OnCalendar = "*-*-* 03:00:00";  # Daily at 3:00 AM`
+- ✅ Good: `consumptionDirIsPublic = true;  # Allow all users to add documents`
+- ✅ Good: `${restic} forget --prune  # Remove old snapshots according to retention policy`
+- ✅ Good: `# NixOS 24.05 requires manual PostgreSQL configuration`
+- ✅ Good: `# Wait for network to prevent DNS failures on first boot`
+- ❌ Bad: `# Enable SSH - CRITICAL for remote operation`
+- ❌ Bad: `# ---------- User Account Configuration ----------`
+- ❌ Bad: Multi-paragraph explanations of what a service does

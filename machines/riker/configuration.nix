@@ -6,9 +6,11 @@
     (modulesPath + "/profiles/qemu-guest.nix")
     ../../modules/common.nix
     ../../modules/secrets/1password.nix
+    ../../modules/storage
     ../../modules/tailscale.nix
     ../../modules/services/paperless.nix
     ../../modules/services/backup.nix
+    ./filesystems.nix
   ];
 
   # Hardware configuration (Hetzner VPS)

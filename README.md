@@ -17,17 +17,39 @@ NixOS config for my homelab infrastructure.
 ├── flake.lock                   # Locked flake dependencies
 ├── machines/
 │   └── riker/
-│       └── configuration.nix    # Host-specific configuration
+│       ├── configuration.nix    # Host-specific configuration
+│       └── filesystems.nix      # Storage tier mappings
 ├── modules/
 │   ├── common.nix              # Shared configuration (users, SSH, packages)
+│   ├── storage/                # Storage abstraction layer
+│   │   └── default.nix         # Mount point and directory conventions
 │   ├── tailscale.nix           # Tailscale VPN with auto-authentication
 │   ├── secrets/
 │   │   └── 1password.nix       # 1Password/opnix integration
 │   └── services/
-│       ├── paperless
+│       ├── paperless.nix       # Paperless-ngx document management
+│       ├── backup.nix          # Restic backups to Backblaze B2
 │       └── (...)
 └── README.md
 ```
+
+## Storage Architecture
+
+Services follow consistent directory conventions across all machines:
+
+**Storage Tiers:**
+- `fast` - NVMe SSD tier for frequently accessed data
+- `normal` - HDD/SATA SSD tier for bulk storage
+
+**Directory Conventions:**
+- `/mnt/{tier}/appdata/` - Service state, databases, configs (backed up daily)
+- `/mnt/{tier}/data/` - Large media files, document libraries (backed up weekly)
+- `/var/backup/` - Database dumps and backup artifacts
+
+**Machine-specific mappings:**
+- **riker**: Single disk - both tiers at `/mnt/storage/`
+- **picard** (future): Multi-disk - `/mnt/nvme/` (fast), `/mnt/pool/` (normal with MergerFS)
+- **guinan**: Raspberry Pi - uses standard `/var/lib/` paths
 
 ## Installation Runbook
 
@@ -108,6 +130,76 @@ services.onepassword-secrets.secrets.my-secret = {
 script = ''
   SECRET=$(cat ${config.services.onepassword-secrets.secretsPath}/my-secret)
 '';
+```
+
+## Backups
+
+Automated backups to Backblaze B2 using restic with a dual-tier strategy:
+
+**Tier 1 - Appdata** (Daily at 3 AM)
+- PostgreSQL database dumps
+- Application state and configuration
+- Retention: 7 daily, 4 weekly, 3 monthly
+
+**Tier 2 - Documents** (Weekly on Sundays at 4 AM)
+- Large media files (documents, photos, etc.)
+- Retention: 4 weekly, 6 monthly
+
+### Restoring from Backup
+
+The `restic` command automatically loads credentials from 1Password (must run as root).
+
+**List available snapshots:**
+```bash
+sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup/appdata snapshots
+sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup/documents snapshots
+```
+
+**Option 1: Direct restore (new system or disaster recovery)**
+
+Restores directly to original locations. Use when setting up a fresh system or confident about restoring:
+
+```bash
+# Restore appdata (PostgreSQL dumps, app state)
+sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup/appdata restore latest --target /
+
+# Restore documents
+sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup/documents restore latest --target /
+
+# Fix ownership (if needed)
+sudo chown -R paperless:paperless /mnt/storage/appdata/paperless
+sudo chown -R paperless:paperless /mnt/storage/data/paperless
+
+# Start services
+sudo systemctl start paperless-scheduler
+```
+
+**Option 2: Cautious restore (inspect before overwriting)**
+
+Restores to temporary location for inspection. Use when services are running or you want to verify before overwriting:
+
+```bash
+# Restore to temp location
+sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup/appdata restore latest --target /tmp/restore
+
+# Inspect what was restored
+ls -la /tmp/restore/mnt/storage/appdata/paperless/
+ls -la /tmp/restore/mnt/storage/data/paperless/
+ls -la /tmp/restore/var/backup/postgresql/
+
+# Stop service, copy files, restart
+sudo systemctl stop paperless-scheduler paperless-web
+sudo cp -a /tmp/restore/mnt/storage/appdata/paperless/* /mnt/storage/appdata/paperless/
+sudo cp -a /tmp/restore/mnt/storage/data/paperless/* /mnt/storage/data/paperless/
+sudo chown -R paperless:paperless /mnt/storage/appdata/paperless
+sudo chown -R paperless:paperless /mnt/storage/data/paperless
+sudo systemctl start paperless-scheduler paperless-web
+
+# Restore PostgreSQL database from dump
+sudo -u postgres psql paperless < /tmp/restore/var/backup/postgresql/paperless.sql
+
+# Clean up
+sudo rm -rf /tmp/restore
 ```
 
 ## Security Model
