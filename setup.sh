@@ -43,7 +43,7 @@ fi
 # Deploy configuration (git is now in PATH for flakes to use)
 echo "Deploying NixOS configuration with flake..."
 cd /etc/nixos-config
-nixos-rebuild switch --extra-experimental-features "nix-command flakes" --flake ".#$HOSTNAME"
+NIX_CONFIG="experimental-features = nix-command flakes" nixos-rebuild switch --flake ".#$HOSTNAME"
 
 echo ""
 echo "=== Setup Complete! ==="
