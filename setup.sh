@@ -26,14 +26,17 @@ echo "$OPNIX_TOKEN" | tee /etc/opnix-token > /dev/null
 chmod 600 /etc/opnix-token
 chown root:root /etc/opnix-token
 
+# Set NIX_PATH for nix-shell to work
+export NIX_PATH=nixpkgs=channel:nixos-24.05
+
 # Clone configuration repository
 echo "Cloning configuration repository..."
 if [ -d /etc/nixos-config ]; then
   echo "Configuration already exists, updating..."
   cd /etc/nixos-config
-  git pull
+  nix-shell -p git --run "git pull"
 else
-  git clone https://github.com/leoweigand/nix /etc/nixos-config
+  nix-shell -p git --run "git clone https://github.com/leoweigand/nix /etc/nixos-config"
 fi
 
 # Deploy configuration
