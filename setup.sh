@@ -39,6 +39,10 @@ fi
 # Deploy configuration
 echo "Deploying NixOS configuration with flake..."
 cd /etc/nixos-config
+
+# Ensure git is in the environment for nixos-rebuild (flakes need it)
+export PATH="$(nix --extra-experimental-features "nix-command flakes" build --no-link --print-out-paths nixpkgs#git)/bin:$PATH"
+
 nixos-rebuild switch --extra-experimental-features "nix-command flakes" --flake ".#$HOSTNAME"
 
 echo ""
