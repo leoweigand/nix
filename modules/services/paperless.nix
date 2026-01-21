@@ -38,7 +38,7 @@ in
     consumptionDirIsPublic = true;  # Allow all users to add documents
 
     settings = {
-      PAPERLESS_URL = "http://riker:28981";
+      PAPERLESS_URL = "http://${config.networking.hostName}:28981";
       PAPERLESS_ADMIN_USER = "admin";
       PAPERLESS_TIME_ZONE = "Europe/Berlin";
       PAPERLESS_OCR_LANGUAGE = "eng";

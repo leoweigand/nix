@@ -7,12 +7,13 @@ in
 
 {
   # Storage abstraction layer
+  # TODO: Once NFS and second vdisk are configured, change these back to /mnt paths
   storage = {
     enable = true;
 
     mounts = {
-      fast = "/mnt/fast";      # VM-local storage (vdisk on Unraid cache)
-      normal = "/mnt/normal";  # NFS from Unraid array
+      fast = "/var/lib/picard";   # Temporarily use local storage until second vdisk is added
+      normal = "/var/lib/picard"; # Temporarily use local storage until NFS is configured
     };
   };
 
@@ -48,7 +49,9 @@ in
   boot.supportedFilesystems = [ "nfs" ];
 
   # Ensure mount points exist
+  # TODO: Restore /mnt/fast and /mnt/normal when external storage is configured
   systemd.tmpfiles.rules = [
+    "d /var/lib/picard 0755 root root - -"
     "d /mnt/fast 0755 root root - -"
     "d /mnt/normal 0755 root root - -"
   ];

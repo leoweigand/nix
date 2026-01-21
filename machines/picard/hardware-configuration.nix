@@ -20,18 +20,7 @@
   boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-intel" "kvm-amd" ];  # Nested virtualization if needed
 
-  # Root filesystem on virtio disk
-  # Partition layout: vda1 = EFI, vda2 = root
-  fileSystems."/" = {
-    device = "/dev/vda2";
-    fsType = "ext4";
-  };
-
-  fileSystems."/boot" = {
-    device = "/dev/vda1";
-    fsType = "vfat";
-    options = [ "fmask=0077" "dmask=0077" ];
-  };
+  # Filesystem mounts are handled by disko.nix
 
   # Hardware specifics
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
