@@ -35,9 +35,8 @@
         specialArgs = { inherit inputs; };
         modules = [
           ./machines/picard/configuration.nix
-          # disko disabled for manual install - re-enable for automated reinstalls
-          # ./machines/picard/disko.nix
-          # disko.nixosModules.disko
+          ./machines/picard/disko.nix
+          disko.nixosModules.disko
           opnix.nixosModules.default
         ];
       };
