@@ -4,7 +4,7 @@
   imports = [
     (modulesPath + "/profiles/qemu-guest.nix")
     ./hardware-configuration.nix
-    ./filesystems.nix
+    ./filesystems.nix  # NFS and storage module config (disko handles disk partitions)
     ../../modules/common.nix
     ../../modules/secrets/1password.nix
     ../../modules/storage

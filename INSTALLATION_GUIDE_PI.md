@@ -1,141 +1,199 @@
 # NixOS Raspberry Pi Installation Guide
 
-## Prerequisites
-- Raspberry Pi (3, 4, or 5)
-- MicroSD card (minimum 8GB, 16GB+ recommended)
-- Network connection (Ethernet recommended for initial setup)
-- Another computer to prepare the SD card
-- Your SSH public key (already configured in initial-configuration.nix)
+## Current Status
 
-## Step 1: Download NixOS ARM Image
+✅ NixOS is already installed on Guinan (Raspberry Pi)
+⚠️ Cannot build configurations locally due to resource constraints (limited RAM/CPU)
+🎯 **Next step:** Set up remote deployment from Riker using deploy-rs
 
-Choose one of these Hydra builds:
+## The Problem
 
-**Recommended - Stable (24.11):**
-https://hydra.nixos.org/job/nixos/release-24.11/nixos.sd_image.aarch64-linux
+Building NixOS configurations directly on the Raspberry Pi is impractical:
+- Limited RAM causes out-of-memory errors during builds
+- Slow CPU makes compilation extremely time-consuming
+- `nixos-rebuild switch` fails or takes hours
 
-**Alternative - Unstable (Latest):**
-https://hydra.nixos.org/job/nixos/trunk-combined/nixos.sd_image.aarch64-linux
+## The Solution: Remote Deployment with deploy-rs
 
-1. Click the link
-2. Click on the latest successful build (green checkmark)
-3. Under "Build products", download the `.img.zst` file
+Build configurations on Riker (powerful x86_64 server), then deploy pre-built packages to Guinan over SSH.
 
-## Step 2: Flash the Image to SD Card
+**How it works:**
+1. Riker evaluates Guinan's configuration for aarch64-linux
+2. Riker builds packages (using binary caches, cross-compilation, or emulation)
+3. Riker copies built packages to Guinan via SSH
+4. Guinan activates the new configuration (fast, just switching symlinks)
 
-The SD card should already be unmounted. Flash the image:
+## Setup Steps
 
-```bash
-# Decompress and write in one command
-nix-shell -p zstd --run "zstdcat /path/to/nixos-sd-image-*.img.zst | sudo dd of=/dev/rdisk4 bs=4m status=progress"
+### Step 1: Add Guinan Configuration to Flake
+
+Add Guinan's configuration to `flake.nix`:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+    deploy-rs.url = "github:serokell/deploy-rs";
+  };
+
+  outputs = { self, nixpkgs, deploy-rs, ... }: {
+    nixosConfigurations = {
+      riker = { ... };  # Existing
+
+      guinan = nixpkgs.lib.nixosSystem {
+        system = "aarch64-linux";
+        modules = [
+          ./machines/guinan/configuration.nix
+          ./machines/guinan/hardware-configuration.nix
+          # Add common modules (tailscale, storage, etc)
+        ];
+      };
+    };
+
+    deploy.nodes.guinan = {
+      hostname = "guinan.local";  # or IP address
+      profiles.system = {
+        user = "root";
+        path = deploy-rs.lib.aarch64-linux.activate.nixos
+               self.nixosConfigurations.guinan;
+        sshUser = "leo";
+        sudo = "sudo -u";
+      };
+    };
+  };
+}
 ```
 
-**Note:** Using `/dev/rdisk4` (raw disk) is faster than `/dev/disk4`
+### Step 2: Copy Hardware Configuration from Guinan
 
-## Step 3: Configure for Headless Boot
-
-After flashing, the SD card will have two partitions. We need to add our configuration BEFORE first boot.
+Guinan already has a generated hardware config. Copy it to the repo:
 
 ```bash
-# Mount the root partition
-diskutil list  # Verify the disk number
-diskutil mount /dev/disk4s2  # Mount the Linux partition
-
-# Copy our initial configuration
-sudo cp initial-configuration.nix /Volumes/NIXOS_SD/etc/nixos/configuration.nix
-
-# Unmount when done
-diskutil unmount /dev/disk4s2
+# From your Mac or Riker
+ssh leo@guinan.local "sudo cat /etc/nixos/hardware-configuration.nix" > machines/guinan/hardware-configuration.nix
 ```
 
-## Step 4: First Boot
+### Step 3: Create Guinan's Configuration
 
-1. Insert the SD card into your Raspberry Pi
-2. Connect Ethernet cable (highly recommended for first boot)
-3. Power on the Pi
+Create `machines/guinan/configuration.nix`:
 
-## Step 5: Connect via SSH
+```nix
+{ config, pkgs, ... }:
 
-The Pi should be discoverable via mDNS:
+{
+  imports = [
+    ./hardware-configuration.nix
+    ../../modules/common.nix
+    ../../modules/tailscale.nix
+    # Add other modules as needed
+  ];
+
+  # Hostname
+  networking.hostName = "guinan";
+
+  # Storage tier (Pi has single disk)
+  storage.tiers = {
+    fast = "/var/lib";    # Pi uses standard paths
+    normal = "/var/lib";
+  };
+
+  # Enable services
+  services.home-assistant.enable = true;
+  # ... other services
+
+  system.stateVersion = "24.05";
+}
+```
+
+### Step 4: Set Up SSH Access from Riker to Guinan
+
+Ensure Riker can SSH into Guinan:
 
 ```bash
-# Try mDNS hostname first (hostname: guinan)
+# On Riker, test SSH connection
 ssh leo@guinan.local
 
-# If that doesn't work, find the IP:
-# Option 1: Check your router's DHCP leases
-# Option 2: Scan your network
-nmap -sn 192.168.1.0/24  # Adjust to your subnet
+# If needed, add Riker's SSH key to Guinan
+ssh-copy-id leo@guinan.local
 
-# Then connect with IP
-ssh leo@192.168.1.XXX
+# Verify sudo works without password (required for deploy-rs)
+ssh leo@guinan.local "sudo -n true" && echo "Sudo works!"
 ```
 
-## Step 6: Verify and Generate Hardware Config
-
-Once connected:
+### Step 5: Deploy from Riker
 
 ```bash
-# Generate hardware configuration
-sudo nixos-generate-config
+# On Riker
+cd /etc/nixos-config
 
-# Review the generated hardware-configuration.nix
-sudo vim /etc/nixos/hardware-configuration.nix
+# First build (will take time for cross-compilation/downloads)
+nix run github:serokell/deploy-rs -- .#guinan
 
-# Apply the configuration
-sudo nixos-rebuild switch
+# Subsequent deployments will be faster (only changed packages)
 ```
 
-## Step 7: Test Configuration Updates
+## Build Strategy Details
 
-Test that you can apply configuration changes remotely:
+**Binary caches** (fastest): Most packages already built for aarch64 at cache.nixos.org
 
-```bash
-# On your Mac, edit the configuration
-# Then copy it to the Pi
-scp initial-configuration.nix leo@guinan.local:/tmp/
+**Cross-compilation**: If package not cached, Riker cross-compiles from x86_64 to aarch64
 
-# On the Pi, apply it
-ssh leo@guinan.local
-sudo cp /tmp/initial-configuration.nix /etc/nixos/configuration.nix
-sudo nixos-rebuild switch
-```
+**Emulation** (slowest): Some packages require native ARM build, Riker uses QEMU emulation
 
 ## Troubleshooting
 
-### Can't connect via SSH
-
-1. **Check if Pi is powered on:** LED should be blinking
-2. **Verify network connection:**
-   - Ethernet: Link light should be on
-   - WiFi: You'll need to configure this via serial console or pre-configure it
-3. **Serial console access:** Connect USB-TTL adapter to GPIO pins (RX/TX) at 115200 baud
-4. **Check router:** Look for new DHCP leases
-
-### Wrong architecture errors
-
-Make sure you downloaded the **aarch64** image, not armv7l.
-
-### Can't write to SD card
+### Can't SSH from Riker to Guinan
 
 ```bash
-# Verify the correct disk
-diskutil list
+# Check network connectivity
+ssh leo@guinan.local
 
-# Force unmount if needed
-diskutil unmountDisk force /dev/disk4
+# Verify firewall allows SSH
+# On Guinan, check SSH is running
+systemctl status sshd
 ```
+
+### Deploy fails with "cannot build derivation"
+
+Some packages can't be cross-compiled. Options:
+1. Use binary caches (add substituters)
+2. Enable QEMU binfmt for native ARM emulation on Riker
+3. Build those packages on a different ARM machine
+
+### Out of disk space on Guinan
+
+```bash
+# On Guinan, clean old generations
+sudo nix-collect-garbage --delete-older-than 7d
+
+# On Riker, optimize before deploying
+nix store optimise
+```
+
+## Alternative: Build from Your Mac
+
+You can also build and deploy from your Mac instead of Riker:
+
+```bash
+# On your Mac
+cd /path/to/nix-config
+deploy .#guinan --hostname guinan.local
+```
+
+Same principle - powerful machine builds, Pi just receives and activates.
 
 ## Next Steps
 
-Once you have SSH working and can apply configurations:
-- ✅ Move to Milestone 3: Set up Tailscale for remote access
-- ✅ Configure Caddy reverse proxy
-- ✅ Deploy Home Assistant
+Once deploy-rs is working:
+- ✅ Deploy Home Assistant configuration
+- ✅ Set up Caddy reverse proxy
+- ✅ Configure Zigbee/Z-Wave integration
+- ✅ Add to Tailscale network for remote access
 
-## Important Notes
+## Historical Notes
 
-- **Backup:** You already have a backup of the original SD card
-- **Password:** The configuration has password authentication disabled. SSH keys only!
-- **Sudo:** Currently configured to not require password. Change `security.sudo.wheelNeedsPassword` to `true` for more security
-- **Timezone:** Adjust `time.timeZone` in configuration.nix to your location
+**Initial Installation** (Already Complete):
+- NixOS 24.11 SD image flashed to SD card
+- Initial configuration copied before first boot
+- SSH access configured with key-based auth
+- Hardware configuration generated with `nixos-generate-config`

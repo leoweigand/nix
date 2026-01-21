@@ -24,9 +24,26 @@ This gives us reproducible infrastructure while keeping Unraid's storage managem
 3. Add two vdisks: primary (OS), secondary (fast storage)
 
 ### NixOS Install
-4. Boot NixOS ISO, partition disks (vda1=EFI, vda2=root, vdb1=fast)
-5. Update `filesystems.nix` with correct Unraid IP (currently `192.168.1.10`)
-6. `nixos-install --flake github:youruser/nix#picard`
+
+**Option 1: Using disko (recommended for reinstalls)**
+4. Boot NixOS ISO
+5. Download the disko config and run:
+   ```bash
+   # Fetch the disko config
+   curl -O https://raw.githubusercontent.com/leoweigand/nix/main/machines/picard/disko.nix
+   
+   # Partition and format
+   sudo nix --experimental-features "nix-command flakes" run github:nix-community/disko/latest -- \
+     --mode destroy,format,mount disko.nix
+   
+   # Install NixOS
+   sudo nixos-install --flake github:leoweigand/nix#picard
+   ```
+
+**Option 2: Manual partitioning (current install)**
+4. Partition manually (vda1=EFI 512M, vda2=root)
+5. Mount: `mount /dev/vda2 /mnt && mkdir -p /mnt/boot && mount /dev/vda1 /mnt/boot`
+6. Install: `nixos-install --flake github:leoweigand/nix#picard`
 
 ### Post-Install
 7. Set up 1Password token at `/etc/opnix-token`
