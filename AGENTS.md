@@ -1,20 +1,14 @@
-This repository is equal parts meant to be a way for me to learn NixOS and actual config for my homelab that has to work and be pretty stable, especially smart home-related systems.
+This repository contains the nix configuration for my homelab machines but is also a learning resource for me. Read the [readme](./README.md) and [architecture](./ARCHITECTURE.md) to get a general understanding of what we're doing. When it comes to nix config, explain how everything works in detail, especially with respect to more peculiar aspects of the nix language or things to do with the nix ecosystem, packages, home manager etc.
 
-Read the [architecture plan](./ARCHITECTURE.md) carefully to understand the goal for where this repository is headed.
+A lot of what I'm doing here is inspired by [Wolfgang's repository](/Users/leo/git/notthebee-nix). When I ask you to add something new, check how things are done over there as one learning resource.
 
-We are loosely following [Wolfgang's repository](/Users/leo/git/notthebee-nix) as an inspiration. Don't blindly copy but always check it when I ask you to add something new that our system doesn't have yet.
-
-I already have a somewhat similar setup but currently all manually set up with rasbian on the pi and Unraid on the server (we're migrating away from that).
-
-I know very little about Nix, so always make sure to explain in detail what we're doing, especially with respect to the Nix language.
-
-Let's document decisions in the README but only important high-level ones, not every implementation detail.
+When planning new features, work in markdown files inside `plans/`. The readme and architecture document should only describe the status quo, unfinished projects should remain in plans.
 
 ## Code Style
 
 **Comments**: Keep comments helpful and concise. Focus on the "why" and non-obvious details.
 
-**What to comment:**
+**Examples of what to comment:**
 - Non-obvious technical constraints or workarounds
 - Cron/timer syntax (hard to read without explanation)
 - Exotic or unclear NixOS options
@@ -22,7 +16,7 @@ Let's document decisions in the README but only important high-level ones, not e
 - Security or timing implications
 - Group/permission meanings for learning purposes
 
-**What NOT to comment:**
+**Examples of what NOT to comment:**
 - Obvious section headers (`# User configuration`)
 - Self-explanatory standard NixOS options
 - Decorative comment borders or ASCII art

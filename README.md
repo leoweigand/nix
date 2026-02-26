@@ -1,120 +1,18 @@
-# Leo's NixOS Infrastructure
+# Homelab infrastructure
 
-NixOS config for my homelab infrastructure.
+NixOS configuration for my homelab.
 
 ## Key Features
 
 - Remote access and SSH authentication through Tailscale
 - Secret management using 1Password with [opnix](https://github.com/brizzbuzz/opnix)
-- Flake-based configuration: reproducible builds with pinned dependencies
-- Automated provisioning via cloud-init and Tailscale auth keys
+- Backups of all critical data to Backblaze B2 using restic
 
-## Repository Structure
+## Machines
+- **guinan (Raspberry Pi)**: Runs critical services (reverse proxy, dns, home assistant)
+- **picard (Unraid server)**: Runs standard homelab apps (Immich, Paperless-ngx, etc.) in a NixOS VM on an Unraid host with a storage array and SSD cache drives.
 
-```
-.
-├── flake.nix                    # Flake configuration with inputs and outputs
-├── flake.lock                   # Locked flake dependencies
-├── machines/
-│   └── riker/
-│       ├── configuration.nix    # Host-specific configuration
-│       └── filesystems.nix      # Storage tier mappings
-├── modules/
-│   ├── common.nix              # Shared configuration (users, SSH, packages)
-│   ├── storage/                # Storage abstraction layer
-│   │   └── default.nix         # Mount point and directory conventions
-│   ├── tailscale.nix           # Tailscale VPN with auto-authentication
-│   ├── secrets/
-│   │   └── 1password.nix       # 1Password/opnix integration
-│   └── services/
-│       ├── paperless.nix       # Paperless-ngx document management
-│       ├── backup.nix          # Restic backups to Backblaze B2
-│       └── (...)
-└── README.md
-```
-
-## Storage Architecture
-
-Services follow consistent directory conventions across all machines:
-
-**Storage Tiers:**
-- `fast` - NVMe SSD tier for frequently accessed data
-- `normal` - HDD/SATA SSD tier for bulk storage
-
-**Directory Conventions:**
-- `/mnt/{tier}/appdata/` - Service state, databases, configs (backed up daily)
-- `/mnt/{tier}/data/` - Large media files, document libraries (backed up weekly)
-- `/var/backup/` - Database dumps and backup artifacts
-
-**Machine-specific mappings:**
-- **riker**: Single disk - both tiers at `/mnt/storage/`
-- **picard** (future): Multi-disk - `/mnt/nvme/` (fast), `/mnt/pool/` (normal with MergerFS)
-- **guinan**: Raspberry Pi - uses standard `/var/lib/` paths
-
-## Installation Runbook
-
-This section covers how to **deploy a server from scratch** using a simple two-step process.
-
-### Step 1: Install NixOS (nixos-infect)
-
-This minimal cloud-config will run [nixos-infect](https://github.com/elitak/nixos-infect) and automatically reboot into NixOS.
-
-```yaml
-#cloud-config
-
-runcmd:
-  - curl https://raw.githubusercontent.com/elitak/nixos-infect/master/nixos-infect | PROVIDER=hetznercloud NIX_CHANNEL=nixos-24.05 bash 2>&1 | tee /tmp/infect.log
-```
-
-> [!Warning]
-> Note for Hetzner: doesn't work with Debian newer than 11 at the time of writing.
-
-
-### Step 2: Apply Configuration
-
-After the server reboots into NixOS (~5 minutes after creation), run the setup script:
-
-```bash
-# SSH to the server
-ssh root@<server-ip>
-
-# Run setup script (replace with your token and hostname)
-curl -sSL https://raw.githubusercontent.com/leoweigand/nix/main/setup.sh | \
-  OPNIX_TOKEN=ops_YOUR_TOKEN_HERE \
-  HOSTNAME=riker \
-  nix-shell -p git --run "bash"
-```
-
-**What the setup script does:**
-1. Creates `/etc/opnix-token` with your 1Password service account token
-2. Clones your configuration repository to `/etc/nixos-config`
-3. Runs `nixos-rebuild switch --flake .#HOSTNAME`
-4. Configures Tailscale, opnix, and all services
-
-**Timeline:** ~5-10 minutes for full deployment
-
-Once connected via Tailscale, you can check the status:
-
-```bash
-# Check that public SSH is blocked
-# From another machine (not on Tailscale):
-nc -zv <public-ip> 22  # Should timeout/be refused
-
-# Connect via Tailscale MagicDNS
-ssh <hostname>
-```
-
-
-## Secret Management
-
-Secrets are managed using [opnix](https://github.com/brizzbuzz/opnix), which integrates 1Password with NixOS.
-
-### How It Works
-
-1. Secrets are stored in 1Password vaults
-2. A Service Account token provides read-only access to specific vaults
-3. At system activation, opnix fetches secrets and mounts them to a secure ramfs
-4. Services reference secrets via the `services.onepassword-secrets.secrets` configuration
+## Runbook
 
 ### Adding New Secrets
 
@@ -132,20 +30,10 @@ script = ''
 '';
 ```
 
-## Backups
-
-Automated backups to Backblaze B2 using restic with a dual-tier strategy:
-
-**Tier 1 - Appdata** (Daily at 3 AM)
-- PostgreSQL database dumps
-- Application state and configuration
-- Retention: 7 daily, 4 weekly, 3 monthly
-
-**Tier 2 - Documents** (Weekly on Sundays at 4 AM)
-- Large media files (documents, photos, etc.)
-- Retention: 4 weekly, 6 monthly
-
 ### Restoring from Backup
+
+> [!Warning]
+> This part is a bit outdated from an earlier iteration, will need to simplify and edit at some point.
 
 The `restic` command automatically loads credentials from 1Password (must run as root).
 
@@ -154,10 +42,6 @@ The `restic` command automatically loads credentials from 1Password (must run as
 sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup/appdata snapshots
 sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup/documents snapshots
 ```
-
-**Option 1: Direct restore (new system or disaster recovery)**
-
-Restores directly to original locations. Use when setting up a fresh system or confident about restoring:
 
 ```bash
 # Restore appdata (PostgreSQL dumps, app state)
@@ -172,86 +56,4 @@ sudo chown -R paperless:paperless /mnt/storage/data/paperless
 
 # Start services
 sudo systemctl start paperless-scheduler
-```
-
-**Option 2: Cautious restore (inspect before overwriting)**
-
-Restores to temporary location for inspection. Use when services are running or you want to verify before overwriting:
-
-```bash
-# Restore to temp location
-sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup/appdata restore latest --target /tmp/restore
-
-# Inspect what was restored
-ls -la /tmp/restore/mnt/storage/appdata/paperless/
-ls -la /tmp/restore/mnt/storage/data/paperless/
-ls -la /tmp/restore/var/backup/postgresql/
-
-# Stop service, copy files, restart
-sudo systemctl stop paperless-scheduler paperless-web
-sudo cp -a /tmp/restore/mnt/storage/appdata/paperless/* /mnt/storage/appdata/paperless/
-sudo cp -a /tmp/restore/mnt/storage/data/paperless/* /mnt/storage/data/paperless/
-sudo chown -R paperless:paperless /mnt/storage/appdata/paperless
-sudo chown -R paperless:paperless /mnt/storage/data/paperless
-sudo systemctl start paperless-scheduler paperless-web
-
-# Restore PostgreSQL database from dump
-sudo -u postgres psql paperless < /tmp/restore/var/backup/postgresql/paperless.sql
-
-# Clean up
-sudo rm -rf /tmp/restore
-```
-
-## Security Model
-- **No password authentication**: SSH key-only access
-- **Public SSH**: DISABLED - port 22 is not accessible from the internet
-- **Tailscale SSH**: ENABLED - all SSH access via Tailscale only
-- **Root login disabled**: Must use sudo
-- **Firewall enabled**: No ports exposed publicly except Tailscale UDP (41641)
-- **1Password Service Accounts**: Secrets never stored in Nix store
-- **Emergency access**: Hetzner Cloud Console provides VNC access if needed
-
-## Updating Configuration
-
-```bash
-# Make changes locally
-cd /path/to/nix-config
-# Edit configuration files...
-
-# Commit and push changes
-git add .
-git commit -m "Update configuration"
-git push
-
-# On the server, pull and apply changes
-ssh <hostname>
-cd /etc/nixos-config
-git pull
-sudo nixos-rebuild switch --flake .#<hostname>
-```
-
-## Troubleshooting
-
-```bash
-# SSH to server using public IP (if still accessible)
-ssh root@<server-ip>
-
-# Check nixos-infect log
-cat /tmp/infect.log
-
-# Check nixos-rebuild log
-cat /tmp/nixos-deploy.log
-
-# Check Tailscale connection
-tailscale status
-
-# Check opnix secrets service
-systemctl status opnix-secrets
-
-# Verify secrets were fetched
-sudo ls -la /var/lib/opnix/secrets/
-
-# Verify you can SSH via Tailscale
-# From another machine on your Tailscale network:
-ssh riker  # Uses Tailscale MagicDNS
 ```
