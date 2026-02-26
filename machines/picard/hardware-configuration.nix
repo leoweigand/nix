@@ -18,7 +18,7 @@
     "sr_mod"
   ];
   boot.initrd.kernelModules = [ ];
-  boot.kernelModules = [ "kvm-intel" "kvm-amd" ];  # Nested virtualization if needed
+  boot.kernelModules = [ ];
 
   # Filesystem mounts are handled by disko.nix
 
