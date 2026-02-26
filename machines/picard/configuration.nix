@@ -19,10 +19,10 @@
     # Static IP on Unraid network (configure in VM settings, DHCP fallback here)
     useDHCP = lib.mkDefault true;
 
-    # All services accessed via Tailscale - no public ports needed
+    # Keep SSH reachable on LAN for bootstrap/recovery
     firewall = {
       enable = true;
-      allowedTCPPorts = [ ];
+      allowedTCPPorts = [ 22 ];
     };
   };
 
