@@ -9,7 +9,7 @@
     ../../modules/secrets/1password.nix
     ../../modules/storage
     ../../modules/tailscale.nix
-    ../../modules/services/paperless.nix
+    # ../../modules/services/paperless.nix
     ../../modules/services/backup.nix
   ];
 
