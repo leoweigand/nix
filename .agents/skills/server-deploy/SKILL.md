@@ -11,19 +11,25 @@ Workflow for updating one of the machines over SSH.
 
 Use this skill only when the user explicitly asks to deploy/apply NixOS config to a machine.
 
-## Command
+## How to run
 
 - Make sure the Git working tree is clean. Changes to be pushed need to be committed before running the deploy.
 - Serve name must be specified 
-- Return concise status with server, branch/commit context, and success/failure.
 
 ```bash
 .agents/skills/server-deploy/scripts/deploy-server.sh <server>
 ```
+
+After the deploy is completed:
+- Return concise status with server, branch/commit context
+- If a service was updated, try doing a health check (over ssh)
+- In case of failure, pull recent logs
+
 
 ## Example
 
 ```bash
 git commit -m "update tailscale module"
 .agents/skills/server-deploy/scripts/deploy-server.sh picard
+ssh picard "systemctl status tailscaled.service"
 ```
