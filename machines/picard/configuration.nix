@@ -16,10 +16,10 @@ in
   imports = [
     (modulesPath + "/profiles/qemu-guest.nix")
     ./hardware-configuration.nix
+    ../../modules/default.nix # load homelab configuration
     ../../modules/common.nix
     ../../modules/secrets/1password.nix
     ../../modules/tailscale.nix
-    ../../modules/services/paperless.nix
     ../../modules/services/backup.nix
   ];
 
@@ -88,9 +88,14 @@ in
     };
   };
 
-  services.paperless = {
-    mediaDir = "/var/lib/picard/data/paperless/media";
-    consumptionDir = "/var/lib/picard/data/paperless/consume";
+  lab = {
+    baseDomain = "leolab.party";
+
+    services.paperless = {
+      enable = true;
+      mediaDir = "/var/lib/picard/data/paperless/media";
+      consumptionDir = "/var/lib/picard/data/paperless/consume";
+    };
   };
 
   # Ensure backup targets exist before first backup run.
