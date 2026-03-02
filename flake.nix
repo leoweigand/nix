@@ -4,6 +4,9 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
 
+    # Newer packages/modules used selectively for unsupported services on 24.05
+    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+
     # 1Password integration for secret management
     opnix = {
       url = "github:brizzbuzz/opnix";
@@ -17,7 +20,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, opnix, disko, ... }@inputs: {
+  outputs = { self, nixpkgs, nixpkgs-unstable, opnix, disko, ... }@inputs: {
     nixosConfigurations = {
       # Riker - Hetzner VPS for development/testing
       riker = nixpkgs.lib.nixosSystem {

@@ -2,6 +2,7 @@
 
 {
   imports = [
+    ./immich.nix
     ./paperless.nix
   ];
 

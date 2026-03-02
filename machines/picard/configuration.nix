@@ -4,6 +4,7 @@ let
   backupPaths = {
     state = [
       "/var/backup"
+      "/var/lib/immich"
       "/var/lib/paperless"
     ];
     documents = [
@@ -95,6 +96,11 @@ in
       enable = true;
       mediaDir = "/var/lib/picard/data/paperless/media";
       consumptionDir = "/var/lib/picard/data/paperless/consume";
+    };
+
+    services.immich = {
+      enable = true;
+      mediaDir = "/var/lib/picard/data/immich";
     };
   };
 

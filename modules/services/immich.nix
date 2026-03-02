@@ -1,0 +1,73 @@
+{ config, lib, pkgs, inputs, ... }:
+
+let
+  cfg = config.lab.services.immich;
+  serviceHost = "${cfg.subdomain}.${config.lab.baseDomain}";
+
+  unstablePkgs = import inputs."nixpkgs-unstable" {
+    system = pkgs.stdenv.hostPlatform.system;
+    config = config.nixpkgs.config;
+  };
+in
+
+{
+  imports = [
+    (lib.mkAliasOptionModule
+      [ "services" "postgresql" "extensions" ]
+      [ "services" "postgresql" "extraPlugins" ]
+    )
+    "${inputs."nixpkgs-unstable"}/nixos/modules/services/web-apps/immich.nix"
+  ];
+
+  options.lab.services.immich = {
+    enable = lib.mkEnableOption "Immich photo and video service";
+
+    subdomain = lib.mkOption {
+      type = lib.types.str;
+      default = "immich";
+      description = "Subdomain used to build the Immich external domain";
+    };
+
+    mediaDir = lib.mkOption {
+      type = lib.types.str;
+      default = "/var/lib/immich";
+      description = "Directory where Immich stores uploaded media";
+    };
+
+    accelerationDevices = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      example = [ "/dev/dri/renderD128" ];
+      description = "Device paths passed to Immich for hardware acceleration";
+    };
+  };
+
+  config = lib.mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = config.lab.baseDomain != "";
+        message = "lab.baseDomain must be set when lab.services.immich.enable = true";
+      }
+    ];
+
+    services.immich = {
+      enable = true;
+      package = unstablePkgs.immich;
+
+      host = "0.0.0.0";
+      port = 2283;
+      mediaLocation = cfg.mediaDir;
+      accelerationDevices = cfg.accelerationDevices;
+
+      settings = {
+        server.externalDomain = "https://${serviceHost}";
+      };
+    };
+
+    users.users.immich.extraGroups = lib.mkIf (cfg.accelerationDevices != [ ]) [
+      "video"
+      "render"
+    ];
+
+  };
+}
