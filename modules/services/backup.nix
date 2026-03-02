@@ -3,6 +3,38 @@
 let
   cfg = config.backup;
   secrets = config.services.onepassword-secrets.secretPaths;
+
+  mkResticJob = name: job:
+    let
+      repository = "s3:${cfg.s3.endpoint}/${cfg.s3.bucket}/${job.repositorySubdir}";
+      restic = "${pkgs.restic}/bin/restic";
+      retentionArgs = lib.concatStringsSep " " job.pruneOpts;
+    in
+    {
+      inherit repository;
+      initialize = true;
+      passwordFile = secrets.resticPassword;
+      environmentFile = secrets.s3Credentials;
+      paths = job.paths;
+      exclude = job.exclude;
+      pruneOpts = job.pruneOpts;
+
+      timerConfig = {
+        OnCalendar = job.schedule;
+        Persistent = true;  # Run missed backups on boot
+      };
+
+      backupPrepareCommand = ''
+        ${restic} -r ${repository} -p ${secrets.resticPassword} snapshots &>/dev/null || \
+          ${restic} -r ${repository} -p ${secrets.resticPassword} init
+        ${restic} -r ${repository} -p ${secrets.resticPassword} unlock || true
+      '';
+
+      backupCleanupCommand = ''
+        # Remove old snapshots according to retention policy
+        ${restic} -r ${repository} -p ${secrets.resticPassword} forget --prune ${retentionArgs}
+      '';
+    };
 in
 
 {
@@ -17,7 +49,7 @@ in
 
       bucket = lib.mkOption {
         type = lib.types.str;
-        description = "S3 bucket name";
+        description = "S3 bucket name (machine-specific bucket recommended)";
       };
     };
 
@@ -32,9 +64,51 @@ in
         description = "1Password reference for restic password";
       };
     };
+
+    jobs = lib.mkOption {
+      description = "Backup job definitions per machine";
+      default = { };
+      type = lib.types.attrsOf (lib.types.submodule ({ name, ... }: {
+        options = {
+          repositorySubdir = lib.mkOption {
+            type = lib.types.str;
+            default = name;
+            description = "Subdirectory inside the machine bucket used as the restic repository prefix";
+          };
+
+          schedule = lib.mkOption {
+            type = lib.types.str;
+            description = "Systemd OnCalendar schedule for the backup timer";
+          };
+
+          paths = lib.mkOption {
+            type = lib.types.listOf lib.types.path;
+            description = "Paths included in this backup job";
+          };
+
+          exclude = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            default = [ ];
+            description = "Restic exclude patterns for this job";
+          };
+
+          pruneOpts = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            description = "Restic prune retention flags (e.g. --keep-daily 7)";
+          };
+        };
+      }));
+    };
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = cfg.jobs != { };
+        message = "backup.jobs must define at least one backup job when backup.enable = true";
+      }
+    ];
+
     services.onepassword-secrets.secrets = {
       s3Credentials = {
         reference = cfg.secrets.s3Credentials;
@@ -56,125 +130,14 @@ in
       databases = config.services.postgresql.ensureDatabases;
     };
 
-    services.restic.backups = {
-      # Tier 1: Appdata (daily backups)
-      appdata-s3 = {
-        repository = "s3:${cfg.s3.endpoint}/${cfg.s3.bucket}/appdata";
-        initialize = true;
-        passwordFile = secrets.resticPassword;
-        environmentFile = secrets.s3Credentials;
+    services.restic.backups = lib.mapAttrs mkResticJob cfg.jobs;
 
-        paths = [
-          config.storage.directories.backup
-          config.storage.directories.appdata
-        ];
-
-      exclude = [
-        "**/log"
-        "**/logs"
-        "**/index"
-        "**/.cache"
-        "**/thumbs"
-        "**/thumbnails"
-      ];
-
-      pruneOpts = [
-        "--keep-daily 7"
-        "--keep-weekly 4"
-        "--keep-monthly 3"
-      ];
-
-      timerConfig = {
-        OnCalendar = "*-*-* 03:00:00";  # Daily at 3:00 AM
-        Persistent = true;  # Run missed backups on boot
-      };
-
-      backupPrepareCommand =
-        let
-          restic = "${pkgs.restic}/bin/restic";
-          repo = config.services.restic.backups.appdata-s3.repository;
-          passFile = secrets.resticPassword;
-        in
-        ''
-          ${restic} -r ${repo} -p ${passFile} snapshots &>/dev/null || \
-            ${restic} -r ${repo} -p ${passFile} init
-          ${restic} -r ${repo} -p ${passFile} unlock || true
-        '';
-
-      backupCleanupCommand =
-        let
-          restic = "${pkgs.restic}/bin/restic";
-          repo = config.services.restic.backups.appdata-s3.repository;
-          passFile = secrets.resticPassword;
-        in
-        ''
-          # Remove old snapshots according to retention policy
-          ${restic} -r ${repo} -p ${passFile} forget --prune --keep-daily 7 --keep-weekly 4 --keep-monthly 3
-        '';
-    };
-
-      # Tier 2: Documents (weekly backups)
-      documents-s3 = {
-        repository = "s3:${cfg.s3.endpoint}/${cfg.s3.bucket}/documents";
-        initialize = true;
-        passwordFile = secrets.resticPassword;
-        environmentFile = secrets.s3Credentials;
-
-        paths = [
-          config.storage.directories.data
-        ];
-
-      exclude = [
-        "**/thumbs"
-        "**/thumbnails"
-        "**/.tmp"
-        "**/consume"
-      ];
-
-      pruneOpts = [
-        "--keep-weekly 4"
-        "--keep-monthly 6"
-      ];
-
-      timerConfig = {
-        OnCalendar = "Sun *-*-* 04:00:00";  # Weekly on Sundays at 4:00 AM
-        Persistent = true;
-      };
-
-      backupPrepareCommand =
-        let
-          restic = "${pkgs.restic}/bin/restic";
-          repo = config.services.restic.backups.documents-s3.repository;
-          passFile = secrets.resticPassword;
-        in
-        ''
-          ${restic} -r ${repo} -p ${passFile} snapshots &>/dev/null || \
-            ${restic} -r ${repo} -p ${passFile} init
-          ${restic} -r ${repo} -p ${passFile} unlock || true
-        '';
-
-      backupCleanupCommand =
-        let
-          restic = "${pkgs.restic}/bin/restic";
-          repo = config.services.restic.backups.documents-s3.repository;
-          passFile = secrets.resticPassword;
-        in
-        ''
-          # Remove old snapshots according to retention policy
-          ${restic} -r ${repo} -p ${passFile} forget --prune --keep-weekly 4 --keep-monthly 6
-        '';
-    };
-  };
-
-    systemd.services.restic-backups-appdata-s3 = {
-      after = [ "opnix-secrets.service" ];
-      requires = [ "opnix-secrets.service" ];
-    };
-
-    systemd.services.restic-backups-documents-s3 = {
-      after = [ "opnix-secrets.service" ];
-      requires = [ "opnix-secrets.service" ];
-    };
+    systemd.services = lib.mapAttrs' (
+      name: _job: lib.nameValuePair "restic-backups-${name}" {
+        after = [ "opnix-secrets.service" ];
+        requires = [ "opnix-secrets.service" ];
+      }
+    ) cfg.jobs;
 
     # Restic wrapper - automatically loads credentials from 1Password
     environment.systemPackages = [

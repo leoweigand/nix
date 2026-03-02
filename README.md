@@ -32,28 +32,71 @@ script = ''
 
 ### Restoring from Backup
 
-> [!Warning]
-> This part is a bit outdated from an earlier iteration, will need to simplify and edit at some point.
+Backups are configured per machine in each machine file under `backup.jobs`, while `modules/services/backup.nix` provides shared restic/opnix plumbing.
 
-The `restic` command automatically loads credentials from 1Password (must run as root).
+Repository layout:
 
-**List available snapshots:**
+- One B2 bucket per machine.
+- One restic repository prefix per resource inside that bucket.
+- Shape: `s3:{endpoint}/{machine-bucket}/{resource}`
+
+Examples:
+
+- Picard appdata: `s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/appdata`
+- Picard documents: `s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/documents`
+
+#### 1) Pick restore scope
+
+- Single file (preferred when possible)
+- Single service (state/data for one service)
+- Full host data restore
+
+#### 2) Pre-restore safety checks
+
 ```bash
-sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup/appdata snapshots
-sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup/documents snapshots
+# Verify backup timers/services
+systemctl list-timers 'restic-backups-*'
+systemctl status restic-backups-appdata restic-backups-documents
+
+# Stop affected services before restore (example: Paperless)
+sudo systemctl stop paperless-scheduler
 ```
 
+#### 3) Discover snapshots
+
 ```bash
-# Restore appdata (PostgreSQL dumps, app state)
-sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup/appdata restore latest --target /
+# Must run as root so the wrapper can load credentials from 1Password
+sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/appdata snapshots
+sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/documents snapshots
+```
 
-# Restore documents
-sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup/documents restore latest --target /
+#### 4) Restore to staging first
 
-# Fix ownership (if needed)
-sudo chown -R paperless:paperless /mnt/storage/appdata/paperless
-sudo chown -R paperless:paperless /mnt/storage/data/paperless
+```bash
+# Restore to staging directory, not directly to /
+sudo mkdir -p /tmp/restore-appdata /tmp/restore-documents
+sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/appdata restore latest --target /tmp/restore-appdata
+sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/documents restore latest --target /tmp/restore-documents
+```
 
-# Start services
+#### 5) Apply restored data and fix ownership
+
+```bash
+# Example targets for picard's current storage layout
+sudo rsync -a --delete /tmp/restore-appdata/var/lib/picard/appdata/ /var/lib/picard/appdata/
+sudo rsync -a --delete /tmp/restore-documents/var/lib/picard/data/ /var/lib/picard/data/
+
+# Fix service ownership where needed
+sudo chown -R paperless:paperless /var/lib/picard/appdata/paperless
+sudo chown -R paperless:paperless /var/lib/picard/data/paperless
+```
+
+#### 6) Start services and verify
+
+```bash
 sudo systemctl start paperless-scheduler
+systemctl status paperless-scheduler
 ```
+
+> [!TIP]
+> To quickly browse backups before restoring, use `restic snapshots`, `restic ls latest`, and `restic find <pattern>`. For interactive browsing, mount temporarily with `restic mount /mnt/restic`.

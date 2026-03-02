@@ -36,11 +36,50 @@
     enable = true;
     s3 = {
       endpoint = "s3.eu-central-003.backblazeb2.com";
-      bucket = "leolab-backup";
+      bucket = "leolab-backup-picard";
     };
     secrets = {
-      s3Credentials = "op://Homelab/Backblaze Backup/s3Credentials";
-      resticPassword = "op://Homelab/Backblaze Backup/resticPassword";
+      s3Credentials = "op://Homelab/Backblaze B2/restic-picard";
+      resticPassword = "op://Homelab/Backblaze B2/restic-password";
+    };
+    jobs = {
+      appdata = {
+        schedule = "*-*-* 03:00:00";  # Daily at 3:00 AM
+        paths = [
+          config.storage.directories.backup
+          config.storage.directories.appdata
+        ];
+        exclude = [
+          "**/log"
+          "**/logs"
+          "**/index"
+          "**/.cache"
+          "**/thumbs"
+          "**/thumbnails"
+        ];
+        pruneOpts = [
+          "--keep-daily 7"
+          "--keep-weekly 4"
+          "--keep-monthly 3"
+        ];
+      };
+
+      documents = {
+        schedule = "Sun *-*-* 04:00:00";  # Weekly on Sundays at 4:00 AM
+        paths = [
+          config.storage.directories.data
+        ];
+        exclude = [
+          "**/thumbs"
+          "**/thumbnails"
+          "**/.tmp"
+          "**/consume"
+        ];
+        pruneOpts = [
+          "--keep-weekly 4"
+          "--keep-monthly 6"
+        ];
+      };
     };
   };
 
