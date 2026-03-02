@@ -4,8 +4,8 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
 
-    # Newer packages/modules used selectively for unsupported services on 24.05
-    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # Dedicated channel for Immich module/package compatibility
+    nixpkgs-immich.url = "github:NixOS/nixpkgs/nixos-24.11";
 
     # 1Password integration for secret management
     opnix = {
@@ -20,7 +20,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, nixpkgs-unstable, opnix, disko, ... }@inputs: {
+  outputs = { self, nixpkgs, nixpkgs-immich, opnix, disko, ... }@inputs: {
     nixosConfigurations = {
       # Riker - Hetzner VPS for development/testing
       riker = nixpkgs.lib.nixosSystem {

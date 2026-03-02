@@ -4,7 +4,7 @@ let
   cfg = config.lab.services.immich;
   serviceHost = "${cfg.subdomain}.${config.lab.baseDomain}";
 
-  unstablePkgs = import inputs."nixpkgs-unstable" {
+  immichPkgs = import inputs."nixpkgs-immich" {
     system = pkgs.stdenv.hostPlatform.system;
     config = config.nixpkgs.config;
   };
@@ -16,7 +16,7 @@ in
       [ "services" "postgresql" "extensions" ]
       [ "services" "postgresql" "extraPlugins" ]
     )
-    "${inputs."nixpkgs-unstable"}/nixos/modules/services/web-apps/immich.nix"
+    "${inputs."nixpkgs-immich"}/nixos/modules/services/web-apps/immich.nix"
   ];
 
   options.lab.services.immich = {
@@ -34,12 +34,6 @@ in
       description = "Directory where Immich stores uploaded media";
     };
 
-    accelerationDevices = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
-      default = [ ];
-      example = [ "/dev/dri/renderD128" ];
-      description = "Device paths passed to Immich for hardware acceleration";
-    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -52,22 +46,16 @@ in
 
     services.immich = {
       enable = true;
-      package = unstablePkgs.immich;
+      package = immichPkgs.immich;
 
       host = "0.0.0.0";
       port = 2283;
       mediaLocation = cfg.mediaDir;
-      accelerationDevices = cfg.accelerationDevices;
 
       settings = {
         server.externalDomain = "https://${serviceHost}";
       };
     };
-
-    users.users.immich.extraGroups = lib.mkIf (cfg.accelerationDevices != [ ]) [
-      "video"
-      "render"
-    ];
 
   };
 }
