@@ -1,9 +1,5 @@
 { config, lib, pkgs, ... }:
 
-let
-  storage = config.storage;
-in
-
 {
   services.onepassword-secrets.secrets = {
     paperlessAdminPassword = {
@@ -28,10 +24,9 @@ in
     enable = true;
     passwordFile = config.services.onepassword-secrets.secretPaths.paperlessAdminPassword;
 
-    # Storage locations
-    dataDir = "${storage.directories.appdata}/paperless";
-    mediaDir = "${storage.directories.data}/paperless/media";
-    consumptionDir = "${storage.directories.data}/paperless/consume";
+    dataDir = lib.mkDefault "/var/lib/paperless";
+    mediaDir = lib.mkDefault "/var/lib/paperless/media";
+    consumptionDir = lib.mkDefault "/var/lib/paperless/consume";
 
     address = "0.0.0.0";
     port = 28981;
@@ -58,10 +53,9 @@ in
   };
 
   systemd.tmpfiles.rules = [
-    "d ${storage.directories.appdata}/paperless 0750 paperless paperless - -"
-    "d ${storage.directories.data}/paperless 0750 paperless paperless - -"
-    "d ${storage.directories.data}/paperless/media 0750 paperless paperless - -"
-    "d ${storage.directories.data}/paperless/consume 0750 paperless paperless - -"
+    "d /var/lib/paperless 0750 paperless paperless - -"
+    "d ${config.services.paperless.mediaDir} 0750 paperless paperless - -"
+    "d ${config.services.paperless.consumptionDir} 0750 paperless paperless - -"
   ];
 
   systemd.services.paperless-scheduler = {

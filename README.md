@@ -42,7 +42,7 @@ Repository layout:
 
 Examples:
 
-- Picard appdata: `s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/appdata`
+- Picard state: `s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/state`
 - Picard documents: `s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/documents`
 
 #### 1) Pick restore scope
@@ -56,7 +56,7 @@ Examples:
 ```bash
 # Verify backup timers/services
 systemctl list-timers 'restic-backups-*'
-systemctl status restic-backups-appdata restic-backups-documents
+systemctl status restic-backups-state restic-backups-documents
 
 # Stop affected services before restore (example: Paperless)
 sudo systemctl stop paperless-scheduler
@@ -66,7 +66,7 @@ sudo systemctl stop paperless-scheduler
 
 ```bash
 # Must run as root so the wrapper can load credentials from 1Password
-sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/appdata snapshots
+sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/state snapshots
 sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/documents snapshots
 ```
 
@@ -74,8 +74,8 @@ sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/documen
 
 ```bash
 # Restore to staging directory, not directly to /
-sudo mkdir -p /tmp/restore-appdata /tmp/restore-documents
-sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/appdata restore latest --target /tmp/restore-appdata
+sudo mkdir -p /tmp/restore-state /tmp/restore-documents
+sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/state restore latest --target /tmp/restore-state
 sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/documents restore latest --target /tmp/restore-documents
 ```
 
@@ -83,11 +83,12 @@ sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/documen
 
 ```bash
 # Example targets for picard's current storage layout
-sudo rsync -a --delete /tmp/restore-appdata/var/lib/picard/appdata/ /var/lib/picard/appdata/
+sudo rsync -a --delete /tmp/restore-state/var/lib/paperless/ /var/lib/paperless/
+sudo rsync -a --delete /tmp/restore-state/var/backup/ /var/backup/
 sudo rsync -a --delete /tmp/restore-documents/var/lib/picard/data/ /var/lib/picard/data/
 
 # Fix service ownership where needed
-sudo chown -R paperless:paperless /var/lib/picard/appdata/paperless
+sudo chown -R paperless:paperless /var/lib/paperless
 sudo chown -R paperless:paperless /var/lib/picard/data/paperless
 ```
 

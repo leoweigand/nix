@@ -1,13 +1,23 @@
 { config, pkgs, lib, modulesPath, ... }:
 
+let
+  backupPaths = {
+    state = [
+      "/var/backup"
+      "/var/lib/paperless"
+    ];
+    documents = [
+      "/var/lib/picard/data"
+    ];
+  };
+in
+
 {
   imports = [
     (modulesPath + "/profiles/qemu-guest.nix")
     ./hardware-configuration.nix
-    ./filesystems.nix  # NFS and storage module config (disko handles disk partitions)
     ../../modules/common.nix
     ../../modules/secrets/1password.nix
-    ../../modules/storage
     ../../modules/tailscale.nix
     ../../modules/services/paperless.nix
     ../../modules/services/backup.nix
@@ -43,12 +53,9 @@
       resticPassword = "op://Homelab/Backblaze B2/restic-password";
     };
     jobs = {
-      appdata = {
+      state = {
         schedule = "*-*-* 03:00:00";  # Daily at 3:00 AM
-        paths = [
-          config.storage.directories.backup
-          config.storage.directories.appdata
-        ];
+        paths = backupPaths.state;
         exclude = [
           "**/log"
           "**/logs"
@@ -66,9 +73,7 @@
 
       documents = {
         schedule = "Sun *-*-* 04:00:00";  # Weekly on Sundays at 4:00 AM
-        paths = [
-          config.storage.directories.data
-        ];
+        paths = backupPaths.documents;
         exclude = [
           "**/thumbs"
           "**/thumbnails"
@@ -82,6 +87,17 @@
       };
     };
   };
+
+  services.paperless = {
+    mediaDir = "/var/lib/picard/data/paperless/media";
+    consumptionDir = "/var/lib/picard/data/paperless/consume";
+  };
+
+  # Ensure backup targets exist before first backup run.
+  systemd.tmpfiles.rules = [
+    "d /var/lib/picard/data 0755 root root - -"  # Bulk data backup path
+    "d /var/backup 0755 root root - -"  # PostgreSQL dump backup path
+  ];
 
   system.stateVersion = "24.05";
 }

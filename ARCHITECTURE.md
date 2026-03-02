@@ -25,3 +25,25 @@ High-level overview of how traffic flows through the network and how the custom 
 ### Service Isolation
 - Backend services bind to localhost or the storage VM network and only accept traffic that originates from the reverse proxy.
 - Firewalls prevent unintended exposure so the only reachable endpoint is Caddy's TLS listener.
+
+## Data Model & Recovery
+
+### Current Layout
+- Service state is stored under `/var/lib/<service>`.
+- Machine-level bulk data is stored under `/var/lib/<machine>/data`.
+- Database dump outputs are stored under `/var/backup`.
+
+### Current Database Backup
+- PostgreSQL is enabled where needed by services.
+- `services.postgresqlBackup` is enabled when PostgreSQL is enabled.
+- PostgreSQL dump outputs are included in the daily state backup job.
+
+### Current Backup Jobs
+- Restic job `state` runs daily and backs up `/var/backup` and service state paths.
+- Restic job `documents` runs weekly and backs up `/var/lib/<machine>/data`.
+- Excludes are configured per job for regenerable paths such as thumbnails, cache, temp files, and ingest directories.
+
+### Current Recovery Model
+- Rebuild `<machine>` from this flake.
+- Restore the restic repositories for `state` and `documents`.
+- Restart services after data restore.
