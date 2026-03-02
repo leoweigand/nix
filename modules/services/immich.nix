@@ -61,5 +61,9 @@ in
       };
     };
 
+    systemd.tmpfiles.rules = [
+      "d ${cfg.mediaDir} 0750 immich immich - -"
+    ];
+
   };
 }
