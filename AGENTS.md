@@ -2,7 +2,7 @@ This repository contains the nix configuration for my homelab machines but is al
 
 A lot of what I'm doing here is inspired by [Wolfgang's repository](/Users/leo/git/notthebee-nix). When I ask you to add something new, check how things are done over there as one learning resource.
 
-When planning new features, work in markdown files inside `plans/`. The readme and architecture document should only describe the status quo, unfinished projects should remain in plans.
+When planning new features, work in markdown files inside `plans/`. The readme and architecture document should only describe the status quo, unfinished projects should remain in plans. Make sure to collaboratively create plans with the user, not just write them in one shot–especially when requirements are not completely clear.
 
 ## Code Style
 
