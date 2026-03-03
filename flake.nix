@@ -22,16 +22,6 @@
 
   outputs = { self, nixpkgs, nixpkgs-immich, opnix, disko, ... }@inputs: {
     nixosConfigurations = {
-      # Riker - Hetzner VPS for development/testing
-      riker = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        specialArgs = { inherit inputs; };
-        modules = [
-          ./machines/riker/configuration.nix
-          opnix.nixosModules.default
-        ];
-      };
-
       # Picard - Main homelab server (NixOS VM on Unraid)
       picard = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
