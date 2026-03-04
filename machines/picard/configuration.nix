@@ -98,6 +98,14 @@ in
       cloudflareCredentialsReference = "op://Homelab/Cloudflare/dnsCredentials";
     };
 
+    edgeDns = {
+      enable = true;
+      lanListenAddress = "192.168.2.4";
+      lanAnswerAddress = "192.168.2.4";
+      tailnetListenAddress = "100.104.119.103";
+      tailnetAnswerAddress = "100.104.119.103";
+    };
+
     services.paperless = {
       enable = true;
       mediaDir = "/var/lib/picard/data/paperless/media";
