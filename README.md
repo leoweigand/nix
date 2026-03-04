@@ -51,6 +51,10 @@ Examples:
 - Picard state: `s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/state`
 - Picard documents: `s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/documents`
 
+Home Assistant mapping:
+
+- Home Assistant config lives at `/var/lib/home-assistant` and is included in Picard's `state` backup job.
+
 #### 1) Pick restore scope
 
 - Single file (preferred when possible)
@@ -90,6 +94,7 @@ sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/documen
 ```bash
 # Example targets for picard's current storage layout
 sudo rsync -a --delete /tmp/restore-state/var/lib/paperless/ /var/lib/paperless/
+sudo rsync -a --delete /tmp/restore-state/var/lib/home-assistant/ /var/lib/home-assistant/
 sudo rsync -a --delete /tmp/restore-state/var/backup/ /var/backup/
 sudo rsync -a --delete /tmp/restore-documents/var/lib/picard/data/ /var/lib/picard/data/
 

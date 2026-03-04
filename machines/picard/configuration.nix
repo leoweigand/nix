@@ -4,6 +4,7 @@ let
   backupPaths = {
     state = [
       "/var/backup"
+      "/var/lib/home-assistant"
       "/var/lib/immich"
       "/var/lib/paperless"
     ];
@@ -110,6 +111,11 @@ in
       enable = true;
       mediaDir = "/var/lib/picard/data/paperless/media";
       consumptionDir = "/var/lib/picard/data/paperless/consume";
+    };
+
+    services.homeassistant = {
+      enable = true;
+      subdomain = "home";
     };
 
     services.immich = {
