@@ -1,8 +1,9 @@
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   cfg = config.lab.services.homeassistant;
   serviceHost = "${cfg.subdomain}.${config.lab.baseDomain}";
+  trustedProxiesLines = lib.concatMapStringsSep "\n" (proxy: "          printf '    - %s\\n' ${lib.escapeShellArg proxy}") cfg.trustedProxies;
 in
 
 {
@@ -31,6 +32,12 @@ in
       type = lib.types.listOf lib.types.str;
       default = [ ];
       description = "Additional bind mounts for integrations (for example USB serial devices)";
+    };
+
+    trustedProxies = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ "10.88.0.0/16" ];
+      description = "Trusted reverse proxy CIDRs for Home Assistant's HTTP integration";
     };
   };
 
@@ -75,5 +82,37 @@ in
     systemd.tmpfiles.rules = [
       "d ${cfg.configDir} 0750 root root - -"
     ];
+
+    systemd.services.homeassistant-proxy-config = {
+      description = "Prepare Home Assistant reverse proxy settings";
+      wantedBy = [ "podman-homeassistant.service" ];
+      before = [ "podman-homeassistant.service" ];
+      path = with pkgs; [ coreutils gnugrep ];
+      serviceConfig = {
+        Type = "oneshot";
+        User = "root";
+        Group = "root";
+      };
+      script = ''
+        set -euo pipefail
+
+        config_file="${cfg.configDir}/configuration.yaml"
+        touch "$config_file"
+
+        if ! grep -Eq '^http:[[:space:]]*$' "$config_file"; then
+          {
+            printf '\nhttp:\n'
+            printf '  use_x_forwarded_for: true\n'
+            printf '  trusted_proxies:\n'
+${trustedProxiesLines}
+          } >> "$config_file"
+        fi
+      '';
+    };
+
+    systemd.services.podman-homeassistant = {
+      after = [ "homeassistant-proxy-config.service" ];
+      requires = [ "homeassistant-proxy-config.service" ];
+    };
   };
 }
