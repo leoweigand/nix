@@ -30,6 +30,10 @@ Split DNS is served by CoreDNS on picard via `modules/edge-dns.nix`, with separa
 - Backend services bind to localhost and only accept traffic that originates from the reverse proxy.
 - Firewalls prevent unintended exposure so the only reachable endpoint is Caddy's TLS listener.
 
+## Home Assistant
+- Home Assistant runs in a Podman container on picard (`modules/services/homeassistant.nix`), while MQTT runs as a native NixOS service (`modules/mqtt.nix`).
+- Tasmota onboarding baseline: configure MQTT host/user/password, set `SetOption19 1` for Home Assistant MQTT discovery, then restart the device so entities are auto-discovered in HA.
+
 ## Data Model & Recovery
 
 ### Current Layout
