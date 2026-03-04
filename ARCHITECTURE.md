@@ -37,6 +37,11 @@ Split DNS is served by CoreDNS on picard via `modules/edge-dns.nix`, with separa
 - On picard, active media/documents are stored under `/mnt/fast` (virtiofs from Unraid).
 - Database dump outputs are stored under `/var/backup`.
 
+### Home Assistant Workflow Today
+- Home Assistant is currently managed through its own `configuration.yaml` in `/mnt/fast/homeassistant/config`.
+- We make config changes there directly and then restart the `home-assistant` service to apply them.
+- This is intentionally documented as the current state, but it is not the Nix-native workflow (declarative config in this flake).
+
 ### Current Database Backup
 - PostgreSQL is enabled where needed by services.
 - `services.postgresqlBackup` is enabled when PostgreSQL is enabled.
