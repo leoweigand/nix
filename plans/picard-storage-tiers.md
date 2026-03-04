@@ -4,8 +4,8 @@
 
 - Keep the VM OS disk mostly rebuildable.
 - Mount Unraid storage in the VM with named mounts:
-  - `mounts.fast = "/mnt/cache"`
-  - `mounts.slow = "/mnt/btrfs_merged"`
+  - `mounts.fast = "/mnt/fast"`
+  - `mounts.slow = "/mnt/slow"`
 - Put active app data on fast storage and avoid unnecessary slow-tier activity.
 
 ## Fixed decisions
@@ -35,10 +35,10 @@
 - `nix flake check`
 - `nixos-rebuild dry-run --flake .#picard`
 - On the VM:
-  - `findmnt /mnt/cache /mnt/btrfs_merged`
-  - verify Paperless/Immich paths resolve to `/mnt/cache`
+  - `findmnt /mnt/fast /mnt/slow`
+  - verify Paperless/Immich paths resolve to `/mnt/fast`
   - `systemctl status restic-backups-state restic-backups-documents`
-- Confirm idle behavior does not repeatedly touch `/mnt/btrfs_merged`.
+- Confirm idle behavior does not repeatedly touch `/mnt/slow`.
 
 ## Required input before coding
 

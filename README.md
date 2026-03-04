@@ -20,6 +20,12 @@ NixOS configuration for my homelab.
 
 ## Runbook
 
+### Picard Storage Tiers
+
+- `lab.mounts.fast` (`/mnt/fast`) is for active app data with low-latency access needs.
+- `lab.mounts.slow` (`/mnt/slow`) is for the larger capacity tier exposed from Unraid.
+- On picard, Paperless documents and Immich media live on `/mnt/fast`, so restoring the `documents` repository targets `/mnt/fast/...` paths.
+
 ### Adding New Secrets
 
 ```nix
@@ -96,11 +102,13 @@ sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/documen
 sudo rsync -a --delete /tmp/restore-state/var/lib/paperless/ /var/lib/paperless/
 sudo rsync -a --delete /tmp/restore-state/var/lib/homeassistant/ /var/lib/homeassistant/
 sudo rsync -a --delete /tmp/restore-state/var/backup/ /var/backup/
-sudo rsync -a --delete /tmp/restore-documents/var/lib/picard/data/ /var/lib/picard/data/
+sudo rsync -a --delete /tmp/restore-documents/mnt/fast/documents/ /mnt/fast/documents/
+sudo rsync -a --delete /tmp/restore-documents/mnt/fast/photos/ /mnt/fast/photos/
 
 # Fix service ownership where needed
 sudo chown -R paperless:paperless /var/lib/paperless
-sudo chown -R paperless:paperless /var/lib/picard/data/paperless
+sudo chown -R paperless:paperless /mnt/fast/documents
+sudo chown -R immich:immich /mnt/fast/photos
 ```
 
 #### 6) Start services and verify

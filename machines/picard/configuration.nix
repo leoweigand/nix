@@ -1,6 +1,11 @@
 { config, pkgs, lib, modulesPath, ... }:
 
 let
+  mounts = {
+    fast = "/mnt/fast";
+    slow = "/mnt/slow";
+  };
+
   backupPaths = {
     state = [
       "/var/backup"
@@ -9,7 +14,8 @@ let
       "/var/lib/paperless"
     ];
     documents = [
-      "/var/lib/picard/data"
+      "${mounts.fast}/documents"
+      "${mounts.fast}/photos"
     ];
   };
 in
@@ -39,6 +45,16 @@ in
   };
 
   boot.tmp.cleanOnBoot = true;
+
+  fileSystems.${mounts.fast} = {
+    device = "nixos-cache";
+    fsType = "virtiofs";
+  };
+
+  fileSystems.${mounts.slow} = {
+    device = "nixos-merged";
+    fsType = "virtiofs";
+  };
 
   # Compressed swap in RAM - good for VMs
   zramSwap.enable = true;
@@ -92,6 +108,7 @@ in
 
   lab = {
     baseDomain = "leolab.party";
+    mounts = mounts;
 
     edge = {
       enable = true;
@@ -109,8 +126,8 @@ in
 
     services.paperless = {
       enable = true;
-      mediaDir = "/var/lib/picard/data/paperless/media";
-      consumptionDir = "/var/lib/picard/data/paperless/consume";
+      mediaDir = "${mounts.fast}/documents";
+      consumptionDir = "${mounts.fast}/documents/consume";
     };
 
     services.homeassistant = {
@@ -120,13 +137,14 @@ in
 
     services.immich = {
       enable = true;
-      mediaDir = "/var/lib/picard/data/immich";
+      mediaDir = "${mounts.fast}/photos";
     };
   };
 
   # Ensure backup targets exist before first backup run.
   systemd.tmpfiles.rules = [
-    "d /var/lib/picard/data 0755 root root - -"  # Bulk data backup path
+    "d ${mounts.fast} 0755 root root - -"
+    "d ${mounts.slow} 0755 root root - -"
     "d /var/backup 0755 root root - -"  # PostgreSQL dump backup path
   ];
 

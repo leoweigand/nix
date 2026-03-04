@@ -33,7 +33,7 @@ Split DNS is served by CoreDNS on picard via `modules/edge-dns.nix`, with separa
 
 ### Current Layout
 - Service state is stored under `/var/lib/<service>`.
-- Machine-level bulk data is stored under `/var/lib/<machine>/data`.
+- On picard, active media/documents are stored under `/mnt/fast` (virtiofs from Unraid).
 - Database dump outputs are stored under `/var/backup`.
 
 ### Current Database Backup
@@ -43,7 +43,7 @@ Split DNS is served by CoreDNS on picard via `modules/edge-dns.nix`, with separa
 
 ### Current Backup Jobs
 - Restic job `state` runs daily and backs up `/var/backup` and service state paths.
-- Restic job `documents` runs weekly and backs up `/var/lib/<machine>/data`.
+- Restic job `documents` runs weekly and backs up configured bulk-data paths (for picard: `/mnt/fast/documents` and `/mnt/fast/photos`).
 - Excludes are configured per job for regenerable paths such as thumbnails, cache, temp files, and ingest directories.
 
 ### Current Recovery Model
