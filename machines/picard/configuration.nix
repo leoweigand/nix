@@ -4,7 +4,7 @@ let
   backupPaths = {
     state = [
       "/var/backup"
-      "/var/lib/home-assistant"
+      "/var/lib/homeassistant"
       "/var/lib/immich"
       "/var/lib/paperless"
     ];

@@ -2,7 +2,7 @@
 
 {
   imports = [
-    ./home-assistant.nix
+    ./homeassistant.nix
     ./immich.nix
     ./paperless.nix
   ];
