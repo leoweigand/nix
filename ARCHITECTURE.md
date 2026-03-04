@@ -32,7 +32,7 @@ Split DNS is served by CoreDNS on picard via `modules/edge-dns.nix`, with separa
 ## Data Model & Recovery
 
 ### Current Layout
-- Service state is stored under `/var/lib/<service>`.
+- Service state is mostly stored under `/var/lib/<service>`, with Home Assistant config on `/mnt/fast/homeassistant/config`.
 - On picard, active media/documents are stored under `/mnt/fast` (virtiofs from Unraid).
 - Database dump outputs are stored under `/var/backup`.
 

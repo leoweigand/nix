@@ -9,7 +9,7 @@ let
   backupPaths = {
     state = [
       "/var/backup"
-      "/var/lib/homeassistant"
+      "${mounts.fast}/homeassistant/config"
       "/var/lib/immich"
       "/var/lib/paperless"
     ];
@@ -133,6 +133,7 @@ in
     services.homeassistant = {
       enable = true;
       subdomain = "home";
+      configDir = "${mounts.fast}/homeassistant/config";
     };
 
     services.immich = {
@@ -145,13 +146,20 @@ in
   systemd.tmpfiles.rules = [
     "d ${mounts.fast} 0755 root root - -"
     "d ${mounts.slow} 0755 root root - -"
+    "d ${mounts.fast}/homeassistant 0750 root root - -"
+    "d ${mounts.fast}/homeassistant/config 0750 root root - -"
     "d ${mounts.fast}/documents 0750 paperless paperless - -"
     "d ${mounts.fast}/photos 0750 immich immich - -"
     "d /var/backup 0755 root root - -"  # PostgreSQL dump backup path
   ];
 
   system.activationScripts.picardStorageDirs.text = ''
-    mkdir -p ${mounts.fast}/documents ${mounts.fast}/photos
+    mkdir -p ${mounts.fast}/documents ${mounts.fast}/photos ${mounts.fast}/homeassistant ${mounts.fast}/homeassistant/config
+
+    chown root:root ${mounts.fast}/homeassistant
+    chown root:root ${mounts.fast}/homeassistant/config
+    chmod 0750 ${mounts.fast}/homeassistant ${mounts.fast}/homeassistant/config
+
     chown paperless:paperless ${mounts.fast}/documents
     chown immich:immich ${mounts.fast}/photos
     chmod 0750 ${mounts.fast}/documents ${mounts.fast}/photos
