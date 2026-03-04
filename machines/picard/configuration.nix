@@ -45,7 +45,7 @@ in
         21064  # Must match the HomeKit Bridge port shown in Home Assistant
       ];
       allowedUDPPorts = [
-        5353
+        5353   # for mdns
       ];
     };
   };
