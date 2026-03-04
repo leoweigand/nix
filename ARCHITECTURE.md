@@ -10,7 +10,7 @@ High-level overview of how traffic flows through the network and how the custom 
   - Tailscale split DNS resolves the same hostnames to picard's Tailscale IP so tailnet clients also connect straight to the proxy without tunneling.
   - Because both paths keep the DNS name identical, TLS termination happens once on Caddy and every client still gets `https://service.leolab.party` regardless of location.
 
-Split DNS is served by CoreDNS on picard via `modules/edge-dns.nix`, with separate LAN and tailnet listeners that both answer for `leolab.party`.
+Split DNS is served by CoreDNS on picard via `modules/edge-dns.nix`, with separate LAN and tailnet listeners that both answer for `leolab.party`. The LAN listener also forwards non-`leolab.party` queries to public upstream resolvers, while the router advertises Cloudflare as secondary DNS for fallback if picard is unavailable.
 
 ## Network Architecture
 
@@ -19,6 +19,7 @@ Split DNS is served by CoreDNS on picard via `modules/edge-dns.nix`, with separa
 - **TLS**: Wildcard certificate for `*.leolab.party`, renewed via DNS-01 so the proxy can answer securely on both networks.
 - **Routing**: Caddy proxies each subdomain to the appropriate backend service on picard.
 - **Module ownership**: `modules/reverse-proxy.nix` owns ACME + Caddy defaults, while each app module contributes its own virtual host.
+- **LAN reachability**: Firewall policy keeps DNS (`53/tcp`, `53/udp`) and edge HTTP(S) (`80/tcp`, `443/tcp`) open so local clients can resolve and reach services through the proxy.
 
 ### Access Flow
 1. Local client resolves `service.leolab.party` via the home DNS server and connects to picard's LAN IP over HTTPS.

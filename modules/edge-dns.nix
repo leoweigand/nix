@@ -4,7 +4,27 @@ let
   cfg = config.lab.edgeDns;
   zone = config.lab.baseDomain;
 
-  mkServerBlock = listenAddress: answerAddress: ''
+  mkLanServerBlock = listenAddress: answerAddress: ''
+    .:53 {
+      bind ${listenAddress}
+      template IN A {
+        match (^|.*\.)${lib.escapeRegex zone}\.$
+        answer "{{ .Name }} 60 IN A ${answerAddress}"
+        fallthrough
+      }
+      template IN AAAA {
+        match (^|.*\.)${lib.escapeRegex zone}\.$
+        rcode NXDOMAIN
+        fallthrough
+      }
+      forward . ${lib.concatStringsSep " " cfg.upstreamResolvers}
+      cache 300
+      log
+      errors
+    }
+  '';
+
+  mkTailnetServerBlock = listenAddress: answerAddress: ''
     ${zone}:53 {
       bind ${listenAddress}
       template IN A {
@@ -48,6 +68,19 @@ in
       description = "A record returned to tailnet clients";
       example = "100.64.0.12";
     };
+
+    upstreamResolvers = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [
+        "1.1.1.1"
+        "1.0.0.1"
+      ];
+      description = "Recursive upstream resolvers used for non-local DNS lookups";
+      example = [
+        "9.9.9.9"
+        "1.1.1.1"
+      ];
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -59,15 +92,16 @@ in
     ];
 
     environment.etc."edge-dns/Corefile".text =
-      mkServerBlock cfg.lanListenAddress cfg.lanAnswerAddress
+      mkLanServerBlock cfg.lanListenAddress cfg.lanAnswerAddress
       + "\n"
-      + mkServerBlock cfg.tailnetListenAddress cfg.tailnetAnswerAddress;
+      + mkTailnetServerBlock cfg.tailnetListenAddress cfg.tailnetAnswerAddress;
 
     systemd.services.edge-dns = {
       description = "CoreDNS authoritative server for split DNS";
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
       wantedBy = [ "multi-user.target" ];
+      restartTriggers = [ config.environment.etc."edge-dns/Corefile".source ];
       serviceConfig = {
         DynamicUser = true;
         ExecStart = "${pkgs.coredns}/bin/coredns -conf /etc/edge-dns/Corefile";
