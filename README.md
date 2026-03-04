@@ -7,10 +7,16 @@ NixOS configuration for my homelab.
 - Remote access and SSH authentication through Tailscale
 - Secret management using 1Password with [opnix](https://github.com/brizzbuzz/opnix)
 - Backups of all critical data to Backblaze B2 using restic
+- Edge reverse proxy on picard with Caddy and wildcard TLS via ACME DNS-01 (Cloudflare)
 
 ## Machines
-- **guinan (Raspberry Pi)**: Runs critical services (reverse proxy, dns, home assistant)
-- **picard (Unraid server)**: Runs standard homelab apps (Immich, Paperless-ngx, etc.) in a NixOS VM on an Unraid host with a storage array and SSD cache drives.
+- **picard (Unraid server)**: Runs the homelab edge (reverse proxy, DNS), plus apps (Immich, Paperless-ngx, etc.) in a NixOS VM on an Unraid host with a storage array and SSD cache drives.
+
+## Edge Routing Model
+
+- Shared edge settings live in `modules/reverse-proxy.nix`.
+- App modules (for example `modules/services/immich.nix` and `modules/services/paperless.nix`) only declare their own `services.caddy.virtualHosts` entries and local upstream target.
+- Cloudflare DNS credentials for ACME are sourced through opnix using a secret file that contains `CF_DNS_API_TOKEN=...`.
 
 ## Runbook
 

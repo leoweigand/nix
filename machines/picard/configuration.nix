@@ -92,6 +92,12 @@ in
   lab = {
     baseDomain = "leolab.party";
 
+    edge = {
+      enable = true;
+      acmeEmail = "admin@leolab.party";
+      cloudflareCredentialsReference = "op://Homelab/Cloudflare/dnsCredentials";
+    };
+
     services.paperless = {
       enable = true;
       mediaDir = "/var/lib/picard/data/paperless/media";

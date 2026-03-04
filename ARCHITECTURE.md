@@ -6,24 +6,27 @@ High-level overview of how traffic flows through the network and how the custom 
 - **Domain**: `leolab.party`
 - **Subdomains**: `service.leolab.party` (e.g., `immich.leolab.party`)
 - **Split DNS (local & Tailscale)**:
-  - Local network DNS resolves every subdomain to the guinan LAN IP so nearby clients talk directly to the reverse proxy.
-  - Tailscale split DNS resolves the same hostnames to guinan's Tailscale IP so tailnet clients also connect straight to the proxy without tunneling.
+  - Local network DNS resolves every subdomain to the picard LAN IP so nearby clients talk directly to the reverse proxy.
+  - Tailscale split DNS resolves the same hostnames to picard's Tailscale IP so tailnet clients also connect straight to the proxy without tunneling.
   - Because both paths keep the DNS name identical, TLS termination happens once on Caddy and every client still gets `https://service.leolab.party` regardless of location.
+
+The split DNS authority can be enabled via `modules/edge-dns.nix`, which runs CoreDNS on picard and serves wildcard A records for `leolab.party` with separate LAN and tailnet listeners.
 
 ## Network Architecture
 
-### Reverse Proxy (Caddy on guinan)
+### Reverse Proxy (Caddy on picard)
 - **Port**: `:443` for all HTTPS traffic (local or over Tailscale).
 - **TLS**: Wildcard certificate for `*.leolab.party`, renewed via DNS-01 so the proxy can answer securely on both networks.
-- **Routing**: Caddy proxies each subdomain to the appropriate backend on guinan or picard.
+- **Routing**: Caddy proxies each subdomain to the appropriate backend service on picard.
+- **Module ownership**: `modules/reverse-proxy.nix` owns ACME + Caddy defaults, while each app module contributes its own virtual host.
 
 ### Access Flow
-1. Local client resolves `service.leolab.party` via the home DNS server and connects to guinan's LAN IP over HTTPS.
-2. Tailscale client resolves the same hostname through split DNS and connects over HTTPS to the Caddy listener on guinan's tailnet IP.
+1. Local client resolves `service.leolab.party` via the home DNS server and connects to picard's LAN IP over HTTPS.
+2. Tailscale client resolves the same hostname through split DNS and connects over HTTPS to the Caddy listener on picard's tailnet IP.
 3. Caddy uses the request hostname to forward traffic to the correct backend service, reusing the same TLS certificate for every path.
 
 ### Service Isolation
-- Backend services bind to localhost or the storage VM network and only accept traffic that originates from the reverse proxy.
+- Backend services bind to localhost and only accept traffic that originates from the reverse proxy.
 - Firewalls prevent unintended exposure so the only reachable endpoint is Caddy's TLS listener.
 
 ## Data Model & Recovery

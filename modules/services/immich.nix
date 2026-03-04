@@ -48,7 +48,7 @@ in
       enable = true;
       package = immichPkgs.immich;
 
-      host = "0.0.0.0";
+      host = "127.0.0.1";
       port = 2283;
       mediaLocation = cfg.mediaDir;
       redis = {
@@ -59,6 +59,13 @@ in
       settings = {
         server.externalDomain = "https://${serviceHost}";
       };
+    };
+
+    services.caddy.virtualHosts.${serviceHost} = {
+      useACMEHost = config.lab.baseDomain;
+      extraConfig = ''
+        reverse_proxy http://${config.services.immich.host}:${toString config.services.immich.port}
+      '';
     };
 
     systemd.tmpfiles.rules = [

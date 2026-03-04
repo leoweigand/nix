@@ -2,6 +2,8 @@
 
 {
   imports = [
+    ./edge-dns.nix
+    ./reverse-proxy.nix
     ./services
   ];
 

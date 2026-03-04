@@ -63,12 +63,12 @@ in
       mediaDir = cfg.mediaDir;
       consumptionDir = cfg.consumptionDir;
 
-      address = "0.0.0.0";
+      address = "127.0.0.1";
       port = 28981;
       consumptionDirIsPublic = true;  # Allow all users to add documents
 
       settings = {
-        PAPERLESS_URL = "http://${serviceHost}";
+        PAPERLESS_URL = "https://${serviceHost}";
         PAPERLESS_ADMIN_USER = "admin";
         PAPERLESS_TIME_ZONE = "Europe/Berlin";
         PAPERLESS_OCR_LANGUAGE = "eng";
@@ -85,6 +85,13 @@ in
         PAPERLESS_TASK_WORKERS = 2;
         PAPERLESS_THREADS_PER_WORKER = 2;
       };
+    };
+
+    services.caddy.virtualHosts.${serviceHost} = {
+      useACMEHost = config.lab.baseDomain;
+      extraConfig = ''
+        reverse_proxy http://127.0.0.1:${toString config.services.paperless.port}
+      '';
     };
 
     systemd.tmpfiles.rules = [
