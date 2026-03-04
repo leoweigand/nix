@@ -68,6 +68,7 @@ in
           ];
           ports = [
             "127.0.0.1:8123:8123"
+            "21064:21064"  # Must match the HomeKit Bridge port shown in Home Assistant
           ];
           volumes = [
             "${cfg.configDir}:/config"

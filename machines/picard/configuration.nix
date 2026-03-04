@@ -40,7 +40,13 @@ in
     # Keep SSH reachable on LAN for bootstrap/recovery
     firewall = {
       enable = true;
-      allowedTCPPorts = [ 22 ];
+      allowedTCPPorts = [
+        22
+        21064  # Must match the HomeKit Bridge port shown in Home Assistant
+      ];
+      allowedUDPPorts = [
+        5353
+      ];
     };
   };
 
