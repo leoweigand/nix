@@ -141,6 +141,7 @@ in
 
     services.immich = {
       enable = true;
+      subdomain = "photos";
       mediaDir = "${mounts.fast}/photos";
     };
   };
