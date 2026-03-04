@@ -10,7 +10,7 @@ High-level overview of how traffic flows through the network and how the custom 
   - Tailscale split DNS resolves the same hostnames to picard's Tailscale IP so tailnet clients also connect straight to the proxy without tunneling.
   - Because both paths keep the DNS name identical, TLS termination happens once on Caddy and every client still gets `https://service.leolab.party` regardless of location.
 
-The split DNS authority can be enabled via `modules/edge-dns.nix`, which runs CoreDNS on picard and serves wildcard A records for `leolab.party` with separate LAN and tailnet listeners.
+Split DNS is served by CoreDNS on picard via `modules/edge-dns.nix`, with separate LAN and tailnet listeners that both answer for `leolab.party`.
 
 ## Network Architecture
 
