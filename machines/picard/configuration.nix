@@ -116,6 +116,12 @@ in
       cloudflareCredentialsReference = "op://Homelab/Cloudflare/dnsCredentials";
     };
 
+    mqtt = {
+      enable = true;
+      user = "ha";
+      passwordReference = "op://Homelab/Home Assistant/mqtt-password";
+    };
+
     edgeDns = {
       enable = true;
       lanListenAddress = "192.168.2.4";

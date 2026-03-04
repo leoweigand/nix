@@ -3,6 +3,7 @@
 {
   imports = [
     ./edge-dns.nix
+    ./mqtt.nix
     ./reverse-proxy.nix
     ./services
   ];
