@@ -19,11 +19,6 @@ case "$server" in
     ;;
 esac
 
-if [[ -n "$(git status --porcelain)" ]]; then
-  echo "Error: working tree is not clean. Commit, stash, or discard all changes first."
-  exit 1
-fi
-
 branch="$(git branch --show-current)"
 commit="$(git rev-parse --short HEAD)"
 

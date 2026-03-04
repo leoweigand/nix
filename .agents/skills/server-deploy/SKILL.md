@@ -13,7 +13,7 @@ Use this skill only when the user explicitly asks to deploy/apply NixOS config t
 
 ## How to run
 
-- Make sure the Git working tree is clean. Changes to be pushed need to be committed before running the deploy.
+- Commit any changes you want deployed before running the script. The deploy only pushes committed history, so uncommitted local edits are not applied.
 - Serve name must be specified 
 
 ```bash
