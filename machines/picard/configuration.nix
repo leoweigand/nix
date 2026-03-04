@@ -145,8 +145,17 @@ in
   systemd.tmpfiles.rules = [
     "d ${mounts.fast} 0755 root root - -"
     "d ${mounts.slow} 0755 root root - -"
+    "d ${mounts.fast}/documents 0750 paperless paperless - -"
+    "d ${mounts.fast}/photos 0750 immich immich - -"
     "d /var/backup 0755 root root - -"  # PostgreSQL dump backup path
   ];
+
+  system.activationScripts.picardStorageDirs.text = ''
+    mkdir -p ${mounts.fast}/documents ${mounts.fast}/photos
+    chown paperless:paperless ${mounts.fast}/documents
+    chown immich:immich ${mounts.fast}/photos
+    chmod 0750 ${mounts.fast}/documents ${mounts.fast}/photos
+  '';
 
   system.stateVersion = "24.05";
 }
