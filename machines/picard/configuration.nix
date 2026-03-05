@@ -10,6 +10,7 @@ let
     state = [
       "/var/backup"
       "${mounts.fast}/homeassistant/config"
+      "/var/lib/zigbee2mqtt"
       "/var/lib/immich"
       "/var/lib/paperless"
     ];
@@ -149,6 +150,12 @@ in
       enable = true;
       subdomain = "home";
       configDir = "${mounts.fast}/homeassistant/config";
+    };
+
+    services.zigbee2mqtt = {
+      enable = true;
+      serialAdapter = "zstack";
+      serialPort = "/dev/serial/by-id/usb-ITead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_64f09a5b4dbeed11b2996b2e38a92db5-if00-port0";
     };
 
     services.immich = {

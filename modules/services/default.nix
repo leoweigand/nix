@@ -5,6 +5,7 @@
     ./homeassistant.nix
     ./immich.nix
     ./paperless.nix
+    ./zigbee2mqtt.nix
   ];
 
   options.lab.services = lib.mkOption {
