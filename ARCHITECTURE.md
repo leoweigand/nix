@@ -33,6 +33,7 @@ Split DNS is served by CoreDNS on picard via `modules/edge-dns.nix`, with separa
 ## Home Assistant
 - Home Assistant runs in a Podman container on picard (`modules/services/homeassistant.nix`), while MQTT runs as a native NixOS service (`modules/mqtt.nix`).
 - Tasmota onboarding baseline: configure MQTT host/user/password, set `SetOption19 1` for Home Assistant MQTT discovery, then restart the device so entities are auto-discovered in HA.
+- Zigbee-native group membership and direct Zigbee binds are managed in Zigbee2MQTT (not in Home Assistant automations) because they react faster and stay in sync better; direct binds are used for blinds and TRADFRI remotes.
 
 ## Data Model & Recovery
 
