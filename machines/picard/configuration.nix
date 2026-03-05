@@ -185,16 +185,6 @@ in
     mkdir -p ${mounts.fast}/appdata/ziqbee2mqtt ${mounts.fast}/appdata/ziqbee2mqtt/config
     mkdir -p ${mounts.fast}/documents ${mounts.fast}/photos
 
-    # One-time migration from legacy Home Assistant path on first switch.
-    if [ -d ${mounts.fast}/homeassistant/config ] && [ ! -e ${mounts.fast}/appdata/homeassistant/config/configuration.yaml ]; then
-      cp -a ${mounts.fast}/homeassistant/config/. ${mounts.fast}/appdata/homeassistant/config/
-    fi
-
-    # One-time migration from Zigbee2MQTT default state directory.
-    if [ -d /var/lib/zigbee2mqtt ] && [ ! -e ${mounts.fast}/appdata/ziqbee2mqtt/config/configuration.yaml ]; then
-      cp -a /var/lib/zigbee2mqtt/. ${mounts.fast}/appdata/ziqbee2mqtt/config/
-    fi
-
     chown root:root ${mounts.fast}/appdata ${mounts.fast}/appdata/homeassistant ${mounts.fast}/appdata/homeassistant/config
     chmod 0755 ${mounts.fast}/appdata
     chmod 0750 ${mounts.fast}/appdata/homeassistant ${mounts.fast}/appdata/homeassistant/config
