@@ -88,7 +88,6 @@ in
       owner = "root";
       group = "root";
       mode = "0400";
-      services = [ "zigbee2mqtt" ];
     };
 
     services.caddy.virtualHosts.${serviceHost} = lib.mkIf cfg.exposeFrontend {
