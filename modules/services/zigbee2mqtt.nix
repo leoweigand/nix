@@ -63,7 +63,7 @@ in
       enable = true;
       dataDir = cfg.dataDir;
       settings = {
-        homeassistant = true;
+        homeassistant.enabled = true;
         mqtt = {
           base_topic = "zigbee2mqtt";
           server = "mqtt://127.0.0.1:${toString config.lab.mqtt.port}";
@@ -76,7 +76,7 @@ in
         };
       } // lib.optionalAttrs cfg.exposeFrontend {
         frontend = {
-          enable = true;
+          enabled = true;
           host = "127.0.0.1";
           port = cfg.frontendPort;
         };
