@@ -68,7 +68,7 @@ in
           base_topic = "zigbee2mqtt";
           server = "mqtt://127.0.0.1:${toString config.lab.mqtt.port}";
           user = config.lab.mqtt.user;
-          password = "!secret mqtt_password";
+          password = "!secret mqtt_password";  # Zigbee2MQTT reads this key from ${cfg.dataDir}/secret.yaml
         };
         serial = {
           port = cfg.serialPort;
@@ -115,6 +115,7 @@ in
         install -d -m 0750 -o zigbee2mqtt -g zigbee2mqtt "${cfg.dataDir}"
         install -m 0640 -o zigbee2mqtt -g zigbee2mqtt /dev/null "${cfg.dataDir}/secret.yaml"
 
+        # opnix gives us a raw secret value; Zigbee2MQTT expects key/value YAML in secret.yaml.
         password=$(cat "${mqttPasswordFile}")
         printf 'mqtt_password: %s\n' "$password" > "${cfg.dataDir}/secret.yaml"
       '';
