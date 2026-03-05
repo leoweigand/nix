@@ -113,10 +113,10 @@ in
         set -euo pipefail
 
         install -d -m 0750 -o zigbee2mqtt -g zigbee2mqtt "${cfg.dataDir}"
-        install -m 0640 -o zigbee2mqtt -g zigbee2mqtt /dev/null "${cfg.dataDir}/secrets.yaml"
+        install -m 0640 -o zigbee2mqtt -g zigbee2mqtt /dev/null "${cfg.dataDir}/secret.yaml"
 
         password=$(cat "${mqttPasswordFile}")
-        printf 'mqtt_password: %s\n' "$password" > "${cfg.dataDir}/secrets.yaml"
+        printf 'mqtt_password: %s\n' "$password" > "${cfg.dataDir}/secret.yaml"
       '';
     };
 
