@@ -5,7 +5,7 @@ description: Use when working on Home Assistant config changes (configuration.ya
 
 # Home Assistant apply workflow
 
-Use this after editing Home Assistant files under `/mnt/fast/homeassistant/config` on `picard`.
+Use this after editing Home Assistant files under `/mnt/fast/appdata/homeassistant/config` on `picard`.
 
 ## When to use
 
@@ -22,7 +22,7 @@ Use this skill when any of these appear in the request context:
 Run these commands in order:
 
 ```bash
-ssh picard 'sudo test -f /mnt/fast/homeassistant/config/configuration.yaml'
+ssh picard 'sudo test -f /mnt/fast/appdata/homeassistant/config/configuration.yaml'
 ssh picard 'sudo systemctl restart podman-homeassistant.service'
 ```
 
@@ -46,4 +46,4 @@ ssh picard 'sudo podman inspect homeassistant --format "{{range .Mounts}}{{if eq
 ssh picard 'journalctl -u podman-homeassistant.service -n 80 --no-pager'
 ```
 
-Expected mount source: `/mnt/fast/homeassistant/config`.
+Expected mount source: `/mnt/fast/appdata/homeassistant/config`.

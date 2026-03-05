@@ -37,12 +37,12 @@ Split DNS is served by CoreDNS on picard via `modules/edge-dns.nix`, with separa
 ## Data Model & Recovery
 
 ### Current Layout
-- Service state is mostly stored under `/var/lib/<service>`, with Home Assistant config on `/mnt/fast/homeassistant/config`.
+- Service state is mostly stored under `/var/lib/<service>`, with Home Assistant config on `/mnt/fast/appdata/homeassistant/config` and Zigbee2MQTT config/state on `/mnt/fast/appdata/ziqbee2mqtt/config`.
 - On picard, active media/documents are stored under `/mnt/fast` (virtiofs from Unraid).
 - Database dump outputs are stored under `/var/backup`.
 
 ### Home Assistant Workflow Today
-- Home Assistant is currently managed through its own `configuration.yaml` in `/mnt/fast/homeassistant/config`.
+- Home Assistant is currently managed through its own `configuration.yaml` in `/mnt/fast/appdata/homeassistant/config`.
 - We make config changes there directly and then restart the `home-assistant` service to apply them.
 - This is intentionally documented as the current state, but it is not the Nix-native workflow (declarative config in this flake).
 

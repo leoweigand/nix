@@ -59,7 +59,8 @@ Examples:
 
 Home Assistant mapping:
 
-- Home Assistant config lives at `/mnt/fast/homeassistant/config` and is included in Picard's `state` backup job.
+- Home Assistant config lives at `/mnt/fast/appdata/homeassistant/config` and is included in Picard's `state` backup job.
+- Zigbee2MQTT config/state lives at `/mnt/fast/appdata/ziqbee2mqtt/config` and is included in Picard's `state` backup job.
 
 #### 1) Pick restore scope
 
@@ -100,7 +101,8 @@ sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/documen
 ```bash
 # Example targets for picard's current storage layout
 sudo rsync -a --delete /tmp/restore-state/var/lib/paperless/ /var/lib/paperless/
-sudo rsync -a --delete /tmp/restore-state/mnt/fast/homeassistant/config/ /mnt/fast/homeassistant/config/
+sudo rsync -a --delete /tmp/restore-state/mnt/fast/appdata/homeassistant/config/ /mnt/fast/appdata/homeassistant/config/
+sudo rsync -a --delete /tmp/restore-state/mnt/fast/appdata/ziqbee2mqtt/config/ /mnt/fast/appdata/ziqbee2mqtt/config/
 sudo rsync -a --delete /tmp/restore-state/var/backup/ /var/backup/
 sudo rsync -a --delete /tmp/restore-documents/mnt/fast/documents/ /mnt/fast/documents/
 sudo rsync -a --delete /tmp/restore-documents/mnt/fast/photos/ /mnt/fast/photos/
