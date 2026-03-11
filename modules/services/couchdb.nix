@@ -63,14 +63,15 @@ in
 
     systemd.tmpfiles.rules = [
       "d ${cfg.dataDir} 0750 couchdb couchdb - -"
-      "f ${credentialsFile} 0400 root root - -"
     ];
 
     systemd.services.couchdb.preStart = lib.mkAfter ''
       if [ ! -s ${credentialsFile} ]; then
-        install -m 0400 -o root -g root /dev/null ${credentialsFile}
+        umask 0077
+        : > ${credentialsFile}
         printf 'COUCHDB_USER=%s\n' "couchdb-admin" >> ${credentialsFile}
         printf 'COUCHDB_PASSWORD=%s\n' "$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32)" >> ${credentialsFile}
+        chmod 0400 ${credentialsFile}
       fi
 
       source ${credentialsFile}
