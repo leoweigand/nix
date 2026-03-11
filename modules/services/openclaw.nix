@@ -65,6 +65,15 @@ in
           extraOptions = [
             "--pull=newer"
           ];
+          cmd = [
+            "node"
+            "dist/index.js"
+            "gateway"
+            "--bind"
+            "lan"
+            "--port"
+            "18789"
+          ];
           ports = [
             "127.0.0.1:${toString cfg.port}:18789"
           ];
