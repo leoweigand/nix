@@ -9,6 +9,7 @@ let
   backupPaths = {
     state = [
       "/var/backup"
+      "${mounts.fast}/appdata/couchdb"
       "${mounts.fast}/appdata/homeassistant/config"
       "${mounts.fast}/appdata/openclaw"
       "${mounts.fast}/appdata/ziqbee2mqtt/config"
@@ -157,6 +158,13 @@ in
       configDir = "${mounts.fast}/appdata/homeassistant/config";
     };
 
+    services.couchdb = {
+      enable = true;
+      subdomain = "couchdb";
+      dataDir = "${mounts.fast}/appdata/couchdb";
+      credentialsReference = "op://Homelab/CouchDB/credentials";
+    };
+
     services.openclaw = {
       enable = true;
       subdomain = "cora";
@@ -183,6 +191,7 @@ in
     "d ${mounts.fast} 0755 root root - -"
     "d ${mounts.slow} 0755 root root - -"
     "d ${mounts.fast}/appdata 0755 root root - -"
+    "d ${mounts.fast}/appdata/couchdb 0750 couchdb couchdb - -"
     "d ${mounts.fast}/appdata/homeassistant 0750 root root - -"
     "d ${mounts.fast}/appdata/homeassistant/config 0750 root root - -"
     "d ${mounts.fast}/appdata/openclaw 0750 1000 1000 - -"
@@ -196,6 +205,7 @@ in
 
   system.activationScripts.picardStorageDirs.text = ''
     mkdir -p ${mounts.fast}/appdata ${mounts.fast}/appdata/homeassistant ${mounts.fast}/appdata/homeassistant/config
+    mkdir -p ${mounts.fast}/appdata/couchdb
     mkdir -p ${mounts.fast}/appdata/openclaw ${mounts.fast}/appdata/openclaw/config
     mkdir -p ${mounts.fast}/appdata/ziqbee2mqtt ${mounts.fast}/appdata/ziqbee2mqtt/config
     mkdir -p ${mounts.fast}/documents ${mounts.fast}/photos
@@ -203,6 +213,9 @@ in
     chown root:root ${mounts.fast}/appdata ${mounts.fast}/appdata/homeassistant ${mounts.fast}/appdata/homeassistant/config
     chmod 0755 ${mounts.fast}/appdata
     chmod 0750 ${mounts.fast}/appdata/homeassistant ${mounts.fast}/appdata/homeassistant/config
+
+    chown couchdb:couchdb ${mounts.fast}/appdata/couchdb
+    chmod 0750 ${mounts.fast}/appdata/couchdb
 
     chown 1000:1000 ${mounts.fast}/appdata/openclaw ${mounts.fast}/appdata/openclaw/config
     chmod 0750 ${mounts.fast}/appdata/openclaw ${mounts.fast}/appdata/openclaw/config
