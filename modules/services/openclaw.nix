@@ -69,6 +69,7 @@ in
             "node"
             "dist/index.js"
             "gateway"
+            # Keep startup non-interactive: Nix bootstraps gateway config before first run.
             "--allow-unconfigured"
             "--bind"
             "lan"
@@ -107,6 +108,8 @@ in
       script = ''
         set -euo pipefail
 
+        # OpenClaw requires explicit non-loopback settings; write them with `openclaw config set`
+        # in ephemeral `podman run` calls so values persist in ${cfg.dataDir}/openclaw.json.
         podman run --rm \
           -v ${cfg.dataDir}:/home/node/.openclaw \
           -v ${cfg.workspaceDir}:/home/node/.openclaw/workspace \
