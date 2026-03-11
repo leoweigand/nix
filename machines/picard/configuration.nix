@@ -54,6 +54,10 @@ in
 
   boot.tmp.cleanOnBoot = true;
 
+  environment.shellAliases = {
+    openclaw = "sudo podman exec -it openclaw node dist/index.js";
+  };
+
   fileSystems.${mounts.fast} = {
     device = "nixos-cache";
     fsType = "virtiofs";
