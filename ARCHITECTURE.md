@@ -38,6 +38,7 @@ Split DNS is served by CoreDNS on picard via `modules/edge-dns.nix`, with separa
 ## OpenClaw
 - OpenClaw runs in a Podman container on picard (`modules/services/openclaw.nix`) and is exposed through Caddy as `https://openclaw.leolab.party`.
 - OpenClaw's persisted config and workspace bind-mount to `/mnt/fast/appdata/openclaw` on the host.
+- On picard, `openclaw` is a shell alias for `sudo podman exec -it openclaw node dist/index.js`, so container CLI operations (for example device approval) are run from the host shell.
 
 ## Data Model & Recovery
 
