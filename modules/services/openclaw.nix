@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   cfg = config.lab.services.openclaw;
@@ -98,6 +98,7 @@ in
       description = "Prepare OpenClaw gateway configuration";
       wantedBy = [ "podman-openclaw.service" ];
       before = [ "podman-openclaw.service" ];
+      path = with pkgs; [ podman ];
       serviceConfig = {
         Type = "oneshot";
         User = "root";
