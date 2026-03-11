@@ -35,10 +35,15 @@ Split DNS is served by CoreDNS on picard via `modules/edge-dns.nix`, with separa
 - Tasmota onboarding baseline: configure MQTT host/user/password, set `SetOption19 1` for Home Assistant MQTT discovery, then restart the device so entities are auto-discovered in HA.
 - Zigbee-native group membership and direct Zigbee binds are managed in Zigbee2MQTT (not in Home Assistant automations) because they react faster and stay in sync better; direct binds are used for blinds and TRADFRI remotes.
 
+## OpenClaw
+- OpenClaw runs in a Podman container on picard (`modules/services/openclaw.nix`) and is exposed through Caddy as `https://openclaw.leolab.party`.
+- OpenClaw's persisted config and workspace bind-mount to `/mnt/fast/appdata/openclaw` on the host.
+
 ## Data Model & Recovery
 
 ### Current Layout
 - Service state is mostly stored under `/var/lib/<service>`, with Home Assistant config on `/mnt/fast/appdata/homeassistant/config` and Zigbee2MQTT config/state on `/mnt/fast/appdata/ziqbee2mqtt/config`.
+- OpenClaw stores config and workspace under `/mnt/fast/appdata/openclaw`.
 - On picard, active media/documents are stored under `/mnt/fast` (virtiofs from Unraid).
 - Database dump outputs are stored under `/var/backup`.
 

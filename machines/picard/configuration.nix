@@ -10,6 +10,7 @@ let
     state = [
       "/var/backup"
       "${mounts.fast}/appdata/homeassistant/config"
+      "${mounts.fast}/appdata/openclaw"
       "${mounts.fast}/appdata/ziqbee2mqtt/config"
       "/var/lib/immich"
       "/var/lib/paperless"
@@ -152,6 +153,13 @@ in
       configDir = "${mounts.fast}/appdata/homeassistant/config";
     };
 
+    services.openclaw = {
+      enable = true;
+      subdomain = "cora";
+      dataDir = "${mounts.fast}/appdata/openclaw/config";
+      workspaceDir = "${mounts.fast}/appdata/openclaw";
+    };
+
     services.zigbee2mqtt = {
       enable = true;
       dataDir = "${mounts.fast}/appdata/ziqbee2mqtt/config";
@@ -173,6 +181,8 @@ in
     "d ${mounts.fast}/appdata 0755 root root - -"
     "d ${mounts.fast}/appdata/homeassistant 0750 root root - -"
     "d ${mounts.fast}/appdata/homeassistant/config 0750 root root - -"
+    "d ${mounts.fast}/appdata/openclaw 0750 1000 1000 - -"
+    "d ${mounts.fast}/appdata/openclaw/config 0750 1000 1000 - -"
     "d ${mounts.fast}/appdata/ziqbee2mqtt 0750 zigbee2mqtt zigbee2mqtt - -"
     "d ${mounts.fast}/appdata/ziqbee2mqtt/config 0750 zigbee2mqtt zigbee2mqtt - -"
     "d ${mounts.fast}/documents 0750 paperless paperless - -"
@@ -182,12 +192,16 @@ in
 
   system.activationScripts.picardStorageDirs.text = ''
     mkdir -p ${mounts.fast}/appdata ${mounts.fast}/appdata/homeassistant ${mounts.fast}/appdata/homeassistant/config
+    mkdir -p ${mounts.fast}/appdata/openclaw ${mounts.fast}/appdata/openclaw/config
     mkdir -p ${mounts.fast}/appdata/ziqbee2mqtt ${mounts.fast}/appdata/ziqbee2mqtt/config
     mkdir -p ${mounts.fast}/documents ${mounts.fast}/photos
 
     chown root:root ${mounts.fast}/appdata ${mounts.fast}/appdata/homeassistant ${mounts.fast}/appdata/homeassistant/config
     chmod 0755 ${mounts.fast}/appdata
     chmod 0750 ${mounts.fast}/appdata/homeassistant ${mounts.fast}/appdata/homeassistant/config
+
+    chown 1000:1000 ${mounts.fast}/appdata/openclaw ${mounts.fast}/appdata/openclaw/config
+    chmod 0750 ${mounts.fast}/appdata/openclaw ${mounts.fast}/appdata/openclaw/config
 
     chown zigbee2mqtt:zigbee2mqtt ${mounts.fast}/appdata/ziqbee2mqtt ${mounts.fast}/appdata/ziqbee2mqtt/config
     chmod 0750 ${mounts.fast}/appdata/ziqbee2mqtt ${mounts.fast}/appdata/ziqbee2mqtt/config

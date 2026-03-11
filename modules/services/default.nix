@@ -4,6 +4,7 @@
   imports = [
     ./homeassistant.nix
     ./immich.nix
+    ./openclaw.nix
     ./paperless.nix
     ./zigbee2mqtt.nix
   ];
