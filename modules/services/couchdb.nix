@@ -96,7 +96,6 @@ in
         owner = "root";
         group = "root";
         mode = "0400";
-        services = [ "couchdb.service" "couchdb-init.service" ];
       };
     } // lib.optionalAttrs (cfg.bootstrap.passwordReference != null) {
       couchdbSyncPassword = {
@@ -104,7 +103,6 @@ in
         owner = "root";
         group = "root";
         mode = "0400";
-        services = [ "couchdb-init.service" ];
       };
     };
 
