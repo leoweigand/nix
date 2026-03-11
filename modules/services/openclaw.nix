@@ -93,5 +93,42 @@ in
       "d ${cfg.dataDir} 0750 1000 1000 - -"
       "d ${cfg.workspaceDir} 0750 1000 1000 - -"
     ];
+
+    systemd.services.openclaw-gateway-config = {
+      description = "Prepare OpenClaw gateway configuration";
+      wantedBy = [ "podman-openclaw.service" ];
+      before = [ "podman-openclaw.service" ];
+      serviceConfig = {
+        Type = "oneshot";
+        User = "root";
+        Group = "root";
+      };
+      script = ''
+        set -euo pipefail
+
+        podman run --rm \
+          -v ${cfg.dataDir}:/home/node/.openclaw \
+          -v ${cfg.workspaceDir}:/home/node/.openclaw/workspace \
+          ${cfg.image} \
+          node dist/index.js config set gateway.mode local
+
+        podman run --rm \
+          -v ${cfg.dataDir}:/home/node/.openclaw \
+          -v ${cfg.workspaceDir}:/home/node/.openclaw/workspace \
+          ${cfg.image} \
+          node dist/index.js config set gateway.bind lan
+
+        podman run --rm \
+          -v ${cfg.dataDir}:/home/node/.openclaw \
+          -v ${cfg.workspaceDir}:/home/node/.openclaw/workspace \
+          ${cfg.image} \
+          node dist/index.js config set gateway.controlUi.allowedOrigins ${lib.escapeShellArg ''["https://${serviceHost}"]''} --strict-json
+      '';
+    };
+
+    systemd.services.podman-openclaw = {
+      after = [ "openclaw-gateway-config.service" ];
+      requires = [ "openclaw-gateway-config.service" ];
+    };
   };
 }
