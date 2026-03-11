@@ -3,7 +3,7 @@
 let
   cfg = config.lab.services.couchdb;
   serviceHost = "${cfg.subdomain}.${config.lab.baseDomain}";
-  credentialsFile = config.services.onepassword-secrets.secretPaths.couchdbCredentials;
+  credentialsFile = "${cfg.dataDir}/credentials.env";
 in
 
 {
@@ -34,35 +34,15 @@ in
       description = "Port CouchDB listens on";
     };
 
-    credentialsReference = lib.mkOption {
-      type = lib.types.str;
-      description = "1Password reference for env file containing COUCHDB_USER and COUCHDB_PASSWORD";
-    };
   };
 
   config = lib.mkIf cfg.enable {
     assertions = [
       {
-        assertion = config.services.onepassword-secrets.enable;
-        message = "lab.services.couchdb.enable requires services.onepassword-secrets.enable";
-      }
-      {
         assertion = config.lab.baseDomain != "";
         message = "lab.baseDomain must be set when lab.services.couchdb.enable = true";
       }
-      {
-        assertion = cfg.credentialsReference != "";
-        message = "lab.services.couchdb.credentialsReference must be set when lab.services.couchdb.enable = true";
-      }
     ];
-
-    services.onepassword-secrets.secrets.couchdbCredentials = {
-      reference = cfg.credentialsReference;
-      owner = "root";
-      group = "root";
-      mode = "0400";
-      services = [ "couchdb-init.service" ];
-    };
 
     services.couchdb = {
       enable = true;
@@ -83,13 +63,32 @@ in
 
     systemd.tmpfiles.rules = [
       "d ${cfg.dataDir} 0750 couchdb couchdb - -"
+      "f ${credentialsFile} 0400 root root - -"
     ];
+
+    systemd.services.couchdb.preStart = lib.mkAfter ''
+      if [ ! -s ${credentialsFile} ]; then
+        install -m 0400 -o root -g root /dev/null ${credentialsFile}
+        printf 'COUCHDB_USER=%s\n' "couchdb-admin" >> ${credentialsFile}
+        printf 'COUCHDB_PASSWORD=%s\n' "$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32)" >> ${credentialsFile}
+      fi
+
+      source ${credentialsFile}
+      : ''${COUCHDB_USER:?Missing COUCHDB_USER in ${credentialsFile}}
+      : ''${COUCHDB_PASSWORD:?Missing COUCHDB_PASSWORD in ${credentialsFile}}
+
+      if ! grep -Eq '^\[admins\]$' ${cfg.dataDir}/local.ini; then
+        printf '\n[admins]\n%s = %s\n' "$COUCHDB_USER" "$COUCHDB_PASSWORD" >> ${cfg.dataDir}/local.ini
+      elif ! grep -Eq "^$COUCHDB_USER[[:space:]]*=" ${cfg.dataDir}/local.ini; then
+        printf '%s = %s\n' "$COUCHDB_USER" "$COUCHDB_PASSWORD" >> ${cfg.dataDir}/local.ini
+      fi
+    '';
 
     systemd.services.couchdb-init = {
       description = "Initialize CouchDB auth and CORS settings";
       wantedBy = [ "multi-user.target" ];
-      after = [ "couchdb.service" "opnix-secrets.service" ];
-      requires = [ "couchdb.service" "opnix-secrets.service" ];
+      after = [ "couchdb.service" ];
+      requires = [ "couchdb.service" ];
       path = with pkgs; [ curl coreutils jq ];
       serviceConfig = {
         Type = "oneshot";

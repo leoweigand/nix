@@ -162,7 +162,6 @@ in
       enable = true;
       subdomain = "couchdb";
       dataDir = "${mounts.fast}/appdata/couchdb";
-      credentialsReference = "op://Homelab/CouchDB/credentials";
     };
 
     services.openclaw = {
