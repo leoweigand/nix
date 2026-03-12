@@ -164,11 +164,6 @@ in
       dataDir = "${mounts.fast}/appdata/couchdb";
       adminUser = "couchdb-admin";
       adminPasswordReference = "op://Homelab/CouchDB/admin";
-      bootstrap = {
-        database = "obsidian-livesync";
-        username = "obsidian-sync";
-        passwordReference = "op://Homelab/CouchDB/obsidian-livesync";
-      };
     };
 
     services.openclaw = {
