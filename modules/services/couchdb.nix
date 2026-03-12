@@ -64,8 +64,8 @@ in
 
     services.onepassword-secrets.secrets.couchdbAdminPassword = {
       reference = cfg.adminPasswordReference;
-      owner = "root";
-      group = "root";
+      owner = "couchdb";
+      group = "couchdb";
       mode = "0400";
     };
 
