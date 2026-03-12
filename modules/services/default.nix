@@ -2,7 +2,6 @@
 
 {
   imports = [
-    ./couchdb.nix
     ./homeassistant.nix
     ./immich.nix
     ./openclaw.nix
