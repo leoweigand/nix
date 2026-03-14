@@ -66,6 +66,7 @@ in
           extraOptions = [
             "--pull=newer"
             "--network=host"  # Required for reliable mDNS/HomeKit discovery from LAN clients
+            # DHCP watcher logs a warning without NET_RAW, but current setup does not rely on DHCP discovery.
           ];
           volumes = [
             "${cfg.configDir}:/config"
