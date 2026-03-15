@@ -153,6 +153,8 @@ in
       email.domains = [ "*" ];
       extraConfig = {
         skip-provider-button = true;
+        oidc-extra-audience = "account";
+        whitelist-domain = serviceHost;
       };
     };
 
