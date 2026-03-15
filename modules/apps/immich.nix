@@ -4,15 +4,7 @@ let
   cfg = config.homelab.apps.immich;
   serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
 in
-
 {
-  imports = [
-    (lib.mkAliasOptionModule
-      [ "services" "postgresql" "extensions" ]
-      [ "services" "postgresql" "extraPlugins" ]
-    )
-  ];
-
   options.homelab.apps.immich = {
     enable = lib.mkEnableOption "Immich photo and video service";
 

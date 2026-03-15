@@ -164,6 +164,15 @@ in
           };
         };
       };
+
+      auth = {
+        enable = true;
+        keycloak = {
+          dbPasswordReference = "op://Homelab/Keycloak/db-password";
+          realm = "homelab";
+        };
+      };
+
     };
 
     apps.paperless = {

@@ -51,6 +51,22 @@
    - Add a new module for oauth2-proxy with secret file wiring and localhost bind.
    - Add auth-specific options under `lab.auth.*` so service modules can opt into `native-oidc` or `proxy-auth`.
 
+### Current implementation status
+- Done: Added a new infra auth module scaffold at `modules/infra/auth.nix` with:
+  - `homelab.infra.auth` options for Keycloak baseline and DB secret wiring.
+  - Localhost-only Keycloak bind and Caddy vhost for `auth.<domain>`.
+- Done: Wired picard to enable the Keycloak baseline module only.
+- Next: deploy Keycloak and create the Keycloak realm/client for Paperless.
+
+#### Paperless OIDC env file (stored in 1Password)
+- Secret reference: `op://Homelab/Paperless/oidc-env`
+- The secret should be an env file with at least:
+
+```env
+PAPERLESS_APPS=allauth.socialaccount.providers.openid_connect
+PAPERLESS_SOCIALACCOUNT_PROVIDERS={"openid_connect":{"APPS":[{"provider_id":"keycloak","name":"Keycloak","client_id":"paperless","secret":"<client-secret>","settings":{"server_url":"https://auth.leolab.party/realms/homelab/.well-known/openid-configuration"}}]}}
+```
+
 2. **Prepare persistence, backups, and recovery**
    - Place Keycloak state in a persistent path included in the picard `state` backup job.
    - Ensure PostgreSQL backups include Keycloak DB dumps.
