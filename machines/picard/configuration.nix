@@ -173,6 +173,13 @@ in
         };
       };
 
+      authentik = {
+        enable = true;
+        subdomain = "authentik";
+        postgresPasswordReference = "op://Homelab/Authentik/postgres-password";
+        secretKeyReference = "op://Homelab/Authentik/secret-key";
+      };
+
     };
 
     apps.paperless = {
@@ -183,11 +190,19 @@ in
     apps.homeassistant = {
       enable = true;
       subdomain = "home";
+      proxyAuth = {
+        enable = false;
+        issuerUrl = "https://authentik.leolab.party/application/o/homeassistant/";
+      };
     };
 
     apps.openclaw = {
       enable = true;
       subdomain = "cora";
+      proxyAuth = {
+        enable = false;
+        issuerUrl = "https://authentik.leolab.party/application/o/openclaw/";
+      };
     };
 
     apps.zigbee2mqtt = {

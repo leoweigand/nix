@@ -38,6 +38,34 @@ in
       default = 18789;
       description = "Local host port where OpenClaw listens";
     };
+
+    proxyAuth = {
+      enable = lib.mkEnableOption "OIDC proxy auth for OpenClaw";
+
+      clientId = lib.mkOption {
+        type = lib.types.str;
+        default = "openclaw";
+        description = "OIDC client ID used by oauth2-proxy";
+      };
+
+      issuerUrl = lib.mkOption {
+        type = lib.types.str;
+        default = "https://auth.${config.homelab.baseDomain}/realms/${config.homelab.infra.auth.keycloak.realm}";
+        description = "OIDC issuer URL used by oauth2-proxy";
+      };
+
+      oauth2ProxyPort = lib.mkOption {
+        type = lib.types.port;
+        default = 4184;
+        description = "Local oauth2-proxy port for OpenClaw forward_auth";
+      };
+
+      envReference = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "1Password reference to oauth2-proxy env values for OpenClaw";
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -46,13 +74,77 @@ in
         assertion = config.homelab.baseDomain != "";
         message = "homelab.baseDomain must be set when homelab.apps.openclaw.enable = true";
       }
+      {
+        assertion = !cfg.proxyAuth.enable || cfg.proxyAuth.envReference != null;
+        message = "homelab.apps.openclaw.proxyAuth.envReference must be set when homelab.apps.openclaw.proxyAuth.enable = true";
+      }
     ];
+
+    services.onepassword-secrets.secrets = lib.optionalAttrs cfg.proxyAuth.enable {
+      openclawOauth2ProxyEnv = {
+        reference = cfg.proxyAuth.envReference;
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+    };
+
+    systemd.services.oauth2-proxy-openclaw = lib.mkIf cfg.proxyAuth.enable {
+      description = "oauth2-proxy for OpenClaw";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "network-online.target" "opnix-secrets.service" "podman-openclaw.service" ];
+      wants = [ "network-online.target" ];
+      requires = [ "opnix-secrets.service" "podman-openclaw.service" ];
+      serviceConfig = {
+        Type = "simple";
+        Restart = "on-failure";
+        RestartSec = 5;
+        DynamicUser = true;
+        EnvironmentFile = config.services.onepassword-secrets.secretPaths.openclawOauth2ProxyEnv;
+        ExecStart = lib.concatStringsSep " " [
+          "${pkgs.oauth2-proxy}/bin/oauth2-proxy"
+          "--provider=oidc"
+          "--reverse-proxy=true"
+          "--http-address=127.0.0.1:${toString cfg.proxyAuth.oauth2ProxyPort}"
+          "--oidc-issuer-url=${cfg.proxyAuth.issuerUrl}"
+          "--client-id=${cfg.proxyAuth.clientId}"
+          "--redirect-url=https://${serviceHost}/oauth2/callback"
+          "--upstream=http://127.0.0.1:${toString cfg.port}"
+          "--scope=openid profile email"
+          "--email-domain=*"
+          "--skip-provider-button=true"
+          "--whitelist-domain=${serviceHost}"
+          "--set-xauthrequest=true"
+        ];
+      };
+    };
 
     services.caddy.virtualHosts.${serviceHost} = {
       useACMEHost = config.homelab.baseDomain;
-      extraConfig = ''
-        reverse_proxy http://127.0.0.1:${toString cfg.port}
-      '';
+      extraConfig =
+        if cfg.proxyAuth.enable then
+          ''
+            handle /oauth2/* {
+              reverse_proxy http://127.0.0.1:${toString cfg.proxyAuth.oauth2ProxyPort}
+            }
+
+            handle {
+              forward_auth 127.0.0.1:${toString cfg.proxyAuth.oauth2ProxyPort} {
+                uri /oauth2/auth
+                header_up X-Real-IP {remote_host}
+                @error status 401
+                handle_response @error {
+                  redir * https://${serviceHost}/oauth2/start?rd={scheme}://{host}{uri}
+                }
+              }
+
+              reverse_proxy http://127.0.0.1:${toString cfg.port}
+            }
+          ''
+        else
+          ''
+            reverse_proxy http://127.0.0.1:${toString cfg.port}
+          '';
     };
 
     virtualisation = {
@@ -134,5 +226,6 @@ in
       after = [ "openclaw-gateway-config.service" ];
       requires = [ "openclaw-gateway-config.service" ];
     };
+
   };
 }
