@@ -30,7 +30,8 @@ in
       };
 
       dbPasswordReference = lib.mkOption {
-        type = lib.types.str;
+        type = lib.types.nullOr lib.types.str;
+        default = null;
         description = "1Password reference for the Keycloak PostgreSQL user password";
       };
 
@@ -58,11 +59,13 @@ in
       }
     ];
 
-    services.onepassword-secrets.secrets.keycloakDbPassword = {
-      reference = cfg.keycloak.dbPasswordReference;
-      owner = "root";
-      group = "root";
-      mode = "0400";
+    services.onepassword-secrets.secrets = lib.optionalAttrs (cfg.keycloak.dbPasswordReference != null) {
+      keycloakDbPassword = {
+        reference = cfg.keycloak.dbPasswordReference;
+        owner = "postgres";
+        group = "postgres";
+        mode = "0400";
+      };
     };
 
     services.postgresql = {
@@ -76,6 +79,7 @@ in
         createLocally = true;
         name = cfg.keycloak.database.name;
         username = cfg.keycloak.database.user;
+      } // lib.optionalAttrs (cfg.keycloak.dbPasswordReference != null) {
         passwordFile = config.services.onepassword-secrets.secretPaths.keycloakDbPassword;
       };
       settings = {
@@ -87,7 +91,7 @@ in
       };
     };
 
-    systemd.services.keycloak = {
+    systemd.services.keycloak = lib.mkIf (cfg.keycloak.dbPasswordReference != null) {
       after = [ "opnix-secrets.service" ];
       requires = [ "opnix-secrets.service" ];
     };
