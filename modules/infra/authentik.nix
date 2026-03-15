@@ -117,10 +117,43 @@ in
     systemd.tmpfiles.rules = [
       "d ${cfg.mediaDir} 0750 1000 1000 - -"
       "d ${cfg.templatesDir} 0750 1000 1000 - -"
-      "d ${cfg.postgresDataDir} 0700 root root - -"
-      "d ${cfg.redisDataDir} 0750 root root - -"
+      "d ${cfg.postgresDataDir} 0700 999 999 - -"
+      "d ${cfg.redisDataDir} 0750 999 999 - -"
       "d /run/authentik 0750 root root - -"
     ];
+
+    systemd.services.authentik-permissions = {
+      description = "Ensure Authentik data directory ownership";
+      wantedBy = [
+        "podman-authentik-postgresql.service"
+        "podman-authentik-redis.service"
+        "podman-authentik-server.service"
+        "podman-authentik-worker.service"
+      ];
+      before = [
+        "podman-authentik-postgresql.service"
+        "podman-authentik-redis.service"
+        "podman-authentik-server.service"
+        "podman-authentik-worker.service"
+      ];
+      path = with pkgs; [ coreutils ];
+      serviceConfig = {
+        Type = "oneshot";
+        User = "root";
+        Group = "root";
+      };
+      script = ''
+        set -euo pipefail
+
+        install -d -m 0750 -o 1000 -g 1000 ${cfg.mediaDir}
+        install -d -m 0750 -o 1000 -g 1000 ${cfg.templatesDir}
+        install -d -m 0700 -o 999 -g 999 ${cfg.postgresDataDir}
+        install -d -m 0750 -o 999 -g 999 ${cfg.redisDataDir}
+
+        chown -R 1000:1000 ${cfg.mediaDir} ${cfg.templatesDir}
+        chown -R 999:999 ${cfg.postgresDataDir} ${cfg.redisDataDir}
+      '';
+    };
 
     systemd.services.authentik-env = {
       description = "Prepare Authentik container environment files";
@@ -266,13 +299,13 @@ in
     };
 
     systemd.services.podman-authentik-postgresql = {
-      after = [ "authentik-env.service" "authentik-pod.service" ];
-      requires = [ "authentik-env.service" "authentik-pod.service" ];
+      after = [ "authentik-env.service" "authentik-pod.service" "authentik-permissions.service" ];
+      requires = [ "authentik-env.service" "authentik-pod.service" "authentik-permissions.service" ];
     };
 
     systemd.services.podman-authentik-redis = {
-      after = [ "authentik-pod.service" ];
-      requires = [ "authentik-pod.service" ];
+      after = [ "authentik-pod.service" "authentik-permissions.service" ];
+      requires = [ "authentik-pod.service" "authentik-permissions.service" ];
     };
 
     systemd.services.podman-authentik-server = {
@@ -281,12 +314,14 @@ in
         "podman-authentik-redis.service"
         "authentik-env.service"
         "authentik-pod.service"
+        "authentik-permissions.service"
       ];
       requires = [
         "podman-authentik-postgresql.service"
         "podman-authentik-redis.service"
         "authentik-env.service"
         "authentik-pod.service"
+        "authentik-permissions.service"
       ];
     };
 
@@ -296,12 +331,14 @@ in
         "podman-authentik-redis.service"
         "authentik-env.service"
         "authentik-pod.service"
+        "authentik-permissions.service"
       ];
       requires = [
         "podman-authentik-postgresql.service"
         "podman-authentik-redis.service"
         "authentik-env.service"
         "authentik-pod.service"
+        "authentik-permissions.service"
       ];
     };
 
