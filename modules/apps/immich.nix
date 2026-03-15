@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   cfg = config.homelab.apps.immich;
@@ -101,7 +101,7 @@ in
           enabled = true;
           issuerUrl = cfg.oidc.issuerUrl;
           clientId = cfg.oidc.clientId;
-          clientSecret._secret = config.services.onepassword-secrets.secretPaths.immichOidcClientSecret;
+          clientSecret = "";
           autoRegister = cfg.oidc.autoRegister;
           scope = cfg.oidc.scope;
           buttonText = cfg.oidc.buttonText;
@@ -112,6 +112,18 @@ in
     systemd.services.immich-server = lib.mkIf cfg.oidc.enable {
       after = [ "opnix-secrets.service" ];
       requires = [ "opnix-secrets.service" ];
+      preStart = ''
+        set -eu
+        umask 077
+        cp ${config.services.immich.environment.IMMICH_CONFIG_FILE} /run/immich/immich.json
+        secret="$(tr -d '\n' < ${config.services.onepassword-secrets.secretPaths.immichOidcClientSecret})"
+        ${pkgs.jq}/bin/jq --arg secret "$secret" '.oauth.clientSecret = $secret' /run/immich/immich.json > /run/immich/immich.json.tmp
+        mv /run/immich/immich.json.tmp /run/immich/immich.json
+      '';
+    };
+
+    services.immich.environment = lib.mkIf cfg.oidc.enable {
+      IMMICH_CONFIG_FILE = lib.mkForce "/run/immich/immich.json";
     };
 
     services.caddy.virtualHosts.${serviceHost} = {
