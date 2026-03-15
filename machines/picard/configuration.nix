@@ -177,6 +177,7 @@ in
 
     apps.paperless = {
       enable = true;
+      oidcEnvReference = "op://Homelab/Paperless/oidc-env";
     };
 
     apps.homeassistant = {
