@@ -70,7 +70,7 @@ in
       after = [ "network-online.target" "opnix-secrets.service" ];
       wants = [ "network-online.target" ];
       requires = [ "opnix-secrets.service" ];
-      path = with pkgs; [ bun ];
+      path = with pkgs; [ deno ];
       serviceConfig = {
         Type = "simple";
         User = "assistant";
@@ -82,7 +82,15 @@ in
           "STATE_DIR=${stateDir}"
           "WORKSPACE_DIR=${workspaceDir}"
         ];
-        ExecStart = "${pkgs.bun}/bin/bun ${srcDir}/index.ts";
+        ExecStart = lib.concatStringsSep " " [
+          "${pkgs.deno}/bin/deno"
+          "run"
+          "--allow-env"
+          "--allow-net"
+          "--allow-read"
+          "--allow-write"
+          "${srcDir}/index.ts"
+        ];
         Restart = "on-failure";
         RestartSec = 5;
       };
