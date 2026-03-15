@@ -3,6 +3,18 @@
 let
   cfg = config.homelab.apps.immich;
   serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
+  oidcConfigTemplate = pkgs.writeText "immich-oidc-template.json" (builtins.toJSON {
+    server.externalDomain = "https://${serviceHost}";
+    oauth = {
+      enabled = true;
+      issuerUrl = cfg.oidc.issuerUrl;
+      clientId = cfg.oidc.clientId;
+      clientSecret = "";
+      autoRegister = cfg.oidc.autoRegister;
+      scope = cfg.oidc.scope;
+      buttonText = cfg.oidc.buttonText;
+    };
+  });
 in
 {
   options.homelab.apps.immich = {
@@ -94,18 +106,8 @@ in
         port = 6379;
       };
 
-      settings = {
+      settings = lib.mkIf (!cfg.oidc.enable) {
         server.externalDomain = "https://${serviceHost}";
-      } // lib.optionalAttrs cfg.oidc.enable {
-        oauth = {
-          enabled = true;
-          issuerUrl = cfg.oidc.issuerUrl;
-          clientId = cfg.oidc.clientId;
-          clientSecret = "";
-          autoRegister = cfg.oidc.autoRegister;
-          scope = cfg.oidc.scope;
-          buttonText = cfg.oidc.buttonText;
-        };
       };
     };
 
@@ -115,7 +117,7 @@ in
       preStart = ''
         set -eu
         umask 077
-        cp ${config.services.immich.environment.IMMICH_CONFIG_FILE} /run/immich/immich.json
+        cp ${oidcConfigTemplate} /run/immich/immich.json
         secret="$(tr -d '\n' < ${config.services.onepassword-secrets.secretPaths.immichOidcClientSecret})"
         ${pkgs.jq}/bin/jq --arg secret "$secret" '.oauth.clientSecret = $secret' /run/immich/immich.json > /run/immich/immich.json.tmp
         mv /run/immich/immich.json.tmp /run/immich/immich.json
