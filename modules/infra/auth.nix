@@ -60,20 +60,13 @@ in
 
     services.onepassword-secrets.secrets.keycloakDbPassword = {
       reference = cfg.keycloak.dbPasswordReference;
-      owner = "keycloak";
-      group = "keycloak";
+      owner = "root";
+      group = "root";
       mode = "0400";
     };
 
     services.postgresql = {
       enable = true;
-      ensureDatabases = [ cfg.keycloak.database.name ];
-      ensureUsers = [
-        {
-          name = cfg.keycloak.database.user;
-          ensureDBOwnership = true;
-        }
-      ];
     };
 
     services.keycloak = {
