@@ -30,7 +30,7 @@ in
 
     mediaDir = lib.mkOption {
       type = lib.types.str;
-      default = "/var/lib/immich";
+      default = "${config.lab.mounts.fast}/photos";
       description = "Directory where Immich stores uploaded media";
     };
 

@@ -43,8 +43,8 @@ Split DNS is served by CoreDNS on picard via `modules/edge-dns.nix`, with separa
 ## Data Model & Recovery
 
 ### Current Layout
-- Service state is mostly stored under `/var/lib/<service>`, with Home Assistant config on `/mnt/fast/appdata/homeassistant/config` and Zigbee2MQTT config/state on `/mnt/fast/appdata/ziqbee2mqtt/config`.
-- OpenClaw stores config and workspace under `/mnt/fast/appdata/openclaw`.
+- Service-owned persistent state is stored under `/mnt/fast/appdata/<appname>` (for example Home Assistant, OpenClaw, Zigbee2MQTT, and Paperless).
+- User-generated datasets live in dedicated top-level directories on `/mnt/fast` (`/mnt/fast/photos` for Immich uploads, `/mnt/fast/documents` for Paperless media/consume).
 - On picard, active media/documents are stored under `/mnt/fast` (virtiofs from Unraid).
 - Database dump outputs are stored under `/var/backup`.
 
@@ -59,7 +59,7 @@ Split DNS is served by CoreDNS on picard via `modules/edge-dns.nix`, with separa
 - PostgreSQL dump outputs are included in the daily state backup job.
 
 ### Current Backup Jobs
-- Restic job `state` runs daily and backs up `/var/backup` and service state paths.
+- Restic job `state` runs daily and backs up `/var/backup` plus `/mnt/fast/appdata`.
 - Restic job `documents` runs weekly and backs up configured bulk-data paths (for picard: `/mnt/fast/documents` and `/mnt/fast/photos`).
 - Excludes are configured per job for regenerable paths such as thumbnails, cache, temp files, and ingest directories.
 

@@ -18,7 +18,7 @@ in
 
     dataDir = lib.mkOption {
       type = lib.types.str;
-      default = "/var/lib/zigbee2mqtt";
+      default = "${config.lab.mounts.fast}/appdata/ziqbee2mqtt/config";
       description = "Directory where Zigbee2MQTT stores configuration and state";
     };
 

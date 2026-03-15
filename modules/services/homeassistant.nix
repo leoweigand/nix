@@ -18,7 +18,7 @@ in
 
     configDir = lib.mkOption {
       type = lib.types.str;
-      default = "/var/lib/homeassistant";
+      default = "${config.lab.mounts.fast}/appdata/homeassistant/config";
       description = "Directory where Home Assistant stores configuration and state";
     };
 

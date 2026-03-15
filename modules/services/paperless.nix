@@ -17,14 +17,20 @@ in
 
     mediaDir = lib.mkOption {
       type = lib.types.str;
-      default = "/var/lib/paperless/media";
+      default = "${config.lab.mounts.fast}/documents";
       description = "Directory where Paperless stores processed documents";
     };
 
     consumptionDir = lib.mkOption {
       type = lib.types.str;
-      default = "/var/lib/paperless/consume";
+      default = "${config.lab.mounts.fast}/documents/consume";
       description = "Directory Paperless watches for incoming files";
+    };
+
+    dataDir = lib.mkOption {
+      type = lib.types.str;
+      default = "${config.lab.mounts.fast}/appdata/paperless";
+      description = "Directory where Paperless stores internal application state";
     };
   };
 
@@ -59,7 +65,7 @@ in
       enable = true;
       passwordFile = config.services.onepassword-secrets.secretPaths.paperlessAdminPassword;
 
-      dataDir = lib.mkDefault "/var/lib/paperless";
+      dataDir = cfg.dataDir;
       mediaDir = cfg.mediaDir;
       consumptionDir = cfg.consumptionDir;
 
@@ -95,7 +101,7 @@ in
     };
 
     systemd.tmpfiles.rules = [
-      "d /var/lib/paperless 0750 paperless paperless - -"
+      "d ${config.services.paperless.dataDir} 0750 paperless paperless - -"
       "d ${config.services.paperless.mediaDir} 0750 paperless paperless - -"
       "d ${config.services.paperless.consumptionDir} 0750 paperless paperless - -"
     ];

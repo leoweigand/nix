@@ -9,11 +9,7 @@ let
   backupPaths = {
     state = [
       "/var/backup"
-      "${mounts.fast}/appdata/homeassistant/config"
-      "${mounts.fast}/appdata/openclaw"
-      "${mounts.fast}/appdata/ziqbee2mqtt/config"
-      "/var/lib/immich"
-      "/var/lib/paperless"
+      "${mounts.fast}/appdata"
     ];
     documents = [
       "${mounts.fast}/documents"
@@ -147,26 +143,20 @@ in
 
     services.paperless = {
       enable = true;
-      mediaDir = "${mounts.fast}/documents";
-      consumptionDir = "${mounts.fast}/documents/consume";
     };
 
     services.homeassistant = {
       enable = true;
       subdomain = "home";
-      configDir = "${mounts.fast}/appdata/homeassistant/config";
     };
 
     services.openclaw = {
       enable = true;
       subdomain = "cora";
-      dataDir = "${mounts.fast}/appdata/openclaw/config";
-      workspaceDir = "${mounts.fast}/appdata/openclaw";
     };
 
     services.zigbee2mqtt = {
       enable = true;
-      dataDir = "${mounts.fast}/appdata/ziqbee2mqtt/config";
       serialAdapter = "zstack";
       serialPort = "/dev/serial/by-id/usb-ITead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_64f09a5b4dbeed11b2996b2e38a92db5-if00-port0";
     };
@@ -174,7 +164,6 @@ in
     services.immich = {
       enable = true;
       subdomain = "photos";
-      mediaDir = "${mounts.fast}/photos";
     };
   };
 
@@ -183,37 +172,8 @@ in
     "d ${mounts.fast} 0755 root root - -"
     "d ${mounts.slow} 0755 root root - -"
     "d ${mounts.fast}/appdata 0755 root root - -"
-    "d ${mounts.fast}/appdata/homeassistant 0750 root root - -"
-    "d ${mounts.fast}/appdata/homeassistant/config 0750 root root - -"
-    "d ${mounts.fast}/appdata/openclaw 0750 1000 1000 - -"
-    "d ${mounts.fast}/appdata/openclaw/config 0750 1000 1000 - -"
-    "d ${mounts.fast}/appdata/ziqbee2mqtt 0750 zigbee2mqtt zigbee2mqtt - -"
-    "d ${mounts.fast}/appdata/ziqbee2mqtt/config 0750 zigbee2mqtt zigbee2mqtt - -"
-    "d ${mounts.fast}/documents 0750 paperless paperless - -"
-    "d ${mounts.fast}/photos 0750 immich immich - -"
     "d /var/backup 0755 root root - -"  # PostgreSQL dump backup path
   ];
-
-  system.activationScripts.picardStorageDirs.text = ''
-    mkdir -p ${mounts.fast}/appdata ${mounts.fast}/appdata/homeassistant ${mounts.fast}/appdata/homeassistant/config
-    mkdir -p ${mounts.fast}/appdata/openclaw ${mounts.fast}/appdata/openclaw/config
-    mkdir -p ${mounts.fast}/appdata/ziqbee2mqtt ${mounts.fast}/appdata/ziqbee2mqtt/config
-    mkdir -p ${mounts.fast}/documents ${mounts.fast}/photos
-
-    chown root:root ${mounts.fast}/appdata ${mounts.fast}/appdata/homeassistant ${mounts.fast}/appdata/homeassistant/config
-    chmod 0755 ${mounts.fast}/appdata
-    chmod 0750 ${mounts.fast}/appdata/homeassistant ${mounts.fast}/appdata/homeassistant/config
-
-    chown 1000:1000 ${mounts.fast}/appdata/openclaw ${mounts.fast}/appdata/openclaw/config
-    chmod 0750 ${mounts.fast}/appdata/openclaw ${mounts.fast}/appdata/openclaw/config
-
-    chown zigbee2mqtt:zigbee2mqtt ${mounts.fast}/appdata/ziqbee2mqtt ${mounts.fast}/appdata/ziqbee2mqtt/config
-    chmod 0750 ${mounts.fast}/appdata/ziqbee2mqtt ${mounts.fast}/appdata/ziqbee2mqtt/config
-
-    chown paperless:paperless ${mounts.fast}/documents
-    chown immich:immich ${mounts.fast}/photos
-    chmod 0750 ${mounts.fast}/documents ${mounts.fast}/photos
-  '';
 
   system.stateVersion = "24.05";
 }

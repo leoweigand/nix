@@ -17,13 +17,13 @@ in
 
     dataDir = lib.mkOption {
       type = lib.types.str;
-      default = "/var/lib/openclaw";
+      default = "${config.lab.mounts.fast}/appdata/openclaw/config";
       description = "Directory where OpenClaw stores config and runtime state";
     };
 
     workspaceDir = lib.mkOption {
       type = lib.types.str;
-      default = "${cfg.dataDir}/workspace";
+      default = "${config.lab.mounts.fast}/appdata/openclaw";
       description = "Directory mapped to OpenClaw's workspace path";
     };
 

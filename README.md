@@ -63,6 +63,7 @@ Home Assistant mapping:
 - Home Assistant config lives at `/mnt/fast/appdata/homeassistant/config` and is included in Picard's `state` backup job.
 - OpenClaw config/workspace lives under `/mnt/fast/appdata/openclaw` and is included in Picard's `state` backup job.
 - Zigbee2MQTT config/state lives at `/mnt/fast/appdata/ziqbee2mqtt/config` and is included in Picard's `state` backup job.
+- Paperless internal app state lives at `/mnt/fast/appdata/paperless` and is included in Picard's `state` backup job.
 
 #### 1) Pick restore scope
 
@@ -102,15 +103,13 @@ sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/documen
 
 ```bash
 # Example targets for picard's current storage layout
-sudo rsync -a --delete /tmp/restore-state/var/lib/paperless/ /var/lib/paperless/
-sudo rsync -a --delete /tmp/restore-state/mnt/fast/appdata/homeassistant/config/ /mnt/fast/appdata/homeassistant/config/
-sudo rsync -a --delete /tmp/restore-state/mnt/fast/appdata/ziqbee2mqtt/config/ /mnt/fast/appdata/ziqbee2mqtt/config/
+sudo rsync -a --delete /tmp/restore-state/mnt/fast/appdata/ /mnt/fast/appdata/
 sudo rsync -a --delete /tmp/restore-state/var/backup/ /var/backup/
 sudo rsync -a --delete /tmp/restore-documents/mnt/fast/documents/ /mnt/fast/documents/
 sudo rsync -a --delete /tmp/restore-documents/mnt/fast/photos/ /mnt/fast/photos/
 
 # Fix service ownership where needed
-sudo chown -R paperless:paperless /var/lib/paperless
+sudo chown -R paperless:paperless /mnt/fast/appdata/paperless
 sudo chown -R paperless:paperless /mnt/fast/documents
 sudo chown -R immich:immich /mnt/fast/photos
 ```
