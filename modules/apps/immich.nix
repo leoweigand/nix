@@ -33,18 +33,18 @@ in
     };
 
     oidc = {
-      enable = lib.mkEnableOption "Keycloak OIDC login for Immich";
+      enable = lib.mkEnableOption "OIDC login for Immich";
 
       issuerUrl = lib.mkOption {
         type = lib.types.str;
-        default = "https://auth.${config.homelab.baseDomain}/realms/${config.homelab.infra.auth.keycloak.realm}";
+        default = "";
         description = "OIDC issuer URL used by Immich";
       };
 
       clientId = lib.mkOption {
         type = lib.types.str;
         default = "immich";
-        description = "OIDC client ID configured in Keycloak for Immich";
+        description = "OIDC client ID configured for Immich";
       };
 
       clientSecretReference = lib.mkOption {
@@ -67,7 +67,7 @@ in
 
       buttonText = lib.mkOption {
         type = lib.types.str;
-        default = "Log in with LeoAuth";
+        default = "Log in with SSO";
         description = "Login button text shown by Immich for OIDC";
       };
     };
@@ -83,6 +83,10 @@ in
       {
         assertion = !cfg.oidc.enable || cfg.oidc.clientSecretReference != null;
         message = "homelab.apps.immich.oidc.clientSecretReference must be set when homelab.apps.immich.oidc.enable = true";
+      }
+      {
+        assertion = !cfg.oidc.enable || cfg.oidc.issuerUrl != "";
+        message = "homelab.apps.immich.oidc.issuerUrl must be set when homelab.apps.immich.oidc.enable = true";
       }
     ];
 

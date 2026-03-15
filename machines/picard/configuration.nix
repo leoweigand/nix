@@ -165,21 +165,6 @@ in
         };
       };
 
-      auth = {
-        enable = true;
-        keycloak = {
-          dbPasswordReference = "op://Homelab/Keycloak/db-password";
-          realm = "homelab";
-        };
-      };
-
-      authentik = {
-        enable = true;
-        subdomain = "authentik";
-        postgresPasswordReference = "op://Homelab/Authentik/postgres-password";
-        secretKeyReference = "op://Homelab/Authentik/secret-key";
-      };
-
     };
 
     apps.paperless = {
@@ -192,7 +177,6 @@ in
       subdomain = "home";
       proxyAuth = {
         enable = false;
-        issuerUrl = "https://authentik.leolab.party/application/o/homeassistant/";
       };
     };
 
@@ -201,7 +185,6 @@ in
       subdomain = "cora";
       proxyAuth = {
         enable = false;
-        issuerUrl = "https://authentik.leolab.party/application/o/openclaw/";
       };
     };
 
@@ -210,8 +193,7 @@ in
       serialAdapter = "zstack";
       serialPort = "/dev/serial/by-id/usb-ITead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_64f09a5b4dbeed11b2996b2e38a92db5-if00-port0";
       proxyAuth = {
-        enable = true;
-        envReference = "op://Homelab/Zigbee2MQTT/oauth2-proxy-env";
+        enable = false;
       };
     };
 
@@ -219,8 +201,7 @@ in
       enable = true;
       subdomain = "photos";
       oidc = {
-        enable = true;
-        clientSecretReference = "op://Homelab/Immich/oidc-client-secret";
+        enable = false;
       };
     };
   };

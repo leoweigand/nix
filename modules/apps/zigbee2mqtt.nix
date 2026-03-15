@@ -51,8 +51,14 @@ in
 
       provider = lib.mkOption {
         type = lib.types.str;
-        default = "keycloak-oidc";
+        default = "oidc";
         description = "oauth2-proxy provider for Zigbee2MQTT auth";
+      };
+
+      issuerUrl = lib.mkOption {
+        type = lib.types.str;
+        default = "";
+        description = "OIDC issuer URL used by oauth2-proxy";
       };
 
       clientId = lib.mkOption {
@@ -90,8 +96,8 @@ in
         message = "homelab.apps.zigbee2mqtt.proxyAuth.enable requires homelab.apps.zigbee2mqtt.exposeFrontend = true";
       }
       {
-        assertion = !cfg.proxyAuth.enable || config.homelab.infra.auth.enable;
-        message = "homelab.apps.zigbee2mqtt.proxyAuth.enable requires homelab.infra.auth.enable";
+        assertion = !cfg.proxyAuth.enable || cfg.proxyAuth.issuerUrl != "";
+        message = "homelab.apps.zigbee2mqtt.proxyAuth.issuerUrl must be set when homelab.apps.zigbee2mqtt.proxyAuth.enable = true";
       }
       {
         assertion = !cfg.proxyAuth.enable || cfg.proxyAuth.envReference != null;
@@ -144,7 +150,7 @@ in
       keyFile = config.services.onepassword-secrets.secretPaths.zigbee2mqttOauth2ProxyEnv;
       reverseProxy = true;
       provider = cfg.proxyAuth.provider;
-      oidcIssuerUrl = "https://auth.${config.homelab.baseDomain}/realms/${config.homelab.infra.auth.keycloak.realm}";
+      oidcIssuerUrl = cfg.proxyAuth.issuerUrl;
       clientID = cfg.proxyAuth.clientId;
       redirectURL = "https://${serviceHost}/oauth2/callback";
       httpAddress = "127.0.0.1:${toString cfg.proxyAuth.oauth2ProxyPort}";

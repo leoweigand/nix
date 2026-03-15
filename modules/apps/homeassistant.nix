@@ -51,7 +51,7 @@ in
 
       issuerUrl = lib.mkOption {
         type = lib.types.str;
-        default = "https://auth.${config.homelab.baseDomain}/realms/${config.homelab.infra.auth.keycloak.realm}";
+        default = "";
         description = "OIDC issuer URL used by oauth2-proxy";
       };
 
@@ -78,6 +78,10 @@ in
       {
         assertion = !cfg.proxyAuth.enable || cfg.proxyAuth.envReference != null;
         message = "homelab.apps.homeassistant.proxyAuth.envReference must be set when homelab.apps.homeassistant.proxyAuth.enable = true";
+      }
+      {
+        assertion = !cfg.proxyAuth.enable || cfg.proxyAuth.issuerUrl != "";
+        message = "homelab.apps.homeassistant.proxyAuth.issuerUrl must be set when homelab.apps.homeassistant.proxyAuth.enable = true";
       }
     ];
 
