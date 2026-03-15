@@ -1,13 +1,8 @@
-{ config, lib, pkgs, inputs, ... }:
+{ config, lib, ... }:
 
 let
   cfg = config.homelab.apps.immich;
   serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
-
-  immichPkgs = import inputs."nixpkgs-immich" {
-    system = pkgs.stdenv.hostPlatform.system;
-    config = config.nixpkgs.config;
-  };
 in
 
 {
@@ -16,7 +11,6 @@ in
       [ "services" "postgresql" "extensions" ]
       [ "services" "postgresql" "extraPlugins" ]
     )
-    "${inputs."nixpkgs-immich"}/nixos/modules/services/web-apps/immich.nix"
   ];
 
   options.homelab.apps.immich = {
@@ -46,7 +40,6 @@ in
 
     services.immich = {
       enable = true;
-      package = immichPkgs.immich;
 
       host = "127.0.0.1";
       port = 2283;

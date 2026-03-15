@@ -2,10 +2,7 @@
   description = "NixOS configurations for homelab infrastructure";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
-
-    # Dedicated channel for Immich module/package compatibility
-    nixpkgs-immich.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
 
     # 1Password integration for secret management
     opnix = {
@@ -20,7 +17,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, nixpkgs-immich, opnix, disko, ... }@inputs: {
+  outputs = { self, nixpkgs, opnix, disko, ... }@inputs: {
     nixosConfigurations = {
       # Picard - Main homelab server (NixOS VM on Unraid)
       picard = nixpkgs.lib.nixosSystem {

@@ -4,6 +4,8 @@ A lot of what I'm doing here is inspired by [Wolfgang's repository](/Users/leo/g
 
 When planning new features, work in markdown files inside `plans/`. The readme and architecture document should only describe the status quo, unfinished projects should remain in plans. Make sure to collaboratively create plans with the user, not just write them in one shot–especially when requirements are not completely clear.
 
+When a package or module requires a newer nixpkgs channel, prefer upgrading the repository's main nixpkgs input for everything instead of introducing a one-off secondary channel just for that dependency.
+
 ## Code Style
 
 **Comments**: Keep comments helpful and concise. Focus on the "why" and non-obvious details.
