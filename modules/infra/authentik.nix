@@ -115,8 +115,8 @@ in
     };
 
     systemd.tmpfiles.rules = [
-      "d ${cfg.mediaDir} 0750 root root - -"
-      "d ${cfg.templatesDir} 0750 root root - -"
+      "d ${cfg.mediaDir} 0750 1000 1000 - -"
+      "d ${cfg.templatesDir} 0750 1000 1000 - -"
       "d ${cfg.postgresDataDir} 0700 root root - -"
       "d ${cfg.redisDataDir} 0750 root root - -"
       "d /run/authentik 0750 root root - -"
