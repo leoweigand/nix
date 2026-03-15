@@ -16,6 +16,7 @@
 - Directory layout: `${config.homelab.mounts.fast}/assistant` is the base directory with `src/` and `workspace/` subdirectories.
 - Naming: Nix module/app name is `assistant`; ingress subdomain is also `assistant`.
 - Telegram delivery: webhook mode through Cloudflare Tunnel is a requirement (not optional) for the Telegram integration phase.
+- MVP scope for the first implementation pass: keep module options minimal and run a Telegram-only responder service first.
 
 ## Goal
 - Ship a pragmatic Nix-managed runtime envelope for a mutable Pi assistant that supports both interactive and daemonized operation, while preserving rapid in-workspace experimentation.
@@ -45,21 +46,11 @@
 - Policy is enforced in the agent prompt/instructions and wrapper tooling: outside-workspace writes require explicit user confirmation in the interaction.
 
 ## Module API proposal (`homelab.apps.assistant`)
-- `enable` (bool)
-- `subdomain` (string, default `"assistant"`)
-- `port` (local listen port if HTTP is enabled)
-- `baseDir` (path; default `${config.homelab.mounts.fast}/assistant`)
-- `srcDir` (path; default `${cfg.baseDir}/src`)
-- `workspaceDir` (path; default `${cfg.baseDir}/workspace`)
-- `package` (Pi/Bun package derivation override)
-- `environmentFiles` (list of secret env files from opnix)
-- `openFirewall` (bool, default false; usually proxied through Caddy)
-- `extraPackages` (list of runtime CLIs exposed to the service)
-- `modes.interactive.enable` (bool; installs `pi` and wrappers for local shell use)
-- `modes.background.enable` (bool; enables long-running systemd service)
-- `modes.background.telegram.enable` (bool)
-- `modes.background.telegram.tokenReference` (opnix reference)
-- `modes.background.telegram.allowedChats` (list of allowed chat IDs/users)
+- Minimal MVP options:
+  - `enable` (bool)
+  - `telegram.tokenReference` (opnix reference)
+  - `telegram.allowedChats` (list of allowed chat IDs/users)
+- Deferred for later phases: ingress-related settings, Pi package override, mode split, extra packages, and other advanced runtime controls.
 
 ## Plan
 1. **Define service envelope in Nix**
@@ -107,9 +98,9 @@
 
 8. **Rollout phases**
    - Phase 0: planning only (this document), no installation or host changes yet.
-   - Phase 1: add pinned `llm-agents.nix` input and expose `pi` CLI through Nix.
-   - Phase 2: background systemd mode (no Telegram yet), same workspace + policy model.
-   - Phase 3: Telegram bot interface with auth allowlist + secret wiring.
+- Phase 1: background Telegram responder with minimal module options and secret wiring.
+- Phase 2: add pinned `llm-agents.nix` input and wire Pi-driven responses.
+- Phase 3: add interactive local mode and richer workspace wrapper ergonomics.
    - Phase 4: Telegram webhook ingress through Cloudflare Tunnel and end-to-end verification.
    - Phase 5: optional web/API ingress through Caddy.
    - Phase 6: stronger controls (sudo policy narrowing, optional sandbox tightening, action approval UX improvements).
@@ -139,8 +130,8 @@
 - Backup/restore for assistant workspace + state is verified.
 - Policy for out-of-workspace writes is documented and enforced in the runtime wrapper/instructions.
 
-## Open questions to settle together before implementation
-- Should phase 1 start as CLI-only service (recommended) or expose HTTP immediately behind Caddy?
+## Open questions for later phases
+- Should we expose HTTP features behind Caddy as soon as Pi integration lands, or keep Telegram-only until webhook ingress is ready?
 - Which initial extra tools should be available by default to the agent (`git`, `gh`, `jq`, `ripgrep`, etc.) vs opt-in later?
 - Do we want a second "quarantine" workspace for testing risky auto-generated tools before promoting them into the main workspace?
-- For Telegram integration, do we want long polling first (recommended for simplicity) or webhook mode behind Caddy from day one?
+- When we switch from polling to webhook mode, should we route Telegram through Caddy or directly through Cloudflare Tunnel to a local webhook listener?
