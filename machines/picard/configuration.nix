@@ -7,13 +7,17 @@ let
   };
 
   backupPaths = {
-    state = [
-      "/var/backup"
+    appdata = [
       "${mounts.fast}/appdata"
     ];
-    documents = [
-      "${mounts.fast}/documents"
+    paperless = [
+      "${mounts.fast}/documents/paperless/library"
+    ];
+    immich = [
       "${mounts.fast}/photos"
+    ];
+    postgres = [
+      "${mounts.fast}/backup/postgres"
     ];
   };
 in
@@ -103,9 +107,9 @@ in
           resticPassword = "op://Homelab/Backblaze B2/restic-password";
         };
         jobs = {
-          state = {
+          appdata = {
             schedule = "*-*-* 03:00:00";  # Daily at 3:00 AM
-            paths = backupPaths.state;
+            paths = backupPaths.appdata;
             exclude = [
               "**/log"
               "**/logs"
@@ -121,18 +125,41 @@ in
             ];
           };
 
-          documents = {
+          paperless = {
             schedule = "Sun *-*-* 04:00:00";  # Weekly on Sundays at 4:00 AM
-            paths = backupPaths.documents;
+            paths = backupPaths.paperless;
             exclude = [
               "**/thumbs"
               "**/thumbnails"
               "**/.tmp"
-              "**/consume"
             ];
             pruneOpts = [
               "--keep-weekly 4"
               "--keep-monthly 6"
+            ];
+          };
+
+          immich = {
+            schedule = "Sun *-*-* 04:30:00";  # Weekly on Sundays at 4:30 AM
+            paths = backupPaths.immich;
+            exclude = [
+              "**/thumbs"
+              "**/thumbnails"
+              "**/.tmp"
+            ];
+            pruneOpts = [
+              "--keep-weekly 4"
+              "--keep-monthly 6"
+            ];
+          };
+
+          postgres = {
+            schedule = "*-*-* 01:30:00";  # Daily after PostgreSQL dump jobs
+            paths = backupPaths.postgres;
+            pruneOpts = [
+              "--keep-daily 7"
+              "--keep-weekly 4"
+              "--keep-monthly 3"
             ];
           };
         };
@@ -165,12 +192,15 @@ in
     };
   };
 
+  services.postgresqlBackup.location = "${mounts.fast}/backup/postgres";
+
   # Ensure backup targets exist before first backup run.
   systemd.tmpfiles.rules = [
     "d ${mounts.fast} 0755 root root - -"
     "d ${mounts.slow} 0755 root root - -"
     "d ${mounts.fast}/appdata 0755 root root - -"
-    "d /var/backup 0755 root root - -"  # PostgreSQL dump backup path
+    "d ${mounts.fast}/backup 0755 root root - -"
+    "d ${mounts.fast}/backup/postgres 0750 postgres postgres - -"
   ];
 
   system.stateVersion = "24.05";

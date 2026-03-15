@@ -17,13 +17,13 @@ in
 
     mediaDir = lib.mkOption {
       type = lib.types.str;
-      default = "${config.homelab.mounts.fast}/documents";
+      default = "${config.homelab.mounts.fast}/documents/paperless/library";
       description = "Directory where Paperless stores processed documents";
     };
 
     consumptionDir = lib.mkOption {
       type = lib.types.str;
-      default = "${config.homelab.mounts.fast}/documents/consume";
+      default = "${config.homelab.mounts.fast}/documents/paperless/import";
       description = "Directory Paperless watches for incoming files";
     };
 
