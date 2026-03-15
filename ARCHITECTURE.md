@@ -10,7 +10,7 @@ High-level overview of how traffic flows through the network and how the custom 
   - Tailscale split DNS resolves the same hostnames to picard's Tailscale IP so tailnet clients also connect straight to the proxy without tunneling.
   - Because both paths keep the DNS name identical, TLS termination happens once on Caddy and every client still gets `https://service.leolab.party` regardless of location.
 
-Split DNS is served by CoreDNS on picard via `modules/edge-dns.nix`, with separate LAN and tailnet listeners that both answer for `leolab.party`. The LAN listener also forwards non-`leolab.party` queries to public upstream resolvers, while the router advertises Cloudflare as secondary DNS for fallback if picard is unavailable.
+Split DNS is served by CoreDNS on picard via `modules/infra/edge-dns.nix`, with separate LAN and tailnet listeners that both answer for `leolab.party`. The LAN listener also forwards non-`leolab.party` queries to public upstream resolvers, while the router advertises Cloudflare as secondary DNS for fallback if picard is unavailable.
 
 ## Network Architecture
 
@@ -18,7 +18,7 @@ Split DNS is served by CoreDNS on picard via `modules/edge-dns.nix`, with separa
 - **Port**: `:443` for all HTTPS traffic (local or over Tailscale).
 - **TLS**: Wildcard certificate for `*.leolab.party`, renewed via DNS-01 so the proxy can answer securely on both networks.
 - **Routing**: Caddy proxies each subdomain to the appropriate backend service on picard.
-- **Module ownership**: `modules/reverse-proxy.nix` owns ACME + Caddy defaults, while each app module contributes its own virtual host.
+- **Module ownership**: `modules/infra/reverse-proxy.nix` owns ACME + Caddy defaults, while each app module contributes its own virtual host.
 - **LAN reachability**: Firewall policy keeps DNS (`53/tcp`, `53/udp`) and edge HTTP(S) (`80/tcp`, `443/tcp`) open so local clients can resolve and reach services through the proxy.
 
 ### Access Flow
@@ -31,12 +31,12 @@ Split DNS is served by CoreDNS on picard via `modules/edge-dns.nix`, with separa
 - Firewalls prevent unintended exposure so the only reachable endpoint is Caddy's TLS listener.
 
 ## Home Assistant
-- Home Assistant runs in a Podman container on picard (`modules/services/homeassistant.nix`), while MQTT runs as a native NixOS service (`modules/mqtt.nix`).
+- Home Assistant runs in a Podman container on picard (`modules/apps/homeassistant.nix`), while MQTT runs as a native NixOS service (`modules/infra/mqtt.nix`).
 - Tasmota onboarding baseline: configure MQTT host/user/password, set `SetOption19 1` for Home Assistant MQTT discovery, then restart the device so entities are auto-discovered in HA.
 - Zigbee-native group membership and direct Zigbee binds are managed in Zigbee2MQTT (not in Home Assistant automations) because they react faster and stay in sync better; direct binds are used for blinds and TRADFRI remotes.
 
 ## OpenClaw
-- OpenClaw runs in a Podman container on picard (`modules/services/openclaw.nix`) and is exposed through Caddy as `https://openclaw.leolab.party`.
+- OpenClaw runs in a Podman container on picard (`modules/apps/openclaw.nix`) and is exposed through Caddy as `https://openclaw.leolab.party`.
 - OpenClaw's persisted config and workspace bind-mount to `/mnt/fast/appdata/openclaw` on the host.
 - On picard, `openclaw` is a shell alias for `sudo podman exec -it openclaw node dist/index.js`, so container CLI operations (for example device approval) are run from the host shell.
 

@@ -1,8 +1,8 @@
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.lab.edgeDns;
-  zone = config.lab.baseDomain;
+  cfg = config.homelab.infra.edgeDns;
+  zone = config.homelab.baseDomain;
 
   mkLanServerBlock = listenAddress: answerAddress: ''
     .:53 {
@@ -42,7 +42,7 @@ let
 in
 
 {
-  options.lab.edgeDns = {
+  options.homelab.infra.edgeDns = {
     enable = lib.mkEnableOption "Authoritative split DNS for the edge domain";
 
     lanListenAddress = lib.mkOption {
@@ -87,7 +87,7 @@ in
     assertions = [
       {
         assertion = zone != "";
-        message = "lab.baseDomain must be set when lab.edgeDns.enable = true";
+        message = "homelab.baseDomain must be set when homelab.infra.edgeDns.enable = true";
       }
     ];
 

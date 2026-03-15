@@ -9,11 +9,11 @@
     ./zigbee2mqtt.nix
   ];
 
-  options.lab.services = lib.mkOption {
+  options.homelab.apps = lib.mkOption {
     type = lib.types.submodule {
       freeformType = lib.types.attrsOf lib.types.anything;
     };
     default = { };
-    description = "Lab-managed service configuration";
+    description = "Homelab app configuration";
   };
 }

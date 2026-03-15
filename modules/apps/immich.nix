@@ -1,8 +1,8 @@
 { config, lib, pkgs, inputs, ... }:
 
 let
-  cfg = config.lab.services.immich;
-  serviceHost = "${cfg.subdomain}.${config.lab.baseDomain}";
+  cfg = config.homelab.apps.immich;
+  serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
 
   immichPkgs = import inputs."nixpkgs-immich" {
     system = pkgs.stdenv.hostPlatform.system;
@@ -19,7 +19,7 @@ in
     "${inputs."nixpkgs-immich"}/nixos/modules/services/web-apps/immich.nix"
   ];
 
-  options.lab.services.immich = {
+  options.homelab.apps.immich = {
     enable = lib.mkEnableOption "Immich photo and video service";
 
     subdomain = lib.mkOption {
@@ -30,7 +30,7 @@ in
 
     mediaDir = lib.mkOption {
       type = lib.types.str;
-      default = "${config.lab.mounts.fast}/photos";
+      default = "${config.homelab.mounts.fast}/photos";
       description = "Directory where Immich stores uploaded media";
     };
 
@@ -39,8 +39,8 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
-        assertion = config.lab.baseDomain != "";
-        message = "lab.baseDomain must be set when lab.services.immich.enable = true";
+        assertion = config.homelab.baseDomain != "";
+        message = "homelab.baseDomain must be set when homelab.apps.immich.enable = true";
       }
     ];
 
@@ -62,7 +62,7 @@ in
     };
 
     services.caddy.virtualHosts.${serviceHost} = {
-      useACMEHost = config.lab.baseDomain;
+      useACMEHost = config.homelab.baseDomain;
       extraConfig = ''
         reverse_proxy http://${config.services.immich.host}:${toString config.services.immich.port}
       '';

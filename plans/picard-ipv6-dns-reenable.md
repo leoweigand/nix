@@ -8,8 +8,8 @@
 - `edge-dns` currently listens on IPv4 LAN only, so IPv6 DNS advertisement bypasses local split DNS.
 
 ## Plan
-1. **Add IPv6 listener support in `modules/edge-dns.nix`**
-   - Extend `lab.edgeDns` options to support LAN IPv6 listen/answer addresses.
+1. **Add IPv6 listener support in `modules/infra/edge-dns.nix`**
+   - Extend `homelab.infra.edgeDns` options to support LAN IPv6 listen/answer addresses.
    - Generate a CoreDNS block bound to picard's LAN ULA (not temporary IPv6).
    - Keep forwarding for non-`leolab.party` queries on the LAN listener.
 

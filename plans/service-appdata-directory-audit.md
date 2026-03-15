@@ -22,23 +22,23 @@
 ## Services and existing path definitions to review
 
 1. `homeassistant`
-   - Module option: `lab.services.homeassistant.configDir` defaults to `/var/lib/homeassistant` in `modules/services/homeassistant.nix`.
+   - Module option: `homelab.apps.homeassistant.configDir` defaults to `/var/lib/homeassistant` in `modules/apps/homeassistant.nix`.
    - Picard override: `configDir = "${mounts.fast}/appdata/homeassistant/config"` in `machines/picard/configuration.nix`.
-   - Container bind: `${cfg.configDir}:/config` in `modules/services/homeassistant.nix`.
+   - Container bind: `${cfg.configDir}:/config` in `modules/apps/homeassistant.nix`.
 2. `openclaw`
-   - Module options: `dataDir` defaults to `/var/lib/openclaw`; `workspaceDir` defaults to `${cfg.dataDir}/workspace` in `modules/services/openclaw.nix`.
+   - Module options: `dataDir` defaults to `/var/lib/openclaw`; `workspaceDir` defaults to `${cfg.dataDir}/workspace` in `modules/apps/openclaw.nix`.
    - Picard overrides: `dataDir = "${mounts.fast}/appdata/openclaw/config"`, `workspaceDir = "${mounts.fast}/appdata/openclaw"` in `machines/picard/configuration.nix`.
-   - Container binds and bootstrap scripts consume both dirs in `modules/services/openclaw.nix`.
+   - Container binds and bootstrap scripts consume both dirs in `modules/apps/openclaw.nix`.
 3. `zigbee2mqtt`
-   - Module option: `lab.services.zigbee2mqtt.dataDir` defaults to `/var/lib/zigbee2mqtt` in `modules/services/zigbee2mqtt.nix`.
+   - Module option: `homelab.apps.zigbee2mqtt.dataDir` defaults to `/var/lib/zigbee2mqtt` in `modules/apps/zigbee2mqtt.nix`.
    - Picard override: `dataDir = "${mounts.fast}/appdata/ziqbee2mqtt/config"` in `machines/picard/configuration.nix`.
-   - Service and secret bootstrap write inside `cfg.dataDir` in `modules/services/zigbee2mqtt.nix`.
+   - Service and secret bootstrap write inside `cfg.dataDir` in `modules/apps/zigbee2mqtt.nix`.
 4. `immich`
-   - Module option: `lab.services.immich.mediaDir` defaults to `/var/lib/immich` in `modules/services/immich.nix`.
+   - Module option: `homelab.apps.immich.mediaDir` defaults to `/var/lib/immich` in `modules/apps/immich.nix`.
    - Picard override: `mediaDir = "${mounts.fast}/photos"` in `machines/picard/configuration.nix` (this is user content, not appdata).
    - Need explicit check of where Immich app state (DB/metadata/thumbs) lands vs media uploads.
 5. `paperless`
-   - Module options: `mediaDir` defaults to `/var/lib/paperless/media`; `consumptionDir` defaults to `/var/lib/paperless/consume` in `modules/services/paperless.nix`.
+   - Module options: `mediaDir` defaults to `/var/lib/paperless/media`; `consumptionDir` defaults to `/var/lib/paperless/consume` in `modules/apps/paperless.nix`.
    - Module also sets `services.paperless.dataDir = lib.mkDefault "/var/lib/paperless"` and tmpfiles entry for `/var/lib/paperless`.
    - Picard overrides: `mediaDir = "${mounts.fast}/documents"`, `consumptionDir = "${mounts.fast}/documents/consume"` in `machines/picard/configuration.nix`.
    - Need explicit decision whether Paperless internal app state moves to `${mounts.fast}/appdata/paperless`.
@@ -49,15 +49,15 @@
   - `backupPaths.state` currently includes explicit `/var/lib/immich` and `/var/lib/paperless`.
   - `systemd.tmpfiles.rules` currently includes `/var/backup` and many per-service appdata dirs.
   - `system.activationScripts.picardStorageDirs` duplicates appdata/user-content directory bootstrap.
-- `modules/services/homeassistant.nix`
+- `modules/apps/homeassistant.nix`
   - Remove `/var` default reference if we decide to rely on upstream default when unset.
-- `modules/services/openclaw.nix`
+- `modules/apps/openclaw.nix`
   - Remove `/var` default reference if relying on service default behavior.
-- `modules/services/zigbee2mqtt.nix`
+- `modules/apps/zigbee2mqtt.nix`
   - Remove `/var` default reference if relying on NixOS service default.
-- `modules/services/immich.nix`
+- `modules/apps/immich.nix`
   - Re-evaluate `mediaDir` default and document split between user content and app state.
-- `modules/services/paperless.nix`
+- `modules/apps/paperless.nix`
   - Remove explicit `/var/lib/paperless` defaults/mkDefault/tmpfiles where they only mirror defaults.
 
 ## Implementation steps

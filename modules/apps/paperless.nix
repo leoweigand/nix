@@ -1,12 +1,12 @@
 { config, lib, ... }:
 
 let
-  cfg = config.lab.services.paperless;
-  serviceHost = "${cfg.subdomain}.${config.lab.baseDomain}";
+  cfg = config.homelab.apps.paperless;
+  serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
 in
 
 {
-  options.lab.services.paperless = {
+  options.homelab.apps.paperless = {
     enable = lib.mkEnableOption "Paperless-ngx service";
 
     subdomain = lib.mkOption {
@@ -17,19 +17,19 @@ in
 
     mediaDir = lib.mkOption {
       type = lib.types.str;
-      default = "${config.lab.mounts.fast}/documents";
+      default = "${config.homelab.mounts.fast}/documents";
       description = "Directory where Paperless stores processed documents";
     };
 
     consumptionDir = lib.mkOption {
       type = lib.types.str;
-      default = "${config.lab.mounts.fast}/documents/consume";
+      default = "${config.homelab.mounts.fast}/documents/consume";
       description = "Directory Paperless watches for incoming files";
     };
 
     dataDir = lib.mkOption {
       type = lib.types.str;
-      default = "${config.lab.mounts.fast}/appdata/paperless";
+      default = "${config.homelab.mounts.fast}/appdata/paperless";
       description = "Directory where Paperless stores internal application state";
     };
   };
@@ -37,8 +37,8 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
-        assertion = config.lab.baseDomain != "";
-        message = "lab.baseDomain must be set when lab.services.paperless.enable = true";
+        assertion = config.homelab.baseDomain != "";
+        message = "homelab.baseDomain must be set when homelab.apps.paperless.enable = true";
       }
     ];
 
@@ -94,7 +94,7 @@ in
     };
 
     services.caddy.virtualHosts.${serviceHost} = {
-      useACMEHost = config.lab.baseDomain;
+      useACMEHost = config.homelab.baseDomain;
       extraConfig = ''
         reverse_proxy http://127.0.0.1:${toString config.services.paperless.port}
       '';

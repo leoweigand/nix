@@ -1,7 +1,7 @@
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.backup;
+  cfg = config.homelab.infra.backup;
   secrets = config.services.onepassword-secrets.secretPaths;
 
   mkResticJob = name: job:
@@ -38,7 +38,7 @@ let
 in
 
 {
-  options.backup = {
+  options.homelab.infra.backup = {
     enable = lib.mkEnableOption "Restic backups to remote storage";
 
     s3 = {
@@ -105,7 +105,7 @@ in
     assertions = [
       {
         assertion = cfg.jobs != { };
-        message = "backup.jobs must define at least one backup job when backup.enable = true";
+        message = "homelab.infra.backup.jobs must define at least one backup job when homelab.infra.backup.enable = true";
       }
     ];
 

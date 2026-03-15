@@ -22,11 +22,7 @@ in
   imports = [
     (modulesPath + "/profiles/qemu-guest.nix")
     ./hardware-configuration.nix
-    ../../modules/default.nix # load homelab configuration
-    ../../modules/common.nix
-    ../../modules/secrets/1password.nix
-    ../../modules/tailscale.nix
-    ../../modules/services/backup.nix
+    ../../modules/default.nix # load shared machine and homelab modules
   ];
 
   networking = {
@@ -67,101 +63,103 @@ in
   # Compressed swap in RAM - good for VMs
   zramSwap.enable = true;
 
-  # Backups to Backblaze B2
-  backup = {
-    enable = true;
-    s3 = {
-      endpoint = "s3.eu-central-003.backblazeb2.com";
-      bucket = "leolab-backup-picard";
-    };
-    secrets = {
-      s3Credentials = "op://Homelab/Backblaze B2/restic-picard";
-      resticPassword = "op://Homelab/Backblaze B2/restic-password";
-    };
-    jobs = {
-      state = {
-        schedule = "*-*-* 03:00:00";  # Daily at 3:00 AM
-        paths = backupPaths.state;
-        exclude = [
-          "**/log"
-          "**/logs"
-          "**/index"
-          "**/.cache"
-          "**/thumbs"
-          "**/thumbnails"
-        ];
-        pruneOpts = [
-          "--keep-daily 7"
-          "--keep-weekly 4"
-          "--keep-monthly 3"
-        ];
-      };
-
-      documents = {
-        schedule = "Sun *-*-* 04:00:00";  # Weekly on Sundays at 4:00 AM
-        paths = backupPaths.documents;
-        exclude = [
-          "**/thumbs"
-          "**/thumbnails"
-          "**/.tmp"
-          "**/consume"
-        ];
-        pruneOpts = [
-          "--keep-weekly 4"
-          "--keep-monthly 6"
-        ];
-      };
-    };
-  };
-
-  lab = {
+  homelab = {
     baseDomain = "leolab.party";
     mounts = mounts;
 
-    edge = {
-      enable = true;
-      acmeEmail = "admin@leolab.party";
-      cloudflareCredentialsReference = "op://Homelab/Cloudflare/dnsCredentials";
+    infra = {
+      edge = {
+        enable = true;
+        acmeEmail = "admin@leolab.party";
+        cloudflareCredentialsReference = "op://Homelab/Cloudflare/dnsCredentials";
+      };
+
+      mqtt = {
+        enable = true;
+        user = "ha";
+        passwordReference = "op://Homelab/Home Assistant/mqtt-password";
+      };
+
+      edgeDns = {
+        enable = true;
+        lanListenAddress = "192.168.2.4";
+        lanAnswerAddress = "192.168.2.4";
+        tailnetListenAddress = "100.104.119.103";
+        tailnetAnswerAddress = "100.104.119.103";
+        upstreamResolvers = [
+          "192.168.2.1"
+        ];
+      };
+
+      # Backups to Backblaze B2
+      backup = {
+        enable = true;
+        s3 = {
+          endpoint = "s3.eu-central-003.backblazeb2.com";
+          bucket = "leolab-backup-picard";
+        };
+        secrets = {
+          s3Credentials = "op://Homelab/Backblaze B2/restic-picard";
+          resticPassword = "op://Homelab/Backblaze B2/restic-password";
+        };
+        jobs = {
+          state = {
+            schedule = "*-*-* 03:00:00";  # Daily at 3:00 AM
+            paths = backupPaths.state;
+            exclude = [
+              "**/log"
+              "**/logs"
+              "**/index"
+              "**/.cache"
+              "**/thumbs"
+              "**/thumbnails"
+            ];
+            pruneOpts = [
+              "--keep-daily 7"
+              "--keep-weekly 4"
+              "--keep-monthly 3"
+            ];
+          };
+
+          documents = {
+            schedule = "Sun *-*-* 04:00:00";  # Weekly on Sundays at 4:00 AM
+            paths = backupPaths.documents;
+            exclude = [
+              "**/thumbs"
+              "**/thumbnails"
+              "**/.tmp"
+              "**/consume"
+            ];
+            pruneOpts = [
+              "--keep-weekly 4"
+              "--keep-monthly 6"
+            ];
+          };
+        };
+      };
     };
 
-    mqtt = {
-      enable = true;
-      user = "ha";
-      passwordReference = "op://Homelab/Home Assistant/mqtt-password";
-    };
-
-    edgeDns = {
-      enable = true;
-      lanListenAddress = "192.168.2.4";
-      lanAnswerAddress = "192.168.2.4";
-      tailnetListenAddress = "100.104.119.103";
-      tailnetAnswerAddress = "100.104.119.103";
-      upstreamResolvers = [
-        "192.168.2.1"
-      ];
-    };
-
-    services.paperless = {
+    apps.paperless = {
       enable = true;
     };
 
-    services.homeassistant = {
+    apps.homeassistant = {
       enable = true;
       subdomain = "home";
     };
 
-    services.openclaw = {
+    apps.openclaw = {
       enable = true;
       subdomain = "cora";
     };
 
-    services.zigbee2mqtt = {
+    apps.zigbee2mqtt = {
       enable = true;
       serialAdapter = "zstack";
       serialPort = "/dev/serial/by-id/usb-ITead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_64f09a5b4dbeed11b2996b2e38a92db5-if00-port0";
     };
 
-    services.immich = {
+    apps.immich = {
       enable = true;
       subdomain = "photos";
     };

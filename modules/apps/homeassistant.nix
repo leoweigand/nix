@@ -1,13 +1,13 @@
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.lab.services.homeassistant;
-  serviceHost = "${cfg.subdomain}.${config.lab.baseDomain}";
+  cfg = config.homelab.apps.homeassistant;
+  serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
   trustedProxiesLines = lib.concatMapStringsSep "\n" (proxy: "          printf '    - %s\\n' ${lib.escapeShellArg proxy}") cfg.trustedProxies;
 in
 
 {
-  options.lab.services.homeassistant = {
+  options.homelab.apps.homeassistant = {
     enable = lib.mkEnableOption "Home Assistant service";
 
     subdomain = lib.mkOption {
@@ -18,7 +18,7 @@ in
 
     configDir = lib.mkOption {
       type = lib.types.str;
-      default = "${config.lab.mounts.fast}/appdata/homeassistant/config";
+      default = "${config.homelab.mounts.fast}/appdata/homeassistant/config";
       description = "Directory where Home Assistant stores configuration and state";
     };
 
@@ -44,13 +44,13 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
-        assertion = config.lab.baseDomain != "";
-        message = "lab.baseDomain must be set when lab.services.homeassistant.enable = true";
+        assertion = config.homelab.baseDomain != "";
+        message = "homelab.baseDomain must be set when homelab.apps.homeassistant.enable = true";
       }
     ];
 
     services.caddy.virtualHosts.${serviceHost} = {
-      useACMEHost = config.lab.baseDomain;
+      useACMEHost = config.homelab.baseDomain;
       extraConfig = ''
         reverse_proxy http://127.0.0.1:8123
       '';

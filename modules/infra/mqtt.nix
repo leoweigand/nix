@@ -1,11 +1,11 @@
 { config, lib, ... }:
 
 let
-  cfg = config.lab.mqtt;
+  cfg = config.homelab.infra.mqtt;
 in
 
 {
-  options.lab.mqtt = {
+  options.homelab.infra.mqtt = {
     enable = lib.mkEnableOption "Local MQTT broker";
 
     port = lib.mkOption {
@@ -37,11 +37,11 @@ in
     assertions = [
       {
         assertion = config.services.onepassword-secrets.enable;
-        message = "lab.mqtt.enable requires services.onepassword-secrets.enable";
+        message = "homelab.infra.mqtt.enable requires services.onepassword-secrets.enable";
       }
       {
         assertion = cfg.passwordReference != "";
-        message = "lab.mqtt.passwordReference must be set when lab.mqtt.enable = true";
+        message = "homelab.infra.mqtt.passwordReference must be set when homelab.infra.mqtt.enable = true";
       }
     ];
 

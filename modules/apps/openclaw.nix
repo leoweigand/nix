@@ -1,12 +1,12 @@
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.lab.services.openclaw;
-  serviceHost = "${cfg.subdomain}.${config.lab.baseDomain}";
+  cfg = config.homelab.apps.openclaw;
+  serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
 in
 
 {
-  options.lab.services.openclaw = {
+  options.homelab.apps.openclaw = {
     enable = lib.mkEnableOption "OpenClaw gateway service";
 
     subdomain = lib.mkOption {
@@ -17,13 +17,13 @@ in
 
     dataDir = lib.mkOption {
       type = lib.types.str;
-      default = "${config.lab.mounts.fast}/appdata/openclaw/config";
+      default = "${config.homelab.mounts.fast}/appdata/openclaw/config";
       description = "Directory where OpenClaw stores config and runtime state";
     };
 
     workspaceDir = lib.mkOption {
       type = lib.types.str;
-      default = "${config.lab.mounts.fast}/appdata/openclaw";
+      default = "${config.homelab.mounts.fast}/appdata/openclaw";
       description = "Directory mapped to OpenClaw's workspace path";
     };
 
@@ -43,13 +43,13 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
-        assertion = config.lab.baseDomain != "";
-        message = "lab.baseDomain must be set when lab.services.openclaw.enable = true";
+        assertion = config.homelab.baseDomain != "";
+        message = "homelab.baseDomain must be set when homelab.apps.openclaw.enable = true";
       }
     ];
 
     services.caddy.virtualHosts.${serviceHost} = {
-      useACMEHost = config.lab.baseDomain;
+      useACMEHost = config.homelab.baseDomain;
       extraConfig = ''
         reverse_proxy http://127.0.0.1:${toString cfg.port}
       '';

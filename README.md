@@ -15,16 +15,17 @@ NixOS configuration for my homelab.
 
 ## Edge Routing Model
 
-- Shared edge settings live in `modules/reverse-proxy.nix`.
-- App modules (for example `modules/services/immich.nix` and `modules/services/paperless.nix`) only declare their own `services.caddy.virtualHosts` entries and local upstream target.
+- Shared edge settings live in `modules/infra/reverse-proxy.nix`.
+- App modules (for example `modules/apps/immich.nix` and `modules/apps/paperless.nix`) only declare their own `services.caddy.virtualHosts` entries and local upstream target.
+- `homelab.apps.*` is reserved for subdomain-routed app modules; supporting platform services belong under `homelab.infra.*`.
 - Cloudflare DNS credentials for ACME are sourced through opnix using a secret file that contains `CF_DNS_API_TOKEN=...`.
 
 ## Runbook
 
 ### Picard Storage Tiers
 
-- `lab.mounts.fast` (`/mnt/fast`) is for active app data with low-latency access needs.
-- `lab.mounts.slow` (`/mnt/slow`) is for the larger capacity tier exposed from Unraid.
+- `homelab.mounts.fast` (`/mnt/fast`) is for active app data with low-latency access needs.
+- `homelab.mounts.slow` (`/mnt/slow`) is for the larger capacity tier exposed from Unraid.
 - On picard, Paperless documents and Immich media live on `/mnt/fast`, so restoring the `documents` repository targets `/mnt/fast/...` paths.
 
 ### Adding New Secrets
@@ -45,7 +46,7 @@ script = ''
 
 ### Restoring from Backup
 
-Backups are configured per machine in each machine file under `backup.jobs`, while `modules/services/backup.nix` provides shared restic/opnix plumbing.
+Backups are configured per machine in each machine file under `homelab.infra.backup.jobs`, while `modules/infra/backup.nix` provides shared restic/opnix plumbing.
 
 Repository layout:
 

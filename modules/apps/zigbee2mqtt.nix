@@ -1,13 +1,13 @@
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.lab.services.zigbee2mqtt;
-  serviceHost = "${cfg.subdomain}.${config.lab.baseDomain}";
+  cfg = config.homelab.apps.zigbee2mqtt;
+  serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
   mqttPasswordFile = config.services.onepassword-secrets.secretPaths.zigbee2mqttMqttPassword;
 in
 
 {
-  options.lab.services.zigbee2mqtt = {
+  options.homelab.apps.zigbee2mqtt = {
     enable = lib.mkEnableOption "Zigbee2MQTT service";
 
     subdomain = lib.mkOption {
@@ -18,7 +18,7 @@ in
 
     dataDir = lib.mkOption {
       type = lib.types.str;
-      default = "${config.lab.mounts.fast}/appdata/ziqbee2mqtt/config";
+      default = "${config.homelab.mounts.fast}/appdata/ziqbee2mqtt/config";
       description = "Directory where Zigbee2MQTT stores configuration and state";
     };
 
@@ -50,12 +50,12 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
-        assertion = config.lab.mqtt.enable;
-        message = "lab.services.zigbee2mqtt.enable requires lab.mqtt.enable";
+        assertion = config.homelab.infra.mqtt.enable;
+        message = "homelab.apps.zigbee2mqtt.enable requires homelab.infra.mqtt.enable";
       }
       {
-        assertion = config.lab.baseDomain != "" || (!cfg.exposeFrontend);
-        message = "lab.baseDomain must be set when lab.services.zigbee2mqtt.exposeFrontend = true";
+        assertion = config.homelab.baseDomain != "" || (!cfg.exposeFrontend);
+        message = "homelab.baseDomain must be set when homelab.apps.zigbee2mqtt.exposeFrontend = true";
       }
     ];
 
@@ -66,8 +66,8 @@ in
         homeassistant.enabled = true;
         mqtt = {
           base_topic = "zigbee2mqtt";
-          server = "mqtt://127.0.0.1:${toString config.lab.mqtt.port}";
-          user = config.lab.mqtt.user;
+          server = "mqtt://127.0.0.1:${toString config.homelab.infra.mqtt.port}";
+          user = config.homelab.infra.mqtt.user;
           password = "!secret mqtt_password";  # Zigbee2MQTT reads this key from ${cfg.dataDir}/secret.yaml
         };
         serial = {
@@ -84,14 +84,14 @@ in
     };
 
     services.onepassword-secrets.secrets.zigbee2mqttMqttPassword = {
-      reference = config.lab.mqtt.passwordReference;
+      reference = config.homelab.infra.mqtt.passwordReference;
       owner = "root";
       group = "root";
       mode = "0400";
     };
 
     services.caddy.virtualHosts.${serviceHost} = lib.mkIf cfg.exposeFrontend {
-      useACMEHost = config.lab.baseDomain;
+      useACMEHost = config.homelab.baseDomain;
       extraConfig = ''
         reverse_proxy http://127.0.0.1:${toString cfg.frontendPort}
       '';

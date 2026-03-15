@@ -1,17 +1,17 @@
 { config, lib, ... }:
 
 let
-  cfg = config.lab.edge;
-  domain = config.lab.baseDomain;
+  cfg = config.homelab.infra.edge;
+  domain = config.homelab.baseDomain;
 in
 
 {
-  options.lab.edge = {
+  options.homelab.infra.edge = {
     enable = lib.mkEnableOption "Picard edge reverse proxy and TLS";
 
     acmeEmail = lib.mkOption {
       type = lib.types.str;
-      default = "admin@${config.lab.baseDomain}";
+      default = "admin@${config.homelab.baseDomain}";
       description = "Contact email used for ACME registration";
     };
 
@@ -25,7 +25,7 @@ in
     assertions = [
       {
         assertion = domain != "";
-        message = "lab.baseDomain must be set when lab.edge.enable = true";
+        message = "homelab.baseDomain must be set when homelab.infra.edge.enable = true";
       }
     ];
 
