@@ -58,8 +58,9 @@
 - Done: Wired picard to enable the Keycloak baseline module only.
 - Done: Keycloak deployed on picard and passkey login enabled in realm flow.
 - Done: Paperless OIDC login works with Keycloak.
-- In progress: Added Immich native OIDC module wiring in `modules/apps/immich.nix` (secret-backed client secret + OIDC settings).
-- Next: point picard Immich config at the 1Password client secret reference and deploy.
+- Done: Immich native OIDC is wired and deployed with runtime secret injection from 1Password.
+- In progress: Zigbee2MQTT is being moved behind `oauth2-proxy` + Caddy `forward_auth`.
+- Remaining app onboarding after this step: Home Assistant and OpenClaw.
 
 #### Paperless OIDC env file (stored in 1Password)
 - Secret reference: `op://Homelab/Paperless/oidc-env`
