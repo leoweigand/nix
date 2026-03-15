@@ -35,6 +35,12 @@ in
         description = "1Password reference for the Keycloak PostgreSQL user password";
       };
 
+      initialAdminPassword = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Temporary bootstrap admin password for first Keycloak login";
+      };
+
       database = {
         name = lib.mkOption {
           type = lib.types.str;
@@ -89,6 +95,8 @@ in
         hostname = "https://${keycloakHost}";
         proxy-headers = "xforwarded";
       };
+    } // lib.optionalAttrs (cfg.keycloak.initialAdminPassword != null) {
+      initialAdminPassword = cfg.keycloak.initialAdminPassword;
     };
 
     systemd.services.keycloak = lib.mkIf (cfg.keycloak.dbPasswordReference != null) {

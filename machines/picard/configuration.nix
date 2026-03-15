@@ -169,6 +169,7 @@ in
         enable = true;
         keycloak = {
           dbPasswordReference = "op://Homelab/Keycloak/db-password";
+          initialAdminPassword = "change-me-now";
           realm = "homelab";
         };
       };
