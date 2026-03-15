@@ -169,7 +169,6 @@ in
         enable = true;
         keycloak = {
           dbPasswordReference = "op://Homelab/Keycloak/db-password";
-          initialAdminPassword = "change-me-now";
           realm = "homelab";
         };
       };
@@ -178,6 +177,7 @@ in
 
     apps.paperless = {
       enable = true;
+      oidcEnvReference = "op://Homelab/Paperless/oidc-env";
     };
 
     apps.homeassistant = {

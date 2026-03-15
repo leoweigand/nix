@@ -32,6 +32,12 @@ in
       default = "${config.homelab.mounts.fast}/appdata/paperless";
       description = "Directory where Paperless stores internal application state";
     };
+
+    oidcEnvReference = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "1Password reference to an env file with Paperless OIDC settings";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -45,6 +51,13 @@ in
     services.onepassword-secrets.secrets = {
       paperlessAdminPassword = {
         reference = "op://Homelab/Paperless/adminPassword";
+        owner = "paperless";
+        group = "paperless";
+        mode = "0400";
+      };
+    } // lib.optionalAttrs (cfg.oidcEnvReference != null) {
+      paperlessOidcEnv = {
+        reference = cfg.oidcEnvReference;
         owner = "paperless";
         group = "paperless";
         mode = "0400";
@@ -109,6 +122,26 @@ in
     systemd.services.paperless-scheduler = {
       after = [ "opnix-secrets.service" ];
       requires = [ "opnix-secrets.service" ];
+    } // lib.optionalAttrs (cfg.oidcEnvReference != null) {
+      serviceConfig.EnvironmentFile = config.services.onepassword-secrets.secretPaths.paperlessOidcEnv;
+    };
+
+    systemd.services.paperless-web = lib.mkIf (cfg.oidcEnvReference != null) {
+      after = [ "opnix-secrets.service" ];
+      requires = [ "opnix-secrets.service" ];
+      serviceConfig.EnvironmentFile = config.services.onepassword-secrets.secretPaths.paperlessOidcEnv;
+    };
+
+    systemd.services.paperless-consumer = lib.mkIf (cfg.oidcEnvReference != null) {
+      after = [ "opnix-secrets.service" ];
+      requires = [ "opnix-secrets.service" ];
+      serviceConfig.EnvironmentFile = config.services.onepassword-secrets.secretPaths.paperlessOidcEnv;
+    };
+
+    systemd.services.paperless-task-queue = lib.mkIf (cfg.oidcEnvReference != null) {
+      after = [ "opnix-secrets.service" ];
+      requires = [ "opnix-secrets.service" ];
+      serviceConfig.EnvironmentFile = config.services.onepassword-secrets.secretPaths.paperlessOidcEnv;
     };
   };
 }
