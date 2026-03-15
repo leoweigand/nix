@@ -20,6 +20,46 @@ in
       description = "Directory where Immich stores uploaded media";
     };
 
+    oidc = {
+      enable = lib.mkEnableOption "Keycloak OIDC login for Immich";
+
+      issuerUrl = lib.mkOption {
+        type = lib.types.str;
+        default = "https://auth.${config.homelab.baseDomain}/realms/${config.homelab.infra.auth.keycloak.realm}";
+        description = "OIDC issuer URL used by Immich";
+      };
+
+      clientId = lib.mkOption {
+        type = lib.types.str;
+        default = "immich";
+        description = "OIDC client ID configured in Keycloak for Immich";
+      };
+
+      clientSecretReference = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "1Password reference for the Immich OIDC client secret";
+      };
+
+      autoRegister = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Automatically create Immich users after successful OIDC login";
+      };
+
+      scope = lib.mkOption {
+        type = lib.types.str;
+        default = "openid email profile";
+        description = "OIDC scopes requested by Immich";
+      };
+
+      buttonText = lib.mkOption {
+        type = lib.types.str;
+        default = "Log in with LeoAuth";
+        description = "Login button text shown by Immich for OIDC";
+      };
+    };
+
   };
 
   config = lib.mkIf cfg.enable {
@@ -28,7 +68,20 @@ in
         assertion = config.homelab.baseDomain != "";
         message = "homelab.baseDomain must be set when homelab.apps.immich.enable = true";
       }
+      {
+        assertion = !cfg.oidc.enable || cfg.oidc.clientSecretReference != null;
+        message = "homelab.apps.immich.oidc.clientSecretReference must be set when homelab.apps.immich.oidc.enable = true";
+      }
     ];
+
+    services.onepassword-secrets.secrets = lib.optionalAttrs cfg.oidc.enable {
+      immichOidcClientSecret = {
+        reference = cfg.oidc.clientSecretReference;
+        owner = "immich";
+        group = "immich";
+        mode = "0400";
+      };
+    };
 
     services.immich = {
       enable = true;
@@ -43,7 +96,22 @@ in
 
       settings = {
         server.externalDomain = "https://${serviceHost}";
+      } // lib.optionalAttrs cfg.oidc.enable {
+        oauth = {
+          enabled = true;
+          issuerUrl = cfg.oidc.issuerUrl;
+          clientId = cfg.oidc.clientId;
+          clientSecret._secret = config.services.onepassword-secrets.secretPaths.immichOidcClientSecret;
+          autoRegister = cfg.oidc.autoRegister;
+          scope = cfg.oidc.scope;
+          buttonText = cfg.oidc.buttonText;
+        };
       };
+    };
+
+    systemd.services.immich-server = lib.mkIf cfg.oidc.enable {
+      after = [ "opnix-secrets.service" ];
+      requires = [ "opnix-secrets.service" ];
     };
 
     services.caddy.virtualHosts.${serviceHost} = {

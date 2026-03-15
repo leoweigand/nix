@@ -199,6 +199,10 @@ in
     apps.immich = {
       enable = true;
       subdomain = "photos";
+      oidc = {
+        enable = true;
+        clientSecretReference = "op://Homelab/Immich/oidc-client-secret";
+      };
     };
   };
 
