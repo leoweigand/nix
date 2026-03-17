@@ -225,10 +225,12 @@ in
       description = "Prepare OpenClaw gateway configuration";
       wantedBy = [ "openclaw.service" ];
       before = [ "openclaw.service" ];
+      path = with pkgs; [ jq coreutils ];
       serviceConfig = {
         Type = "oneshot";
         User = "openclaw";
         Group = "openclaw";
+        TimeoutStartSec = 60;
         Environment = [
           "OPENCLAW_STATE_DIR=${cfg.dataDir}"
           "OPENCLAW_CONFIG_PATH=${cfg.dataDir}/openclaw.json"
@@ -237,11 +239,36 @@ in
       script = ''
         set -euo pipefail
 
-        # OpenClaw requires explicit non-loopback settings when the service starts unattended.
-        ${lib.getExe cfg.package} config set gateway.mode local
-        ${lib.getExe cfg.package} config set gateway.bind lan
-        ${lib.getExe cfg.package} config set agents.defaults.workspace ${lib.escapeShellArg cfg.workspaceDir}
-        ${lib.getExe cfg.package} config set gateway.controlUi.allowedOrigins ${lib.escapeShellArg ''["https://${serviceHost}"]''} --strict-json
+        config_file="${cfg.dataDir}/openclaw.json"
+        tmp_file=$(mktemp)
+
+        if [ -f "$config_file" ]; then
+          jq --arg workspace ${lib.escapeShellArg cfg.workspaceDir} --arg origin ${lib.escapeShellArg "https://${serviceHost}"} '
+            .gateway = ((.gateway // {}) + { mode: "local", bind: "lan" })
+            | .gateway.controlUi = ((.gateway.controlUi // {}) + { allowedOrigins: [ $origin ] })
+            | .agents = (.agents // {})
+            | .agents.defaults = ((.agents.defaults // {}) + { workspace: $workspace })
+          ' "$config_file" > "$tmp_file"
+        else
+          jq -n --arg workspace ${lib.escapeShellArg cfg.workspaceDir} --arg origin ${lib.escapeShellArg "https://${serviceHost}"} '
+            {
+              gateway: {
+                mode: "local",
+                bind: "lan",
+                controlUi: {
+                  allowedOrigins: [ $origin ]
+                }
+              },
+              agents: {
+                defaults: {
+                  workspace: $workspace
+                }
+              }
+            }
+          ' > "$tmp_file"
+        fi
+
+        mv "$tmp_file" "$config_file"
       '';
     };
 
