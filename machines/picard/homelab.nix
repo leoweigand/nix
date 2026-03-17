@@ -171,7 +171,7 @@ in
 
       openclaw = {
         enable = true;
-        subdomain = "cora";
+        subdomain = "assistant";
         proxyAuth = {
           enable = false;
         };

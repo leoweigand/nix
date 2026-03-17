@@ -3,6 +3,13 @@
 let
   cfg = config.homelab.apps.openclaw;
   serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
+  defaultPackage = pkgs.openclaw.overrideAttrs (old: {
+    meta = old.meta // {
+      # nixpkgs marks OpenClaw insecure by default because it runs an agent over untrusted input.
+      # We intentionally run it in this homelab and keep it behind local reverse-proxy controls.
+      knownVulnerabilities = [ ];
+    };
+  });
 in
 
 {
@@ -17,20 +24,20 @@ in
 
     dataDir = lib.mkOption {
       type = lib.types.str;
-      default = "${config.homelab.mounts.fast}/appdata/openclaw/config";
+      default = "${config.homelab.mounts.fast}/appdata/openclaw";
       description = "Directory where OpenClaw stores config and runtime state";
     };
 
     workspaceDir = lib.mkOption {
       type = lib.types.str;
-      default = "${config.homelab.mounts.fast}/appdata/openclaw";
-      description = "Directory mapped to OpenClaw's workspace path";
+      default = "${config.homelab.mounts.fast}/appdata/openclaw/workspace";
+      description = "Workspace directory for the default/main OpenClaw agent";
     };
 
-    image = lib.mkOption {
-      type = lib.types.str;
-      default = "ghcr.io/openclaw/openclaw:2026.2.26";
-      description = "Container image used for OpenClaw";
+    package = lib.mkOption {
+      type = lib.types.package;
+      default = defaultPackage;
+      description = "OpenClaw package to run as a native systemd service";
     };
 
     port = lib.mkOption {
@@ -96,9 +103,9 @@ in
     systemd.services.oauth2-proxy-openclaw = lib.mkIf cfg.proxyAuth.enable {
       description = "oauth2-proxy for OpenClaw";
       wantedBy = [ "multi-user.target" ];
-      after = [ "network-online.target" "opnix-secrets.service" "podman-openclaw.service" ];
+      after = [ "network-online.target" "opnix-secrets.service" "openclaw.service" ];
       wants = [ "network-online.target" ];
-      requires = [ "opnix-secrets.service" "podman-openclaw.service" ];
+      requires = [ "opnix-secrets.service" "openclaw.service" ];
       serviceConfig = {
         Type = "simple";
         Restart = "on-failure";
@@ -151,51 +158,59 @@ in
           '';
     };
 
-    virtualisation = {
-      podman.enable = true;
-      oci-containers = {
-        backend = "podman";
-        containers.openclaw = {
-          image = cfg.image;
-          autoStart = true;
-          extraOptions = [
-            "--pull=newer"
-          ];
-          cmd = [
-            "node"
-            "dist/index.js"
-            "gateway"
-            # Keep startup non-interactive: Nix bootstraps gateway config before first run.
-            "--allow-unconfigured"
-            "--bind"
-            "lan"
-            "--port"
-            "18789"
-          ];
-          ports = [
-            "127.0.0.1:${toString cfg.port}:18789"
-          ];
-          volumes = [
-            "${cfg.dataDir}:/home/node/.openclaw"
-            "${cfg.workspaceDir}:/home/node/.openclaw/workspace"
-          ];
-          environment = {
-            TZ = config.time.timeZone;
-          };
-        };
-      };
+    users.groups.openclaw = { };
+
+    users.users.openclaw = {
+      isSystemUser = true;
+      group = "openclaw";
+      home = cfg.dataDir;
+      createHome = false;
+      shell = "/run/current-system/sw/bin/nologin";
     };
 
     systemd.tmpfiles.rules = [
-      "d ${cfg.dataDir} 0750 1000 1000 - -"
-      "d ${cfg.workspaceDir} 0750 1000 1000 - -"
+      "d ${cfg.dataDir} 0750 openclaw openclaw - -"
+      "d ${cfg.workspaceDir} 0750 openclaw openclaw - -"
     ];
 
-    systemd.services.openclaw-gateway-config = {
-      description = "Prepare OpenClaw gateway configuration";
-      wantedBy = [ "podman-openclaw.service" ];
-      before = [ "podman-openclaw.service" ];
-      path = with pkgs; [ podman ];
+    environment.shellAliases = {
+      openclaw = "sudo -u openclaw OPENCLAW_STATE_DIR=${cfg.dataDir} OPENCLAW_CONFIG_PATH=${cfg.dataDir}/openclaw.json ${lib.getExe cfg.package}";
+    };
+
+    systemd.services.openclaw = {
+      description = "OpenClaw gateway";
+      wantedBy = [ "multi-user.target" ];
+      wants = [ "network-online.target" ];
+      after = [ "network-online.target" "openclaw-data-permissions.service" "openclaw-gateway-config.service" ];
+      requires = [ "openclaw-data-permissions.service" "openclaw-gateway-config.service" ];
+      serviceConfig = {
+        Type = "simple";
+        User = "openclaw";
+        Group = "openclaw";
+        WorkingDirectory = cfg.workspaceDir;
+        Environment = [
+          "OPENCLAW_STATE_DIR=${cfg.dataDir}"
+          "OPENCLAW_CONFIG_PATH=${cfg.dataDir}/openclaw.json"
+          "TZ=${config.time.timeZone}"
+        ];
+        ExecStart = lib.concatStringsSep " " [
+          (lib.getExe cfg.package)
+          "gateway"
+          "--allow-unconfigured"
+          "--bind"
+          "lan"
+          "--port"
+          (toString cfg.port)
+        ];
+        Restart = "on-failure";
+        RestartSec = 5;
+      };
+    };
+
+    systemd.services.openclaw-data-permissions = {
+      description = "Normalize OpenClaw state and workspace ownership";
+      wantedBy = [ "openclaw.service" ];
+      before = [ "openclaw.service" ];
       serviceConfig = {
         Type = "oneshot";
         User = "root";
@@ -204,31 +219,33 @@ in
       script = ''
         set -euo pipefail
 
-        # OpenClaw requires explicit non-loopback settings; write them with `openclaw config set`
-        # in ephemeral `podman run` calls so values persist in ${cfg.dataDir}/openclaw.json.
-        podman run --rm \
-          -v ${cfg.dataDir}:/home/node/.openclaw \
-          -v ${cfg.workspaceDir}:/home/node/.openclaw/workspace \
-          ${cfg.image} \
-          node dist/index.js config set gateway.mode local
-
-        podman run --rm \
-          -v ${cfg.dataDir}:/home/node/.openclaw \
-          -v ${cfg.workspaceDir}:/home/node/.openclaw/workspace \
-          ${cfg.image} \
-          node dist/index.js config set gateway.bind lan
-
-        podman run --rm \
-          -v ${cfg.dataDir}:/home/node/.openclaw \
-          -v ${cfg.workspaceDir}:/home/node/.openclaw/workspace \
-          ${cfg.image} \
-          node dist/index.js config set gateway.controlUi.allowedOrigins ${lib.escapeShellArg ''["https://${serviceHost}"]''} --strict-json
+        # Keep migrated files readable by the dedicated service account.
+        chown -R openclaw:openclaw ${cfg.dataDir}
       '';
     };
 
-    systemd.services.podman-openclaw = {
-      after = [ "openclaw-gateway-config.service" ];
-      requires = [ "openclaw-gateway-config.service" ];
+    systemd.services.openclaw-gateway-config = {
+      description = "Prepare OpenClaw gateway configuration";
+      wantedBy = [ "openclaw.service" ];
+      before = [ "openclaw.service" ];
+      serviceConfig = {
+        Type = "oneshot";
+        User = "openclaw";
+        Group = "openclaw";
+        Environment = [
+          "OPENCLAW_STATE_DIR=${cfg.dataDir}"
+          "OPENCLAW_CONFIG_PATH=${cfg.dataDir}/openclaw.json"
+        ];
+      };
+      script = ''
+        set -euo pipefail
+
+        # OpenClaw requires explicit non-loopback settings when the service starts unattended.
+        ${lib.getExe cfg.package} config set gateway.mode local
+        ${lib.getExe cfg.package} config set gateway.bind lan
+        ${lib.getExe cfg.package} config set agents.defaults.workspace ${lib.escapeShellArg cfg.workspaceDir}
+        ${lib.getExe cfg.package} config set gateway.controlUi.allowedOrigins ${lib.escapeShellArg ''["https://${serviceHost}"]''} --strict-json
+      '';
     };
 
   };

@@ -36,9 +36,9 @@ Split DNS is served by CoreDNS on picard via `modules/infra/edge-dns.nix`, with 
 - Zigbee-native group membership and direct Zigbee binds are managed in Zigbee2MQTT (not in Home Assistant automations) because they react faster and stay in sync better; direct binds are used for blinds and TRADFRI remotes.
 
 ## OpenClaw
-- OpenClaw runs in a Podman container on picard (`modules/apps/openclaw.nix`) and is exposed through Caddy as `https://openclaw.leolab.party`.
-- OpenClaw's persisted config and workspace bind-mount to `/mnt/fast/appdata/openclaw` on the host.
-- On picard, `openclaw` is a shell alias for `sudo podman exec -it openclaw node dist/index.js`, so container CLI operations (for example device approval) are run from the host shell.
+- OpenClaw runs as a native systemd service on picard (`modules/apps/openclaw.nix`) and is exposed through Caddy as `https://assistant.leolab.party`.
+- OpenClaw's persisted state and workspaces use the standard layout under `/mnt/fast/appdata/openclaw` (for example `openclaw.json`, `workspace`, and `workspace-labby`).
+- On picard, `openclaw` is a shell alias that runs the CLI as the `openclaw` service user against that persisted state directory.
 
 ## Data Model & Recovery
 
