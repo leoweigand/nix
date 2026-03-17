@@ -3,13 +3,6 @@
 let
   cfg = config.homelab.apps.openclaw;
   serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
-  defaultPackage = pkgs.openclaw.overrideAttrs (old: {
-    meta = old.meta // {
-      # nixpkgs marks OpenClaw insecure by default because it runs an agent over untrusted input.
-      # We intentionally run it in this homelab and keep it behind local reverse-proxy controls.
-      knownVulnerabilities = [ ];
-    };
-  });
 in
 
 {
@@ -36,7 +29,7 @@ in
 
     package = lib.mkOption {
       type = lib.types.package;
-      default = defaultPackage;
+      default = pkgs.openclaw;
       description = "OpenClaw package to run as a native systemd service";
     };
 
@@ -76,6 +69,10 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    nixpkgs.config.permittedInsecurePackages = [
+      "${cfg.package.pname}-${cfg.package.version}"
+    ];
+
     assertions = [
       {
         assertion = config.homelab.baseDomain != "";
