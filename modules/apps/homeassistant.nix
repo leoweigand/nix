@@ -40,33 +40,6 @@ in
       description = "Trusted reverse proxy CIDRs for Home Assistant's HTTP integration";
     };
 
-    proxyAuth = {
-      enable = lib.mkEnableOption "OIDC proxy auth for Home Assistant";
-
-      clientId = lib.mkOption {
-        type = lib.types.str;
-        default = "homeassistant";
-        description = "OIDC client ID used by oauth2-proxy";
-      };
-
-      issuerUrl = lib.mkOption {
-        type = lib.types.str;
-        default = "";
-        description = "OIDC issuer URL used by oauth2-proxy";
-      };
-
-      oauth2ProxyPort = lib.mkOption {
-        type = lib.types.port;
-        default = 4185;
-        description = "Local oauth2-proxy port for Home Assistant forward_auth";
-      };
-
-      envReference = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-        description = "1Password reference to oauth2-proxy env values for Home Assistant";
-      };
-    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -75,81 +48,13 @@ in
         assertion = config.homelab.baseDomain != "";
         message = "homelab.baseDomain must be set when homelab.apps.homeassistant.enable = true";
       }
-      {
-        assertion = !cfg.proxyAuth.enable || cfg.proxyAuth.envReference != null;
-        message = "homelab.apps.homeassistant.proxyAuth.envReference must be set when homelab.apps.homeassistant.proxyAuth.enable = true";
-      }
-      {
-        assertion = !cfg.proxyAuth.enable || cfg.proxyAuth.issuerUrl != "";
-        message = "homelab.apps.homeassistant.proxyAuth.issuerUrl must be set when homelab.apps.homeassistant.proxyAuth.enable = true";
-      }
     ];
-
-    services.onepassword-secrets.secrets = lib.optionalAttrs cfg.proxyAuth.enable {
-      homeassistantOauth2ProxyEnv = {
-        reference = cfg.proxyAuth.envReference;
-        owner = "root";
-        group = "root";
-        mode = "0400";
-      };
-    };
-
-    systemd.services.oauth2-proxy-homeassistant = lib.mkIf cfg.proxyAuth.enable {
-      description = "oauth2-proxy for Home Assistant";
-      wantedBy = [ "multi-user.target" ];
-      after = [ "network-online.target" "opnix-secrets.service" "podman-homeassistant.service" ];
-      wants = [ "network-online.target" ];
-      requires = [ "opnix-secrets.service" "podman-homeassistant.service" ];
-      serviceConfig = {
-        Type = "simple";
-        Restart = "on-failure";
-        RestartSec = 5;
-        DynamicUser = true;
-        EnvironmentFile = config.services.onepassword-secrets.secretPaths.homeassistantOauth2ProxyEnv;
-        ExecStart = lib.concatStringsSep " " [
-          "${pkgs.oauth2-proxy}/bin/oauth2-proxy"
-          "--provider=oidc"
-          "--reverse-proxy=true"
-          "--http-address=127.0.0.1:${toString cfg.proxyAuth.oauth2ProxyPort}"
-          "--oidc-issuer-url=${cfg.proxyAuth.issuerUrl}"
-          "--client-id=${cfg.proxyAuth.clientId}"
-          "--redirect-url=https://${serviceHost}/oauth2/callback"
-          "--upstream=http://127.0.0.1:8123"
-          "--scope=openid profile email"
-          "--email-domain=*"
-          "--skip-provider-button=true"
-          "--whitelist-domain=${serviceHost}"
-          "--set-xauthrequest=true"
-        ];
-      };
-    };
 
     services.caddy.virtualHosts.${serviceHost} = {
       useACMEHost = config.homelab.baseDomain;
-      extraConfig =
-        if cfg.proxyAuth.enable then
-          ''
-            handle /oauth2/* {
-              reverse_proxy http://127.0.0.1:${toString cfg.proxyAuth.oauth2ProxyPort}
-            }
-
-            handle {
-              forward_auth 127.0.0.1:${toString cfg.proxyAuth.oauth2ProxyPort} {
-                uri /oauth2/auth
-                header_up X-Real-IP {remote_host}
-                @error status 401
-                handle_response @error {
-                  redir * https://${serviceHost}/oauth2/start?rd={scheme}://{host}{uri}
-                }
-              }
-
-              reverse_proxy http://127.0.0.1:8123
-            }
-          ''
-        else
-          ''
-            reverse_proxy http://127.0.0.1:8123
-          '';
+      extraConfig = ''
+        reverse_proxy http://127.0.0.1:8123
+      '';
     };
 
     virtualisation = {

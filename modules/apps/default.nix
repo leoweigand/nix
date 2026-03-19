@@ -2,7 +2,6 @@
 
 {
   imports = [
-    ./assistant.nix
     ./homeassistant.nix
     ./immich.nix
     ./openclaw.nix

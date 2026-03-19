@@ -10,9 +10,6 @@ let
     appdata = [
       "${mounts.fast}/appdata"
     ];
-    assistant = [
-      "${mounts.fast}/assistant"
-    ];
     paperless = [
       "${mounts.fast}/documents/paperless/library"
     ];
@@ -83,20 +80,6 @@ in
             ];
           };
 
-          assistant = {
-            schedule = "*-*-* 03:30:00"; # Daily at 3:30 AM after appdata
-            paths = backupPaths.assistant;
-            exclude = [
-              "**/logs"
-              "**/.cache"
-            ];
-            pruneOpts = [
-              "--keep-daily 7"
-              "--keep-weekly 4"
-              "--keep-monthly 3"
-            ];
-          };
-
           paperless = {
             schedule = "Sun *-*-* 04:00:00"; # Weekly on Sundays at 4:00 AM
             paths = backupPaths.paperless;
@@ -147,18 +130,12 @@ in
       homeassistant = {
         enable = true;
         subdomain = "home";
-        proxyAuth = {
-          enable = false;
-        };
       };
 
       zigbee2mqtt = {
         enable = true;
         serialAdapter = "zstack";
         serialPort = "/dev/serial/by-id/usb-ITead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_64f09a5b4dbeed11b2996b2e38a92db5-if00-port0";
-        proxyAuth = {
-          enable = false;
-        };
       };
 
       immich = {
@@ -172,19 +149,6 @@ in
       openclaw = {
         enable = true;
         subdomain = "assistant";
-        proxyAuth = {
-          enable = false;
-        };
-      };
-
-      assistant = {
-        enable = true;
-        telegram = {
-          tokenReference = "op://Homelab/Assistant/telegram-bot-token";
-          allowedChats = [
-            123456789
-          ];
-        };
       };
     };
   };
