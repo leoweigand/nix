@@ -16,6 +16,7 @@
   users.users.leo = {
     isNormalUser = true;
     extraGroups = [ "wheel" ];  # wheel group provides sudo access
+    linger = true;  # Ensures user@1000.service runs at boot so nixos-rebuild can reload user-level units (e.g. podman socket) without an active login session
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDevMcuw1B5G4A3K2RbCgA9rz43bG4Imz2nKm9K3X8lL "
     ];
