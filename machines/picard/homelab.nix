@@ -150,6 +150,11 @@ in
         enable = true;
         subdomain = "assistant";
       };
+
+      silverbullet = {
+        enable = true;
+        subdomain = "notes";
+      };
     };
   };
 }
