@@ -16,6 +16,9 @@ let
     immich = [
       "${mounts.fast}/photos"
     ];
+    notes = [
+      "${mounts.fast}/notes"
+    ];
     postgres = [
       "${mounts.fast}/backup/postgres"
     ];
@@ -102,6 +105,15 @@ in
               "**/thumbnails"
               "**/.tmp"
             ];
+            pruneOpts = [
+              "--keep-weekly 4"
+              "--keep-monthly 6"
+            ];
+          };
+
+          notes = {
+            schedule = "Sun *-*-* 05:00:00"; # Weekly on Sundays at 5:00 AM
+            paths = backupPaths.notes;
             pruneOpts = [
               "--keep-weekly 4"
               "--keep-monthly 6"
