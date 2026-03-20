@@ -67,6 +67,7 @@ in
             "--pull=newer"
             "--network=host"  # Required for reliable mDNS/HomeKit discovery from LAN clients
             # DHCP watcher logs a warning without NET_RAW, but current setup does not rely on DHCP discovery.
+            "--umask=0002"  # Combined with setgid on configDir, new files are group-writable (rw-rw-r--)
           ];
           volumes = [
             "${cfg.configDir}:/config"
@@ -83,8 +84,8 @@ in
     systemd.tmpfiles.rules = [
       # Parent needs group-execute so homeassistant group members can traverse to config/
       "d ${builtins.dirOf cfg.configDir} 0750 root homeassistant - -"
-      # group-writable so openclaw (member of homeassistant group) can edit config files
-      "d ${cfg.configDir} 0770 root homeassistant - -"
+      # setgid (2770): new files/dirs inherit homeassistant group; group-writable for openclaw
+      "d ${cfg.configDir} 2770 root homeassistant - -"
     ];
 
     systemd.services.homeassistant-proxy-config = {

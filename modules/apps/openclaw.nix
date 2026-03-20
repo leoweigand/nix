@@ -134,6 +134,8 @@ in
           "TZ=${config.time.timeZone}"
           "HA_URL=http://127.0.0.1:8123"
           "HA_TOKEN_FILE=${config.services.onepassword-secrets.secretPaths.openclawHaToken}"
+          # Systemd inherits the service user's login shell; override so exec tools work
+          "SHELL=/bin/sh"
         ] ++ lib.mapAttrsToList (k: v: "${k}=${v}") cfg.extraEnvironment;
         ExecStart = lib.concatStringsSep " " [
           (lib.getExe cfg.package)
