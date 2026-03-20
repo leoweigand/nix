@@ -82,8 +82,8 @@ in
     users.groups.homeassistant = { };
 
     systemd.tmpfiles.rules = [
-      # Parent needs group-execute so homeassistant group members can traverse to config/
-      "d ${builtins.dirOf cfg.configDir} 0750 root homeassistant - -"
+      # 0751: others get traverse-only so sibling services can reach their own subdirectories
+      "d ${builtins.dirOf cfg.configDir} 0751 root homeassistant - -"
       # setgid (2770): new files/dirs inherit homeassistant group; group-writable for openclaw
       "d ${cfg.configDir} 2770 root homeassistant - -"
     ];
