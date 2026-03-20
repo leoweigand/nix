@@ -39,6 +39,12 @@ in
       description = "Local host port where OpenClaw listens";
     };
 
+    extraEnvironment = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      default = { };
+      description = "Additional environment variables passed to the OpenClaw service";
+    };
+
   };
 
   config = lib.mkIf cfg.enable {
@@ -60,15 +66,47 @@ in
       '';
     };
 
+    services.onepassword-secrets.secrets.openclawHaToken = {
+      reference = "op://Homelab/Openclaw/ha-token";
+      owner = "openclaw";
+    };
+
     users.groups.openclaw = { };
 
     users.users.openclaw = {
       isSystemUser = true;
       group = "openclaw";
+      # nixconfig: shared nix config repo at /opt/nixos-config
+      # homeassistant: read/write HA config at /mnt/fast/appdata/homeassistant/config
+      extraGroups = [ "nixconfig" "homeassistant" ];
       home = cfg.dataDir;
       createHome = false;
       shell = "/run/current-system/sw/bin/nologin";
     };
+
+    security.sudo.extraRules = [
+      {
+        users = [ "openclaw" ];
+        commands = [
+          {
+            command = "/run/current-system/sw/bin/nixos-rebuild switch --flake /opt/nixos-config#picard";
+            options = [ "NOPASSWD" ];
+          }
+          {
+            command = "/run/current-system/sw/bin/nixos-rebuild --rollback switch";
+            options = [ "NOPASSWD" ];
+          }
+          {
+            command = "/run/current-system/sw/bin/systemctl restart podman-homeassistant.service";
+            options = [ "NOPASSWD" ];
+          }
+          {
+            command = "/run/current-system/sw/bin/systemctl status podman-homeassistant.service";
+            options = [ "NOPASSWD" ];
+          }
+        ];
+      }
+    ];
 
     systemd.tmpfiles.rules = [
       "d ${cfg.dataDir} 0750 openclaw openclaw - -"
@@ -83,8 +121,8 @@ in
       description = "OpenClaw gateway";
       wantedBy = [ "multi-user.target" ];
       wants = [ "network-online.target" ];
-      after = [ "network-online.target" "openclaw-data-permissions.service" "openclaw-gateway-config.service" ];
-      requires = [ "openclaw-data-permissions.service" "openclaw-gateway-config.service" ];
+      after = [ "network-online.target" "openclaw-data-permissions.service" "openclaw-gateway-config.service" "opnix-secrets.service" ];
+      requires = [ "openclaw-data-permissions.service" "openclaw-gateway-config.service" "opnix-secrets.service" ];
       serviceConfig = {
         Type = "simple";
         User = "openclaw";
@@ -94,7 +132,9 @@ in
           "OPENCLAW_STATE_DIR=${cfg.dataDir}"
           "OPENCLAW_CONFIG_PATH=${cfg.dataDir}/openclaw.json"
           "TZ=${config.time.timeZone}"
-        ];
+          "HA_URL=http://127.0.0.1:8123"
+          "HA_TOKEN_FILE=${config.services.onepassword-secrets.secretPaths.openclawHaToken}"
+        ] ++ lib.mapAttrsToList (k: v: "${k}=${v}") cfg.extraEnvironment;
         ExecStart = lib.concatStringsSep " " [
           (lib.getExe cfg.package)
           "gateway"

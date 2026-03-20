@@ -79,8 +79,11 @@ in
       };
     };
 
+    users.groups.homeassistant = { };
+
     systemd.tmpfiles.rules = [
-      "d ${cfg.configDir} 0750 root root - -"
+      # group-writable so openclaw (member of homeassistant group) can edit config files
+      "d ${cfg.configDir} 0770 root homeassistant - -"
     ];
 
     systemd.services.homeassistant-proxy-config = {

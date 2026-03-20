@@ -40,7 +40,7 @@ echo "==> Pushing local branch to tracked remote"
 git push
 
 echo "==> Running remote deploy on $server"
-ssh "$server" "set -euo pipefail; cd ~/nixos-config; git pull --ff-only; sudo nixos-rebuild switch --flake .#$server"
+ssh "$server" "set -euo pipefail; cd /opt/nixos-config; git pull --ff-only; sudo nixos-rebuild switch --flake .#$server"
 
 echo "==> Deploy complete for $server"
 echo "==> Applied commit: $commit from branch $branch"
