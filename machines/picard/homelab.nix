@@ -142,7 +142,7 @@ in
       homeassistant = {
         enable = true;
         subdomain = "home";
-        configDir = "${config.homelab.mounts.fast}/appdata/homeassistant";
+        configDir = "${mounts.fast}/appdata/homeassistant";
       };
 
       zigbee2mqtt = {
