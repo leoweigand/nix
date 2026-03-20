@@ -23,7 +23,8 @@ in
       enable = true;
       allowedTCPPorts = [
         22
-        21064  # Must match the HomeKit Bridge port shown in Home Assistant
+        21064  # HomeKit Bridge
+        21065  # Dedicated LG TV HomeKit accessory
       ];
       allowedUDPPorts = [
         5353   # for mdns
