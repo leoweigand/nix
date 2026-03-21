@@ -58,11 +58,6 @@ in
         ];
       };
 
-      tinyauth = {
-        enable = true;
-        envReference = "op://Homelab/Tinyauth/env";
-      };
-
       # Backups to Backblaze B2
       backup = {
         enable = true;
