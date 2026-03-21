@@ -39,6 +39,10 @@ in
       tinyauth = {
         enable = true;
         envReference = "op://Homelab/Tinyauth/env";
+        oidcClients.paperless = {
+          clientId = "paperless";
+          trustedRedirectUris = [ "https://paperless.leolab.party/accounts/oidc/tinyauth/login/callback/" ];
+        };
       };
 
       mqtt = {
