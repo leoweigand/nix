@@ -43,6 +43,10 @@ in
           clientId = "paperless";
           trustedRedirectUris = [ "https://paperless.leolab.party/accounts/oidc/tinyauth/login/callback/" ];
         };
+        oidcClients.immich = {
+          clientId = "immich";
+          trustedRedirectUris = [ "https://photos.leolab.party/api/oauth/callback" ];
+        };
       };
 
       mqtt = {
@@ -164,7 +168,9 @@ in
         enable = true;
         subdomain = "photos";
         oidc = {
-          enable = false;
+          enable = true;
+          issuerUrl = "https://auth.leolab.party";
+          clientSecretReference = "op://Homelab/Immich/oidc-client-secret";
         };
       };
 
