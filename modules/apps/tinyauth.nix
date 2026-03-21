@@ -27,12 +27,12 @@ in
       description = "Container image tag for TinyAuth";
     };
 
-    # 1Password reference to an env file containing TINYAUTH_SECRET and TINYAUTH_USERS.
+    # 1Password reference to an env file containing SECRET and TINYAUTH_AUTH_USERS.
     # Generate user entries with:
     #   docker run -it --rm ghcr.io/steveiliop56/tinyauth:v5 user create --interactive
     envReference = lib.mkOption {
       type = lib.types.str;
-      description = "1Password reference to env file with TINYAUTH_SECRET and TINYAUTH_USERS";
+      description = "1Password reference to env file with SECRET and TINYAUTH_AUTH_USERS";
     };
   };
 
@@ -62,7 +62,7 @@ in
           ports = [ "127.0.0.1:${toString cfg.port}:3000" ];
           environmentFiles = [ config.services.onepassword-secrets.secretPaths.tinyauthEnv ];
           environment = {
-            TINYAUTH_APP_URL = "https://${serviceHost}";
+            TINYAUTH_APPURL = "https://${serviceHost}";
           };
         };
       };
