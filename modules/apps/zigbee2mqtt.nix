@@ -96,6 +96,11 @@ in
     services.caddy.virtualHosts.${serviceHost} = lib.mkIf cfg.exposeFrontend {
       useACMEHost = config.homelab.baseDomain;
       extraConfig = ''
+        ${lib.optionalString config.homelab.infra.tinyauth.enable ''
+          forward_auth http://127.0.0.1:${toString config.homelab.infra.tinyauth.port} {
+            uri /api/auth/caddy
+          }
+        ''}
         reverse_proxy http://127.0.0.1:${toString cfg.frontendPort}
       '';
     };
