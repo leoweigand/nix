@@ -164,9 +164,15 @@ in
         subdomain = "assistant";
       };
 
+      tinyauth = {
+        enable = true;
+        envReference = "op://Homelab/TinyAuth/env";
+      };
+
       silverbullet = {
         enable = true;
         subdomain = "notes";
+        tinyauth = true;
       };
     };
   };

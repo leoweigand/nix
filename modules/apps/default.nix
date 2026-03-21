@@ -7,6 +7,7 @@
     ./openclaw.nix
     ./paperless.nix
     ./silverbullet.nix
+    ./tinyauth.nix
     ./zigbee2mqtt.nix
   ];
 
