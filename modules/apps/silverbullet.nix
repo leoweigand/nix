@@ -26,12 +26,6 @@ in
       default = "2.5.2";
       description = "Container image tag for SilverBullet";
     };
-
-    tinyauth = lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-      description = "Protect SilverBullet with tinyauth forward auth";
-    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -40,17 +34,13 @@ in
         assertion = config.homelab.baseDomain != "";
         message = "homelab.baseDomain must be set when homelab.apps.silverbullet.enable = true";
       }
-      {
-        assertion = !cfg.tinyauth || config.homelab.apps.tinyauth.enable;
-        message = "homelab.apps.tinyauth.enable must be true when homelab.apps.silverbullet.tinyauth = true";
-      }
     ];
 
     services.caddy.virtualHosts.${serviceHost} = {
       useACMEHost = config.homelab.baseDomain;
       extraConfig = ''
-        ${lib.optionalString cfg.tinyauth ''
-          forward_auth http://127.0.0.1:${toString config.homelab.apps.tinyauth.port} {
+        ${lib.optionalString config.homelab.infra.tinyauth.enable ''
+          forward_auth http://127.0.0.1:${toString config.homelab.infra.tinyauth.port} {
             uri /api/auth/caddy
           }
         ''}

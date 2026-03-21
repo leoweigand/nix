@@ -8,5 +8,6 @@
     ./mqtt.nix
     ./reverse-proxy.nix
     ./tailscale.nix
+    ./tinyauth.nix
   ];
 }

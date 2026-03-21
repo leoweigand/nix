@@ -36,6 +36,11 @@ in
         cloudflareCredentialsReference = "op://Homelab/Cloudflare/dnsCredentials";
       };
 
+      tinyauth = {
+        enable = true;
+        envReference = "op://Homelab/Tinyauth/env";
+      };
+
       mqtt = {
         enable = true;
         user = "ha";
@@ -51,6 +56,11 @@ in
         upstreamResolvers = [
           "192.168.2.1"
         ];
+      };
+
+      tinyauth = {
+        enable = true;
+        envReference = "op://Homelab/Tinyauth/env";
       };
 
       # Backups to Backblaze B2
@@ -164,15 +174,9 @@ in
         subdomain = "assistant";
       };
 
-      tinyauth = {
-        enable = true;
-        envReference = "op://Homelab/TinyAuth/env";
-      };
-
       silverbullet = {
         enable = true;
         subdomain = "notes";
-        tinyauth = true;
       };
     };
   };
