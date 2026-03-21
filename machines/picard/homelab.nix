@@ -45,7 +45,10 @@ in
         };
         oidcClients.immich = {
           clientId = "immich";
-          trustedRedirectUris = [ "https://photos.leolab.party/api/oauth/callback" ];
+          trustedRedirectUris = [
+            "https://photos.leolab.party/auth/login"
+            "app.immich:///oauth-callback" # mobile app
+          ];
         };
       };
 
