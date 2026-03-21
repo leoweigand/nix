@@ -27,12 +27,12 @@ in
       description = "Container image tag for TinyAuth";
     };
 
-    # 1Password reference to an env file containing SECRET and TINYAUTH_AUTH_USERS.
-    # Generate user entries with:
-    #   docker run -it --rm ghcr.io/steveiliop56/tinyauth:v5 user create --interactive
+    # 1Password reference to an env file containing TINYAUTH_AUTH_USERS.
+    # Generate user entries with (use single $ in env file, not $$):
+    #   docker run -it --rm ghcr.io/steveiliop56/tinyauth:v5 user create --username <user> --password <pass>
     envReference = lib.mkOption {
       type = lib.types.str;
-      description = "1Password reference to env file with SECRET and TINYAUTH_AUTH_USERS";
+      description = "1Password reference to env file with TINYAUTH_AUTH_USERS=user:bcrypt_hash";
     };
   };
 
