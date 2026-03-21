@@ -62,6 +62,12 @@ in
     services.caddy.virtualHosts.${serviceHost} = {
       useACMEHost = config.homelab.baseDomain;
       extraConfig = ''
+        ${lib.optionalString config.homelab.infra.tinyauth.enable ''
+          forward_auth http://127.0.0.1:${toString config.homelab.infra.tinyauth.port} {
+            uri /api/auth/caddy
+            copy_headers Remote-User
+          }
+        ''}
         reverse_proxy http://127.0.0.1:${toString cfg.port}
       '';
     };
@@ -214,6 +220,17 @@ in
             }
           ' > "$tmp_file"
         fi
+
+        ${lib.optionalString config.homelab.infra.tinyauth.enable ''
+          # Configure trusted-proxy auth: delegate identity to Caddy/tinyauth via Remote-User header
+          jq '
+            .gateway.trustedProxies = ["127.0.0.1"]
+            | .gateway.auth = {
+                mode: "trusted-proxy",
+                trustedProxy: { userHeader: "Remote-User" }
+              }
+          ' "$tmp_file" > "$tmp_file.2" && mv "$tmp_file.2" "$tmp_file"
+        ''}
 
         mv "$tmp_file" "$config_file"
       '';
