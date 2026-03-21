@@ -67,7 +67,7 @@ in
 
       buttonText = lib.mkOption {
         type = lib.types.str;
-        default = "Log in with SSO";
+        default = "Log in with Tinyauth";
         description = "Login button text shown by Immich for OIDC";
       };
     };
