@@ -115,11 +115,8 @@ in
       requires = [ "opnix-secrets.service" ];
     };
 
-    services.caddy.virtualHosts.${serviceHost} = {
-      useACMEHost = config.homelab.baseDomain;
-      extraConfig = ''
-        reverse_proxy http://127.0.0.1:${toString cfg.port}
-      '';
+    homelab.infra.edge.proxies.${cfg.subdomain} = {
+      upstream = "http://127.0.0.1:${toString cfg.port}";
     };
   };
 }

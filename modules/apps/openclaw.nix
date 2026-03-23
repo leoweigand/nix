@@ -60,17 +60,10 @@ in
       }
     ];
 
-    services.caddy.virtualHosts.${serviceHost} = {
-      useACMEHost = config.homelab.baseDomain;
-      extraConfig = ''
-        ${lib.optionalString config.homelab.infra.tinyauth.enable ''
-          forward_auth http://127.0.0.1:${toString config.homelab.infra.tinyauth.port} {
-            uri /api/auth/caddy
-            copy_headers Remote-User
-          }
-        ''}
-        reverse_proxy http://127.0.0.1:${toString cfg.port}
-      '';
+    homelab.infra.edge.proxies.${cfg.subdomain} = {
+      upstream = "http://127.0.0.1:${toString cfg.port}";
+      auth = true;
+      passUser = true;
     };
 
     services.onepassword-secrets.secrets.openclawHaToken = {

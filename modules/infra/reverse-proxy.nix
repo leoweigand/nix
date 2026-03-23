@@ -3,6 +3,7 @@
 let
   cfg = config.homelab.infra.edge;
   domain = config.homelab.baseDomain;
+  tinyauth = config.homelab.infra.tinyauth;
 in
 
 {
@@ -18,6 +19,31 @@ in
     cloudflareCredentialsReference = lib.mkOption {
       type = lib.types.str;
       description = "1Password reference for the ACME DNS-01 environment file";
+    };
+
+    proxies = lib.mkOption {
+      description = "Reverse-proxy virtual hosts, keyed by subdomain";
+      default = { };
+      type = lib.types.attrsOf (lib.types.submodule {
+        options = {
+          upstream = lib.mkOption {
+            type = lib.types.str;
+            description = "Backend URL to proxy requests to";
+          };
+          auth = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Require tinyauth forward authentication before proxying";
+          };
+          passUser = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            # passUser implies auth; setting this without auth = true is valid
+            # and will still gate the request through tinyauth.
+            description = "Forward the authenticated Remote-User header to upstream";
+          };
+        };
+      });
     };
   };
 
@@ -71,7 +97,23 @@ in
         "http://*.${domain}".extraConfig = ''
           redir https://{host}{uri}
         '';
-      };
+      } // lib.mapAttrs' (subdomain: proxyCfg:
+        let
+          needsAuth = (proxyCfg.auth || proxyCfg.passUser) && tinyauth.enable;
+        in
+        lib.nameValuePair "${subdomain}.${domain}" {
+          useACMEHost = domain;
+          extraConfig = ''
+            ${lib.optionalString needsAuth ''
+              forward_auth http://127.0.0.1:${toString tinyauth.port} {
+                uri /api/auth/caddy
+                ${lib.optionalString proxyCfg.passUser "copy_headers Remote-User"}
+              }
+            ''}
+            reverse_proxy ${proxyCfg.upstream}
+          '';
+        }
+      ) cfg.proxies;
     };
 
     networking.firewall = {

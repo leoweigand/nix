@@ -133,11 +133,8 @@ in
       IMMICH_CONFIG_FILE = lib.mkForce "/run/immich/immich.json";
     };
 
-    services.caddy.virtualHosts.${serviceHost} = {
-      useACMEHost = config.homelab.baseDomain;
-      extraConfig = ''
-        reverse_proxy http://${config.services.immich.host}:${toString config.services.immich.port}
-      '';
+    homelab.infra.edge.proxies.${cfg.subdomain} = {
+      upstream = "http://${config.services.immich.host}:${toString config.services.immich.port}";
     };
 
     systemd.tmpfiles.rules = [

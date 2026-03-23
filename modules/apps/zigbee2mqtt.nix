@@ -3,7 +3,6 @@
 let
   name = "zigbee2mqtt";
   cfg = config.homelab.apps.${name};
-  serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
   mqttPasswordFile = config.services.onepassword-secrets.secretPaths.zigbee2mqttMqttPassword;
 in
 
@@ -94,16 +93,11 @@ in
       };
     };
 
-    services.caddy.virtualHosts.${serviceHost} = lib.mkIf cfg.exposeFrontend {
-      useACMEHost = config.homelab.baseDomain;
-      extraConfig = ''
-        ${lib.optionalString config.homelab.infra.tinyauth.enable ''
-          forward_auth http://127.0.0.1:${toString config.homelab.infra.tinyauth.port} {
-            uri /api/auth/caddy
-          }
-        ''}
-        reverse_proxy http://127.0.0.1:${toString cfg.frontendPort}
-      '';
+    homelab.infra.edge.proxies = lib.optionalAttrs cfg.exposeFrontend {
+      ${cfg.subdomain} = {
+        upstream = "http://127.0.0.1:${toString cfg.frontendPort}";
+        auth = true;
+      };
     };
 
     systemd.services.zigbee2mqtt-secrets = {

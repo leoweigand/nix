@@ -3,7 +3,6 @@
 let
   name = "homeassistant";
   cfg = config.homelab.apps.${name};
-  serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
   trustedProxiesLines = lib.concatMapStringsSep "\n" (proxy: "          printf '    - %s\\n' ${lib.escapeShellArg proxy}") cfg.trustedProxies;
 in
 
@@ -50,11 +49,8 @@ in
       }
     ];
 
-    services.caddy.virtualHosts.${serviceHost} = {
-      useACMEHost = config.homelab.baseDomain;
-      extraConfig = ''
-        reverse_proxy http://127.0.0.1:8123
-      '';
+    homelab.infra.edge.proxies.${cfg.subdomain} = {
+      upstream = "http://127.0.0.1:8123";
     };
 
     virtualisation = {
