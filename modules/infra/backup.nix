@@ -8,7 +8,6 @@ let
     let
       repository = "s3:${cfg.s3.endpoint}/${cfg.s3.bucket}/${job.repositorySubdir}";
       restic = "${pkgs.restic}/bin/restic";
-      retentionArgs = lib.concatStringsSep " " job.pruneOpts;
     in
     {
       inherit repository;
@@ -17,7 +16,6 @@ let
       environmentFile = secrets.s3Credentials;
       paths = job.paths;
       exclude = job.exclude;
-      pruneOpts = job.pruneOpts;
 
       timerConfig = {
         OnCalendar = job.schedule;
@@ -29,9 +27,21 @@ let
           ${restic} -r ${repository} -p ${secrets.resticPassword} init
         ${restic} -r ${repository} -p ${secrets.resticPassword} unlock || true
       '';
+    };
 
-      backupCleanupCommand = ''
-        # Remove old snapshots according to retention policy
+  mkResticPruneJob = name: job:
+    let
+      repository = "s3:${cfg.s3.endpoint}/${cfg.s3.bucket}/${job.repositorySubdir}";
+      restic = "${pkgs.restic}/bin/restic";
+      retentionArgs = lib.concatStringsSep " " job.pruneOpts;
+    in
+    {
+      description = "Monthly restic prune for ${name}";
+      after = [ "opnix-secrets.service" "network-online.target" ];
+      requires = [ "opnix-secrets.service" ];
+      serviceConfig.Type = "oneshot";
+      script = ''
+        source ${secrets.s3Credentials}
         ${restic} -r ${repository} -p ${secrets.resticPassword} forget --prune ${retentionArgs}
       '';
     };
@@ -132,10 +142,25 @@ in
 
     services.restic.backups = lib.mapAttrs mkResticJob cfg.jobs;
 
-    systemd.services = lib.mapAttrs' (
-      name: _job: lib.nameValuePair "restic-backups-${name}" {
+    systemd.services = lib.mkMerge [
+      # Ensure backup services wait for secrets to be available
+      (lib.mapAttrs' (name: _job: lib.nameValuePair "restic-backups-${name}" {
         after = [ "opnix-secrets.service" ];
         requires = [ "opnix-secrets.service" ];
+      }) cfg.jobs)
+      # Monthly prune services — separate from backups to avoid running on every backup
+      (lib.mapAttrs' (name: job:
+        lib.nameValuePair "restic-prune-${name}" (mkResticPruneJob name job)
+      ) cfg.jobs)
+    ];
+
+    systemd.timers = lib.mapAttrs' (name: _job:
+      lib.nameValuePair "restic-prune-${name}" {
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          OnCalendar = "monthly";  # First of each month
+          Persistent = true;
+        };
       }
     ) cfg.jobs;
 

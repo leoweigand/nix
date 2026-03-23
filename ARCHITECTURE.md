@@ -46,7 +46,7 @@ Split DNS is served by CoreDNS on picard via `modules/infra/edge-dns.nix`, with 
 - Service-owned persistent state is stored under `/mnt/fast/appdata/<appname>` (for example Home Assistant, OpenClaw, Zigbee2MQTT, and Paperless).
 - User-generated datasets live in dedicated top-level directories on `/mnt/fast` (`/mnt/fast/photos` for Immich uploads, `/mnt/fast/documents` for Paperless media/consume).
 - On picard, active media/documents are stored under `/mnt/fast` (virtiofs from Unraid).
-- Database dump outputs are stored under `/var/backup`.
+- Database dump outputs are stored under `/mnt/fast/backup/postgres`.
 
 ### Home Assistant Workflow Today
 - Home Assistant is currently managed through its own `configuration.yaml` in `/mnt/fast/appdata/homeassistant/config`.
@@ -55,15 +55,23 @@ Split DNS is served by CoreDNS on picard via `modules/infra/edge-dns.nix`, with 
 
 ### Current Database Backup
 - PostgreSQL is enabled where needed by services.
-- `services.postgresqlBackup` is enabled when PostgreSQL is enabled.
-- PostgreSQL dump outputs are included in the daily state backup job.
+- `services.postgresqlBackup` is enabled when PostgreSQL is enabled, dumping to `/mnt/fast/backup/postgres`.
+- Dumps are picked up by the daily `postgres` restic job.
 
 ### Current Backup Jobs
-- Restic job `state` runs daily and backs up `/var/backup` plus `/mnt/fast/appdata`.
-- Restic job `documents` runs weekly and backs up configured bulk-data paths (for picard: `/mnt/fast/documents` and `/mnt/fast/photos`).
-- Excludes are configured per job for regenerable paths such as thumbnails, cache, temp files, and ingest directories.
+All jobs run daily and prune on the first of each month. Retention: 7 daily, 4 weekly, 3 monthly.
+
+| Job | Schedule | Paths |
+|-----|----------|-------|
+| `postgres` | 1:30 AM | `/mnt/fast/backup/postgres` |
+| `appdata` | 3:00 AM | `/mnt/fast/appdata` |
+| `paperless` | 3:30 AM | `/mnt/fast/documents/paperless/library` |
+| `notes` | 4:00 AM | `/mnt/fast/notes` |
+| `immich` | 4:30 AM | `/mnt/fast/photos` |
+
+Excludes are configured per job for regenerable paths (thumbnails, cache, temp files).
 
 ### Current Recovery Model
 - Rebuild `<machine>` from this flake.
-- Restore the restic repositories for `state` and `documents`.
+- Restore the relevant restic job repositories (see README for restore procedure).
 - Restart services after data restore.

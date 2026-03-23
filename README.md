@@ -54,17 +54,22 @@ Repository layout:
 - One restic repository prefix per resource inside that bucket.
 - Shape: `s3:{endpoint}/{machine-bucket}/{resource}`
 
-Examples:
+Picard job URLs:
 
-- Picard state: `s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/state`
-- Picard documents: `s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/documents`
+| Job | Repository |
+|-----|-----------|
+| `postgres` | `s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/postgres` |
+| `appdata` | `s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/appdata` |
+| `paperless` | `s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/paperless` |
+| `notes` | `s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/notes` |
+| `immich` | `s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/immich` |
 
-Home Assistant mapping:
+Service data mapping (all covered by `appdata` job):
 
-- Home Assistant config lives at `/mnt/fast/appdata/homeassistant/config` and is included in Picard's `state` backup job.
-- OpenClaw state lives under `/mnt/fast/appdata/openclaw` (standard OpenClaw layout, including `openclaw.json`, `workspace`, and `workspace-labby`) and is included in Picard's `state` backup job.
-- Zigbee2MQTT config/state lives at `/mnt/fast/appdata/ziqbee2mqtt/config` and is included in Picard's `state` backup job.
-- Paperless internal app state lives at `/mnt/fast/appdata/paperless` and is included in Picard's `state` backup job.
+- Home Assistant config: `/mnt/fast/appdata/homeassistant/config`
+- OpenClaw state: `/mnt/fast/appdata/openclaw`
+- Zigbee2MQTT config: `/mnt/fast/appdata/ziqbee2mqtt/config`
+- Paperless app state: `/mnt/fast/appdata/paperless`
 
 #### 1) Pick restore scope
 
@@ -75,9 +80,9 @@ Home Assistant mapping:
 #### 2) Pre-restore safety checks
 
 ```bash
-# Verify backup timers/services
-systemctl list-timers 'restic-backups-*'
-systemctl status restic-backups-state restic-backups-documents
+# Verify backup and prune timers
+systemctl list-timers 'restic-backups-*' 'restic-prune-*'
+systemctl status restic-backups-appdata restic-backups-immich
 
 # Stop affected services before restore (example: Paperless)
 sudo systemctl stop paperless-scheduler
@@ -87,27 +92,25 @@ sudo systemctl stop paperless-scheduler
 
 ```bash
 # Must run as root so the wrapper can load credentials from 1Password
-sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/state snapshots
-sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/documents snapshots
+sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/appdata snapshots
+sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/paperless snapshots
 ```
 
 #### 4) Restore to staging first
 
 ```bash
 # Restore to staging directory, not directly to /
-sudo mkdir -p /tmp/restore-state /tmp/restore-documents
-sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/state restore latest --target /tmp/restore-state
-sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/documents restore latest --target /tmp/restore-documents
+sudo mkdir -p /tmp/restore-appdata /tmp/restore-paperless
+sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/appdata restore latest --target /tmp/restore-appdata
+sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/paperless restore latest --target /tmp/restore-paperless
 ```
 
 #### 5) Apply restored data and fix ownership
 
 ```bash
 # Example targets for picard's current storage layout
-sudo rsync -a --delete /tmp/restore-state/mnt/fast/appdata/ /mnt/fast/appdata/
-sudo rsync -a --delete /tmp/restore-state/var/backup/ /var/backup/
-sudo rsync -a --delete /tmp/restore-documents/mnt/fast/documents/ /mnt/fast/documents/
-sudo rsync -a --delete /tmp/restore-documents/mnt/fast/photos/ /mnt/fast/photos/
+sudo rsync -a --delete /tmp/restore-appdata/mnt/fast/appdata/ /mnt/fast/appdata/
+sudo rsync -a --delete /tmp/restore-paperless/mnt/fast/documents/paperless/library/ /mnt/fast/documents/paperless/library/
 
 # Fix service ownership where needed
 sudo chown -R paperless:paperless /mnt/fast/appdata/paperless

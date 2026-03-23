@@ -83,6 +83,16 @@ in
           resticPassword = "op://Homelab/Backblaze B2/restic-password";
         };
         jobs = {
+          postgres = {
+            schedule = "*-*-* 01:30:00"; # Daily, after postgresqlBackup runs at midnight
+            paths = backupPaths.postgres;
+            pruneOpts = [
+              "--keep-daily 7"
+              "--keep-weekly 4"
+              "--keep-monthly 3"
+            ];
+          };
+
           appdata = {
             schedule = "*-*-* 03:00:00"; # Daily at 3:00 AM
             paths = backupPaths.appdata;
@@ -102,7 +112,7 @@ in
           };
 
           paperless = {
-            schedule = "Sun *-*-* 04:00:00"; # Weekly on Sundays at 4:00 AM
+            schedule = "*-*-* 03:30:00"; # Daily at 3:30 AM
             paths = backupPaths.paperless;
             exclude = [
               "**/thumbs"
@@ -110,37 +120,30 @@ in
               "**/.tmp"
             ];
             pruneOpts = [
+              "--keep-daily 7"
               "--keep-weekly 4"
-              "--keep-monthly 6"
+              "--keep-monthly 3"
+            ];
+          };
+
+          notes = {
+            schedule = "*-*-* 04:00:00"; # Daily at 4:00 AM
+            paths = backupPaths.notes;
+            pruneOpts = [
+              "--keep-daily 7"
+              "--keep-weekly 4"
+              "--keep-monthly 3"
             ];
           };
 
           immich = {
-            schedule = "Sun *-*-* 04:30:00"; # Weekly on Sundays at 4:30 AM
+            schedule = "*-*-* 04:30:00"; # Daily at 4:30 AM (large library, last to run)
             paths = backupPaths.immich;
             exclude = [
               "**/thumbs"
               "**/thumbnails"
               "**/.tmp"
             ];
-            pruneOpts = [
-              "--keep-weekly 4"
-              "--keep-monthly 6"
-            ];
-          };
-
-          notes = {
-            schedule = "Sun *-*-* 05:00:00"; # Weekly on Sundays at 5:00 AM
-            paths = backupPaths.notes;
-            pruneOpts = [
-              "--keep-weekly 4"
-              "--keep-monthly 6"
-            ];
-          };
-
-          postgres = {
-            schedule = "*-*-* 01:30:00"; # Daily after PostgreSQL dump jobs
-            paths = backupPaths.postgres;
             pruneOpts = [
               "--keep-daily 7"
               "--keep-weekly 4"
