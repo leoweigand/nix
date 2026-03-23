@@ -1,7 +1,8 @@
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.homelab.apps.immich;
+  name = "immich";
+  cfg = config.homelab.apps.${name};
   serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
   oidcConfigTemplate = pkgs.writeText "immich-oidc-template.json" (builtins.toJSON {
     server.externalDomain = "https://${serviceHost}";
@@ -17,12 +18,12 @@ let
   });
 in
 {
-  options.homelab.apps.immich = {
+  options.homelab.apps.${name} = {
     enable = lib.mkEnableOption "Immich photo and video service";
 
     subdomain = lib.mkOption {
       type = lib.types.str;
-      default = "immich";
+      default = name;
       description = "Subdomain used to build the Immich external domain";
     };
 
@@ -78,15 +79,15 @@ in
     assertions = [
       {
         assertion = config.homelab.baseDomain != "";
-        message = "homelab.baseDomain must be set when homelab.apps.immich.enable = true";
+        message = "homelab.baseDomain must be set when homelab.apps.${name}.enable = true";
       }
       {
         assertion = !cfg.oidc.enable || cfg.oidc.clientSecretReference != null;
-        message = "homelab.apps.immich.oidc.clientSecretReference must be set when homelab.apps.immich.oidc.enable = true";
+        message = "homelab.apps.${name}.oidc.clientSecretReference must be set when homelab.apps.${name}.oidc.enable = true";
       }
       {
         assertion = !cfg.oidc.enable || cfg.oidc.issuerUrl != "";
-        message = "homelab.apps.immich.oidc.issuerUrl must be set when homelab.apps.immich.oidc.enable = true";
+        message = "homelab.apps.${name}.oidc.issuerUrl must be set when homelab.apps.${name}.oidc.enable = true";
       }
     ];
 

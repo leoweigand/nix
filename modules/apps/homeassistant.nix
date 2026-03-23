@@ -1,18 +1,19 @@
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.homelab.apps.homeassistant;
+  name = "homeassistant";
+  cfg = config.homelab.apps.${name};
   serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
   trustedProxiesLines = lib.concatMapStringsSep "\n" (proxy: "          printf '    - %s\\n' ${lib.escapeShellArg proxy}") cfg.trustedProxies;
 in
 
 {
-  options.homelab.apps.homeassistant = {
+  options.homelab.apps.${name} = {
     enable = lib.mkEnableOption "Home Assistant service";
 
     subdomain = lib.mkOption {
       type = lib.types.str;
-      default = "home";
+      default = name;
       description = "Subdomain used to build the Home Assistant URL";
     };
 
@@ -45,7 +46,7 @@ in
     assertions = [
       {
         assertion = config.homelab.baseDomain != "";
-        message = "homelab.baseDomain must be set when homelab.apps.homeassistant.enable = true";
+        message = "homelab.baseDomain must be set when homelab.apps.${name}.enable = true";
       }
     ];
 

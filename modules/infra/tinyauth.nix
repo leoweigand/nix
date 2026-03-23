@@ -1,17 +1,18 @@
 { config, lib, ... }:
 
 let
-  cfg = config.homelab.infra.tinyauth;
+  name = "tinyauth";
+  cfg = config.homelab.infra.${name};
   serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
 in
 
 {
-  options.homelab.infra.tinyauth = {
+  options.homelab.infra.${name} = {
     enable = lib.mkEnableOption "TinyAuth forward-auth service";
 
     subdomain = lib.mkOption {
       type = lib.types.str;
-      default = "auth";
+      default = name;
       description = "Subdomain for the TinyAuth login UI";
     };
 
@@ -64,7 +65,7 @@ in
     assertions = [
       {
         assertion = config.homelab.baseDomain != "";
-        message = "homelab.baseDomain must be set when homelab.infra.tinyauth.enable = true";
+        message = "homelab.baseDomain must be set when homelab.infra.${name}.enable = true";
       }
     ];
 

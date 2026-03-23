@@ -1,17 +1,18 @@
 { config, lib, ... }:
 
 let
-  cfg = config.homelab.apps.paperless;
+  name = "paperless";
+  cfg = config.homelab.apps.${name};
   serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
 in
 
 {
-  options.homelab.apps.paperless = {
+  options.homelab.apps.${name} = {
     enable = lib.mkEnableOption "Paperless-ngx service";
 
     subdomain = lib.mkOption {
       type = lib.types.str;
-      default = "paperless";
+      default = name;
       description = "Subdomain used to build the Paperless URL";
     };
 
@@ -44,7 +45,7 @@ in
     assertions = [
       {
         assertion = config.homelab.baseDomain != "";
-        message = "homelab.baseDomain must be set when homelab.apps.paperless.enable = true";
+        message = "homelab.baseDomain must be set when homelab.apps.${name}.enable = true";
       }
     ];
 

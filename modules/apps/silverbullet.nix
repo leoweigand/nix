@@ -1,17 +1,18 @@
 { config, lib, ... }:
 
 let
-  cfg = config.homelab.apps.silverbullet;
+  name = "silverbullet";
+  cfg = config.homelab.apps.${name};
   serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
 in
 
 {
-  options.homelab.apps.silverbullet = {
+  options.homelab.apps.${name} = {
     enable = lib.mkEnableOption "SilverBullet note-taking service";
 
     subdomain = lib.mkOption {
       type = lib.types.str;
-      default = "silverbullet";
+      default = name;
       description = "Subdomain used to build the SilverBullet URL";
     };
 
@@ -32,7 +33,7 @@ in
     assertions = [
       {
         assertion = config.homelab.baseDomain != "";
-        message = "homelab.baseDomain must be set when homelab.apps.silverbullet.enable = true";
+        message = "homelab.baseDomain must be set when homelab.apps.${name}.enable = true";
       }
     ];
 

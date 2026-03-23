@@ -1,17 +1,18 @@
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.homelab.apps.openclaw;
+  name = "openclaw";
+  cfg = config.homelab.apps.${name};
   serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
 in
 
 {
-  options.homelab.apps.openclaw = {
+  options.homelab.apps.${name} = {
     enable = lib.mkEnableOption "OpenClaw gateway service";
 
     subdomain = lib.mkOption {
       type = lib.types.str;
-      default = "openclaw";
+      default = name;
       description = "Subdomain used to build the OpenClaw URL";
     };
 
@@ -55,7 +56,7 @@ in
     assertions = [
       {
         assertion = config.homelab.baseDomain != "";
-        message = "homelab.baseDomain must be set when homelab.apps.openclaw.enable = true";
+        message = "homelab.baseDomain must be set when homelab.apps.${name}.enable = true";
       }
     ];
 

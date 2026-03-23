@@ -38,6 +38,7 @@ in
 
       tinyauth = {
         enable = true;
+        subdomain = "auth";
         envReference = "op://Homelab/Tinyauth/env";
         oidcClients.paperless = {
           clientId = "paperless";
@@ -163,6 +164,7 @@ in
 
       zigbee2mqtt = {
         enable = true;
+        subdomain = "zigbee";
         serialAdapter = "zstack";
         serialPort = "/dev/serial/by-id/usb-ITead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_64f09a5b4dbeed11b2996b2e38a92db5-if00-port0";
       };

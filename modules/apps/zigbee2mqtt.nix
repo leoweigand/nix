@@ -1,18 +1,19 @@
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.homelab.apps.zigbee2mqtt;
+  name = "zigbee2mqtt";
+  cfg = config.homelab.apps.${name};
   serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
   mqttPasswordFile = config.services.onepassword-secrets.secretPaths.zigbee2mqttMqttPassword;
 in
 
 {
-  options.homelab.apps.zigbee2mqtt = {
+  options.homelab.apps.${name} = {
     enable = lib.mkEnableOption "Zigbee2MQTT service";
 
     subdomain = lib.mkOption {
       type = lib.types.str;
-      default = "zigbee";
+      default = name;
       description = "Subdomain used to build the Zigbee2MQTT frontend URL";
     };
 
