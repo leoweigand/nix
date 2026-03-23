@@ -18,13 +18,11 @@ in
 
     dataDir = lib.mkOption {
       type = lib.types.str;
-      default = "${config.homelab.mounts.fast}/appdata/openclaw";
       description = "Directory where OpenClaw stores config and runtime state";
     };
 
     workspaceDir = lib.mkOption {
       type = lib.types.str;
-      default = "${config.homelab.mounts.fast}/appdata/openclaw/workspace";
       description = "Workspace directory for the default/main OpenClaw agent";
     };
 

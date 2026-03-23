@@ -16,22 +16,22 @@ in
       description = "Subdomain used to build the Paperless URL";
     };
 
+    dataDir = lib.mkOption {
+      type = lib.types.str;
+      default = "/var/lib/paperless";
+      description = "Directory where Paperless stores internal application state";
+    };
+
     mediaDir = lib.mkOption {
       type = lib.types.str;
-      default = "${config.homelab.mounts.fast}/documents/paperless/library";
+      default = "${cfg.dataDir}/media";
       description = "Directory where Paperless stores processed documents";
     };
 
     consumptionDir = lib.mkOption {
       type = lib.types.str;
-      default = "${config.homelab.mounts.fast}/documents/paperless/import";
+      default = "${cfg.dataDir}/consume";
       description = "Directory Paperless watches for incoming files";
-    };
-
-    dataDir = lib.mkOption {
-      type = lib.types.str;
-      default = "${config.homelab.mounts.fast}/appdata/paperless";
-      description = "Directory where Paperless stores internal application state";
     };
 
     oidcEnvReference = lib.mkOption {

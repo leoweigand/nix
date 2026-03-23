@@ -17,7 +17,6 @@ in
 
     spaceDir = lib.mkOption {
       type = lib.types.str;
-      default = "${config.homelab.mounts.fast}/notes";
       description = "Directory where SilverBullet stores notes (the 'space')";
     };
 

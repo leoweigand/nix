@@ -29,7 +29,7 @@ in
 
     mediaDir = lib.mkOption {
       type = lib.types.str;
-      default = "${config.homelab.mounts.fast}/photos";
+      default = "/var/lib/immich";
       description = "Directory where Immich stores uploaded media";
     };
 

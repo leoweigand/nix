@@ -39,6 +39,7 @@ in
       tinyauth = {
         enable = true;
         subdomain = "auth";
+        dataDir = "${mounts.fast}/appdata/tinyauth";
         envReference = "op://Homelab/Tinyauth/env";
         oidcClients.paperless = {
           clientId = "paperless";
@@ -153,6 +154,9 @@ in
     apps = {
       paperless = {
         enable = true;
+        dataDir = "${mounts.fast}/appdata/paperless";
+        mediaDir = "${mounts.fast}/documents/paperless/library";
+        consumptionDir = "${mounts.fast}/documents/paperless/import";
         oidcEnvReference = "op://Homelab/Paperless/oidc-env";
       };
 
@@ -165,6 +169,7 @@ in
       zigbee2mqtt = {
         enable = true;
         subdomain = "zigbee";
+        dataDir = "${mounts.fast}/appdata/ziqbee2mqtt/config";  # existing path, typo intentional
         serialAdapter = "zstack";
         serialPort = "/dev/serial/by-id/usb-ITead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_64f09a5b4dbeed11b2996b2e38a92db5-if00-port0";
       };
@@ -172,6 +177,7 @@ in
       immich = {
         enable = true;
         subdomain = "photos";
+        mediaDir = "${mounts.fast}/photos";
         oidc = {
           enable = true;
           issuerUrl = "https://auth.leolab.party";
@@ -182,11 +188,14 @@ in
       openclaw = {
         enable = true;
         subdomain = "assistant";
+        dataDir = "${mounts.fast}/appdata/openclaw";
+        workspaceDir = "${mounts.fast}/appdata/openclaw/workspace";
       };
 
       silverbullet = {
         enable = true;
         subdomain = "notes";
+        spaceDir = "${mounts.fast}/notes";
       };
     };
   };

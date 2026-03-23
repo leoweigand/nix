@@ -30,7 +30,6 @@ in
 
     dataDir = lib.mkOption {
       type = lib.types.str;
-      default = "${config.homelab.mounts.fast}/appdata/tinyauth";
       description = "Directory for persistent TinyAuth data (OIDC keys, database)";
     };
 
