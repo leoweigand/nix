@@ -84,10 +84,10 @@ in
         User = "postgres";
         ExecStart = pkgs.writeShellScript "n8n-set-db-password" ''
           password=$(${pkgs.gnugrep}/bin/grep '^DB_POSTGRESDB_PASSWORD=' ${secretPath} | ${pkgs.coreutils}/bin/cut -d= -f2-)
-          # :'pass' safely quotes the variable as a SQL string literal
-          ${config.services.postgresql.package}/bin/psql \
-            -v "pass=$password" \
-            -c "ALTER USER n8n WITH PASSWORD :'pass'"
+          # :'pass' quotes the variable as a SQL string literal; pipe via stdin because
+          # psql variable interpolation does not apply when using the -c flag
+          echo "ALTER USER n8n WITH PASSWORD :'pass'" \
+            | ${config.services.postgresql.package}/bin/psql -v "pass=$password"
         '';
       };
     };
