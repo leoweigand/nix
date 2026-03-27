@@ -1,9 +1,10 @@
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   name = "n8n";
   cfg = config.homelab.apps.${name};
   serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
+  secretPath = config.services.onepassword-secrets.secretPaths.n8nEncryptionKey;
 in
 
 {
@@ -16,10 +17,22 @@ in
       description = "Subdomain used to build the n8n URL";
     };
 
+    dataDir = lib.mkOption {
+      type = lib.types.str;
+      default = "/mnt/fast/appdata/n8n";
+      description = "Directory for n8n runtime data (config, logs)";
+    };
+
+    imageTag = lib.mkOption {
+      type = lib.types.str;
+      default = "latest";
+      description = "Container image tag for n8n";
+    };
+
     envReference = lib.mkOption {
       type = lib.types.str;
-      description = "1Password reference to an env file containing N8N_ENCRYPTION_KEY";
-      example = "op://Homelab/n8n/envFile";
+      description = "1Password reference for the n8n encryption key (raw value)";
+      example = "op://Homelab/n8n/encryption-key";
     };
   };
 
@@ -31,7 +44,7 @@ in
       }
     ];
 
-    services.onepassword-secrets.secrets.n8nEnv = {
+    services.onepassword-secrets.secrets.n8nEncryptionKey = {
       reference = cfg.envReference;
       owner = "root";
       group = "root";
@@ -46,32 +59,58 @@ in
         name = "n8n";
         ensureDBOwnership = true;
       }];
+      # Allow n8n container (host networking, 127.0.0.1) to connect without a password
+      authentication = lib.mkAfter ''
+        host n8n n8n 127.0.0.1/32 trust
+      '';
     };
 
-    services.n8n = {
-      enable = true;
-      environment = {
-        N8N_HOST = serviceHost;
-        N8N_PROTOCOL = "https";
-        WEBHOOK_URL = "https://${serviceHost}";
-        # DynamicUser names the process user "n8n", matching the PostgreSQL role,
-        # so peer auth works over the Unix socket without a password.
-        DB_TYPE = "postgresdb";
-        DB_POSTGRESDB_HOST = "/run/postgresql";
-        DB_POSTGRESDB_DATABASE = "n8n";
-        DB_POSTGRESDB_USER = "n8n";
-        GENERIC_TIMEZONE = "Europe/Berlin";
-        N8N_DIAGNOSTICS_ENABLED = "false";
-        N8N_VERSION_NOTIFICATIONS_ENABLED = "false";
+    virtualisation = {
+      podman.enable = true;
+      oci-containers = {
+        backend = "podman";
+        containers.n8n = {
+          image = "n8nio/n8n:${cfg.imageTag}";
+          autoStart = true;
+          extraOptions = [
+            "--pull=newer"
+            "--network=host"  # Reach host PostgreSQL on 127.0.0.1
+          ];
+          environmentFiles = [ "/run/n8n-env" ];
+          environment = {
+            N8N_HOST = serviceHost;
+            N8N_PORT = "5678";
+            N8N_PROTOCOL = "https";
+            WEBHOOK_URL = "https://${serviceHost}";
+            DB_TYPE = "postgresdb";
+            DB_POSTGRESDB_HOST = "127.0.0.1";
+            DB_POSTGRESDB_PORT = "5432";
+            DB_POSTGRESDB_DATABASE = "n8n";
+            DB_POSTGRESDB_USER = "n8n";
+            GENERIC_TIMEZONE = "Europe/Berlin";
+            N8N_DIAGNOSTICS_ENABLED = "false";
+            N8N_VERSION_NOTIFICATIONS_ENABLED = "false";
+          };
+          volumes = [ "${cfg.dataDir}:/home/node/.n8n" ];
+        };
       };
     };
 
-    # systemd reads EnvironmentFile as root before privilege drop, so root-owned mode 0400 is fine
-    systemd.services.n8n = {
+    systemd.services."podman-n8n" = {
       after = [ "opnix-secrets.service" "postgresql.service" ];
-      requires = [ "opnix-secrets.service" ];
-      serviceConfig.EnvironmentFile = config.services.onepassword-secrets.secretPaths.n8nEnv;
+      requires = [ "opnix-secrets.service" "postgresql.service" ];
+      # Build a KEY=VALUE env file from the raw secret value before the container starts
+      serviceConfig.ExecStartPre = lib.mkBefore [
+        ("+${pkgs.writeShellScript "n8n-prepare-env" ''
+          printf 'N8N_ENCRYPTION_KEY=%s\n' "$(cat ${secretPath})" > /run/n8n-env
+          chmod 400 /run/n8n-env
+        ''}")
+      ];
     };
+
+    systemd.tmpfiles.rules = [
+      "d ${cfg.dataDir} 0750 root root - -"
+    ];
 
     homelab.infra.edge.proxies.${cfg.subdomain} = {
       upstream = "http://127.0.0.1:5678";
