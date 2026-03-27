@@ -1,4 +1,4 @@
-{ config, lib, modulesPath, ... }:
+{ config, lib, pkgs, modulesPath, ... }:
 
 let
   mounts = config.homelab.mounts;
@@ -48,6 +48,31 @@ in
   zramSwap.enable = true;
 
   services.postgresqlBackup.location = "${mounts.fast}/backup/postgres";
+
+  # Refresh collation metadata on template databases before ensureDatabases runs.
+  # Needed after glibc upgrades bump the collation version; without this,
+  # CREATE DATABASE fails because template1's stored version doesn't match the OS.
+  # This is a metadata-only refresh (no index rebuild); full REINDEX is tracked separately.
+  systemd.services.postgresql-collation-refresh = {
+    description = "Refresh PostgreSQL collation versions on template databases";
+    after = [ "postgresql.service" ];
+    before = [ "postgresql-setup.service" ];
+    wantedBy = [ "postgresql-setup.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      User = "postgres";
+      ExecStart = pkgs.writeShellScript "collation-refresh" ''
+        psql=${config.services.postgresql.package}/bin/psql
+        $psql -c "ALTER DATABASE postgres REFRESH COLLATION VERSION;" || true
+        $psql -c "ALTER DATABASE template1 REFRESH COLLATION VERSION;" || true
+      '';
+    };
+  };
+
+  systemd.services.postgresql-setup = {
+    after = lib.mkAfter [ "postgresql-collation-refresh.service" ];
+  };
 
   # Ensure backup targets exist before first backup run.
   systemd.tmpfiles.rules = [

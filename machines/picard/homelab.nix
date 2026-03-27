@@ -208,7 +208,7 @@ in
 
       n8n = {
         enable = true;
-        envReference = "op://Homelab/N8n/encryption-key";
+        envReference = "op://Homelab/N8n/env";
       };
     };
   };

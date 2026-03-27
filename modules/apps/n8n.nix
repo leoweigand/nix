@@ -4,7 +4,7 @@ let
   name = "n8n";
   cfg = config.homelab.apps.${name};
   serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
-  secretPath = config.services.onepassword-secrets.secretPaths.n8nEncryptionKey;
+  secretPath = config.services.onepassword-secrets.secretPaths.n8nEnv;
 in
 
 {
@@ -31,8 +31,12 @@ in
 
     envReference = lib.mkOption {
       type = lib.types.str;
-      description = "1Password reference for the n8n encryption key (raw value)";
-      example = "op://Homelab/n8n/encryption-key";
+      description = ''
+        1Password reference to a KEY=VALUE env file with:
+          N8N_ENCRYPTION_KEY=<32-char random string>
+          DB_POSTGRESDB_PASSWORD=<database password>
+      '';
+      example = "op://Homelab/n8n/env-file";
     };
   };
 
@@ -44,7 +48,7 @@ in
       }
     ];
 
-    services.onepassword-secrets.secrets.n8nEncryptionKey = {
+    services.onepassword-secrets.secrets.n8nEnv = {
       reference = cfg.envReference;
       owner = "root";
       group = "root";
@@ -59,10 +63,32 @@ in
         name = "n8n";
         ensureDBOwnership = true;
       }];
-      # Allow n8n container (host networking, 127.0.0.1) to connect without a password
+      # Allow n8n container to authenticate over TCP; podman uses the 10.88.0.0/16 bridge network
       authentication = lib.mkAfter ''
-        host n8n n8n 127.0.0.1/32 trust
+        host n8n n8n 10.88.0.0/16 scram-sha-256
       '';
+    };
+
+    # Set the PostgreSQL n8n user password from the env file before the container starts.
+    # Runs on every boot so the password stays in sync with the secret.
+    systemd.services.n8n-db-password = {
+      description = "Set PostgreSQL password for n8n";
+      after = [ "postgresql.service" "opnix-secrets.service" ];
+      requires = [ "postgresql.service" "opnix-secrets.service" ];
+      wantedBy = [ "podman-n8n.service" ];
+      before = [ "podman-n8n.service" ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        User = "postgres";
+        ExecStart = pkgs.writeShellScript "n8n-set-db-password" ''
+          password=$(${pkgs.gnugrep}/bin/grep '^DB_POSTGRESDB_PASSWORD=' ${secretPath} | ${pkgs.coreutils}/bin/cut -d= -f2-)
+          # :'pass' safely quotes the variable as a SQL string literal
+          ${config.services.postgresql.package}/bin/psql \
+            -v "pass=$password" \
+            -c "ALTER USER n8n WITH PASSWORD :'pass'"
+        '';
+      };
     };
 
     virtualisation = {
@@ -72,18 +98,17 @@ in
         containers.n8n = {
           image = "n8nio/n8n:${cfg.imageTag}";
           autoStart = true;
-          extraOptions = [
-            "--pull=newer"
-            "--network=host"  # Reach host PostgreSQL on 127.0.0.1
-          ];
-          environmentFiles = [ "/run/n8n-env" ];
+          extraOptions = [ "--pull=newer" ];
+          ports = [ "127.0.0.1:5678:5678" ];
+          environmentFiles = [ secretPath ];
           environment = {
             N8N_HOST = serviceHost;
             N8N_PORT = "5678";
             N8N_PROTOCOL = "https";
             WEBHOOK_URL = "https://${serviceHost}";
+            # host.containers.internal resolves to the host gateway in podman's bridge network
             DB_TYPE = "postgresdb";
-            DB_POSTGRESDB_HOST = "127.0.0.1";
+            DB_POSTGRESDB_HOST = "host.containers.internal";
             DB_POSTGRESDB_PORT = "5432";
             DB_POSTGRESDB_DATABASE = "n8n";
             DB_POSTGRESDB_USER = "n8n";
@@ -97,15 +122,8 @@ in
     };
 
     systemd.services."podman-n8n" = {
-      after = [ "opnix-secrets.service" "postgresql.service" ];
-      requires = [ "opnix-secrets.service" "postgresql.service" ];
-      # Build a KEY=VALUE env file from the raw secret value before the container starts
-      serviceConfig.ExecStartPre = lib.mkBefore [
-        ("+${pkgs.writeShellScript "n8n-prepare-env" ''
-          printf 'N8N_ENCRYPTION_KEY=%s\n' "$(cat ${secretPath})" > /run/n8n-env
-          chmod 400 /run/n8n-env
-        ''}")
-      ];
+      after = [ "opnix-secrets.service" "postgresql.service" "n8n-db-password.service" ];
+      requires = [ "opnix-secrets.service" "n8n-db-password.service" ];
     };
 
     systemd.tmpfiles.rules = [
