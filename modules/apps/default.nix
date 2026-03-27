@@ -4,6 +4,7 @@
   imports = [
     ./homeassistant.nix
     ./immich.nix
+    ./n8n.nix
     ./openclaw.nix
     ./paperless.nix
     ./silverbullet.nix

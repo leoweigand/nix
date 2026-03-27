@@ -205,6 +205,11 @@ in
         subdomain = "notes";
         spaceDir = "${mounts.fast}/notes";
       };
+
+      n8n = {
+        enable = true;
+        envReference = "op://Homelab/N8n/encryption-key";
+      };
     };
   };
 }
