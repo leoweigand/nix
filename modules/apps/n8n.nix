@@ -65,7 +65,7 @@ in
         ensureDBOwnership = true;
       }];
       # Listen on podman bridge gateway so the container can reach postgres via host.containers.internal
-      settings.listen_addresses = "localhost,10.88.0.1";
+      settings.listen_addresses = lib.mkForce "localhost,10.88.0.1";
       # Allow n8n container to authenticate over TCP; podman uses the 10.88.0.0/16 bridge network
       authentication = lib.mkAfter ''
         host n8n n8n 10.88.0.0/16 scram-sha-256
