@@ -128,7 +128,8 @@ in
     };
 
     systemd.tmpfiles.rules = [
-      "d ${cfg.dataDir} 0750 root root - -"
+      # n8n container runs as UID 1000 (node user); use numeric UID since it doesn't exist on the host
+      "d ${cfg.dataDir} 0750 1000 1000 - -"
     ];
 
     homelab.infra.edge.proxies.${cfg.subdomain} = {
