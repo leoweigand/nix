@@ -50,8 +50,9 @@ in
 
     services.onepassword-secrets.secrets.n8nEnv = {
       reference = cfg.envReference;
-      owner = "root";
-      group = "root";
+      # postgres needs to read this to set the DB password; root bypasses permissions anyway
+      owner = "postgres";
+      group = "postgres";
       mode = "0400";
     };
 
@@ -80,11 +81,11 @@ in
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        # Run as root to read the secret file; connect as postgres via unix socket (trust auth)
+        User = "postgres";
         ExecStart = pkgs.writeShellScript "n8n-set-db-password" ''
           password=$(${pkgs.gnugrep}/bin/grep '^DB_POSTGRESDB_PASSWORD=' ${secretPath} | ${pkgs.coreutils}/bin/cut -d= -f2-)
           # :'pass' safely quotes the variable as a SQL string literal
-          ${config.services.postgresql.package}/bin/psql -U postgres \
+          ${config.services.postgresql.package}/bin/psql \
             -v "pass=$password" \
             -c "ALTER USER n8n WITH PASSWORD :'pass'"
         '';
