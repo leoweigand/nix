@@ -24,6 +24,7 @@
         system = "x86_64-linux";
         specialArgs = { inherit inputs; };
         modules = [
+          { nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (nixpkgs.lib.getName pkg) [ "n8n" ]; }
           ./machines/picard/configuration.nix
           ./machines/picard/disko.nix
           disko.nixosModules.disko
