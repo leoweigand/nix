@@ -80,11 +80,11 @@ in
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        User = "postgres";
+        # Run as root to read the secret file; connect as postgres via unix socket (trust auth)
         ExecStart = pkgs.writeShellScript "n8n-set-db-password" ''
           password=$(${pkgs.gnugrep}/bin/grep '^DB_POSTGRESDB_PASSWORD=' ${secretPath} | ${pkgs.coreutils}/bin/cut -d= -f2-)
           # :'pass' safely quotes the variable as a SQL string literal
-          ${config.services.postgresql.package}/bin/psql \
+          ${config.services.postgresql.package}/bin/psql -U postgres \
             -v "pass=$password" \
             -c "ALTER USER n8n WITH PASSWORD :'pass'"
         '';
