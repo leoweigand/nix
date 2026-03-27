@@ -118,6 +118,12 @@ in
         "http://*.${domain}".extraConfig = ''
           redir https://{host}{uri}
         '';
+
+        # Abort unknown subdomains after TLS handshake rather than serving a blank page
+        "https://*.${domain}" = {
+          useACMEHost = domain;
+          extraConfig = "abort";
+        };
       } // lib.optionalAttrs (cfg.webhookRoutes != [ ]) {
         # Plain HTTP so cloudflared can connect without TLS verification issues.
         # Cloudflare terminates TLS at the edge; the tunnel leg is already encrypted.
