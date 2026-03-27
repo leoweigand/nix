@@ -1,40 +1,59 @@
 # Picard PostgreSQL Collation Refresh Plan
 
-## Goal
-Clear PostgreSQL collation version mismatch warnings (currently `2.40 -> 2.42`) on picard in a safe maintenance window.
+## Background
+After a glibc upgrade, the OS collation version bumped from `2.40` to `2.42`.
+PostgreSQL stores the version it was initialized with, causing:
+- **Warnings** on every connection to existing databases (immich, paperless)
+- **CREATE DATABASE failures** on template1, blocking new database creation (broke n8n setup)
 
-## Scope
-- Databases with warnings (at least `immich`, possibly `postgres` and others).
-- Services writing to those databases (`immich-server`, `paperless-*`).
+## What's Already Done
+- `postgresql-collation-refresh` systemd service runs `ALTER DATABASE ... REFRESH COLLATION VERSION`
+  on **all** databases before `postgresql-setup.service` — prevents future CREATE DATABASE failures
+  and clears the metadata mismatch warnings. This is metadata-only (cheap, runs every boot).
 
-## Pre-flight
-1. Confirm a fresh backup exists (or create one immediately before work).
-2. Confirm enough free disk for temporary index rebuild work.
-3. Announce a short maintenance window.
+## Remaining: One-Time REINDEX
 
-## Execution
-1. Stop write-heavy app services:
-   - `immich-server.service`
-   - `paperless-web.service`
-   - `paperless-task-queue.service`
-   - `paperless-consumer.service`
-   - `paperless-scheduler.service`
-2. For each affected database:
-   - Rebuild collation-sensitive indexes (`REINDEX DATABASE <db>;` in maintenance context).
-   - Run `ALTER DATABASE <db> REFRESH COLLATION VERSION;`.
-3. Start services again.
+The collation refresh updates stored metadata but doesn't rebuild indexes that were built
+against the old sort order. Indexes using collation-sensitive comparisons (text columns with
+`LIKE`, `ORDER BY`, B-tree indexes on text) may return incorrect results until reindexed.
 
-## Verification
-1. Check logs for absence of collation mismatch warnings:
-   - `journalctl -u immich-server.service`
-   - `journalctl -u postgresql.service`
-2. Verify apps are healthy:
-   - `systemctl is-active immich-server.service`
-   - `systemctl is-active paperless-web.service`
-3. Spot-check in app UIs (Immich search/sort, Paperless list/sort).
+### Databases to REINDEX
+- `immich` — text-heavy (search, filenames, tags)
+- `paperless` — text-heavy (document titles, tags, correspondents)
+- `n8n` — freshly created after the refresh, no stale indexes
 
-## Rollback
-If DB behavior looks wrong after refresh:
+### Execution
+1. Deploy the updated config to picard (collation refresh service now covers all DBs).
+2. SSH into picard.
+3. Stop write-heavy services:
+   ```
+   systemctl stop immich-server paperless-web paperless-task-queue paperless-consumer paperless-scheduler podman-n8n
+   ```
+4. Reindex affected databases (as postgres user):
+   ```
+   sudo -u postgres psql -c "REINDEX DATABASE immich;"
+   sudo -u postgres psql -c "REINDEX DATABASE paperless;"
+   ```
+5. Start services:
+   ```
+   systemctl start immich-server paperless-web paperless-task-queue paperless-consumer paperless-scheduler podman-n8n
+   ```
+
+### Verification
+1. Check logs for absence of collation warnings:
+   ```
+   journalctl -u postgresql.service --since "5 min ago" | grep -i collation
+   journalctl -u immich-server.service --since "5 min ago"
+   journalctl -u paperless-web.service --since "5 min ago"
+   ```
+2. Verify services are running:
+   ```
+   systemctl is-active immich-server paperless-web podman-n8n
+   ```
+3. Spot-check app UIs: Immich search/sort, Paperless list/sort.
+
+### Rollback
+If DB behavior looks wrong after REINDEX:
 1. Stop app services.
-2. Restore the latest verified PostgreSQL backup.
-3. Start services and re-validate availability.
+2. Restore from the latest verified PostgreSQL backup (`/mnt/fast/backup/postgres`).
+3. Start services and re-validate.
