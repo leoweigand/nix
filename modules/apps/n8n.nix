@@ -129,6 +129,9 @@ in
       requires = [ "opnix-secrets.service" "n8n-db-password.service" ];
     };
 
+    # Allow the container to reach postgres on the podman bridge; podman0 is not a trusted interface by default
+    networking.firewall.interfaces.podman0.allowedTCPPorts = [ 5432 ];
+
     systemd.tmpfiles.rules = [
       # n8n container runs as UID 1000 (node user); use numeric UID since it doesn't exist on the host
       "d ${cfg.dataDir} 0750 1000 1000 - -"
