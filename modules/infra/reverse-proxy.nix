@@ -45,6 +45,27 @@ in
         };
       });
     };
+
+    webhookRoutes = lib.mkOption {
+      description = "Path-based routes for webhooks.{domain}, each rewriting the path before proxying";
+      default = [ ];
+      type = lib.types.listOf (lib.types.submodule {
+        options = {
+          path = lib.mkOption {
+            type = lib.types.str;
+            description = "URL path to match (e.g. /telegram)";
+          };
+          rewrite = lib.mkOption {
+            type = lib.types.str;
+            description = "Path to rewrite matched requests to before proxying";
+          };
+          upstream = lib.mkOption {
+            type = lib.types.str;
+            description = "Backend URL";
+          };
+        };
+      });
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -97,6 +118,20 @@ in
         "http://*.${domain}".extraConfig = ''
           redir https://{host}{uri}
         '';
+      } // lib.optionalAttrs (cfg.webhookRoutes != [ ]) {
+        "webhooks.${domain}" = {
+          useACMEHost = domain;
+          extraConfig =
+            lib.concatMapStrings (route: ''
+              handle ${route.path} {
+                rewrite * ${route.rewrite}
+                reverse_proxy ${route.upstream}
+              }
+            '') cfg.webhookRoutes
+            + ''
+              respond 404
+            '';
+        };
       } // lib.mapAttrs' (subdomain: proxyCfg:
         let
           needsAuth = (proxyCfg.auth || proxyCfg.passUser) && tinyauth.enable;

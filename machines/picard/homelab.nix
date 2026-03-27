@@ -34,6 +34,18 @@ in
         enable = true;
         acmeEmail = "admin@leolab.party";
         cloudflareCredentialsReference = "op://Homelab/Cloudflare/dnsCredentials";
+        webhookRoutes = [
+          {
+            path = "/ha-telegram-bot";
+            rewrite = "/api/telegram_webhooks";
+            upstream = "http://127.0.0.1:8123";
+          }
+        ];
+      };
+
+      cloudflareTunnel = {
+        enable = true;
+        tokenReference = "op://Homelab/Cloudflare/tunnelCredential";
       };
 
       tinyauth = {
