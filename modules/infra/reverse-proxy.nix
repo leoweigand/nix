@@ -119,8 +119,9 @@ in
           redir https://{host}{uri}
         '';
       } // lib.optionalAttrs (cfg.webhookRoutes != [ ]) {
-        "webhooks.${domain}" = {
-          useACMEHost = domain;
+        # Plain HTTP so cloudflared can connect without TLS verification issues.
+        # Cloudflare terminates TLS at the edge; the tunnel leg is already encrypted.
+        "http://webhooks.${domain}" = {
           extraConfig =
             lib.concatMapStrings (route: ''
               handle ${route.path} {
