@@ -81,7 +81,7 @@ in
     systemd.tmpfiles.rules = [
       # 0751: others get traverse-only so sibling services can reach their own subdirectories
       "d ${builtins.dirOf cfg.configDir} 0751 root homeassistant - -"
-      # setgid (2770): new files/dirs inherit homeassistant group; group-writable for openclaw
+      # setgid (2770): new files/dirs inherit homeassistant group; group-writable for HA-integrated services
       "d ${cfg.configDir} 2770 root homeassistant - -"
     ];
 

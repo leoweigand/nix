@@ -200,13 +200,6 @@ in
         };
       };
 
-      openclaw = {
-        enable = true;
-        subdomain = "assistant";
-        dataDir = "${mounts.fast}/appdata/openclaw";
-        workspaceDir = "${mounts.fast}/appdata/openclaw/workspace";
-      };
-
       silverbullet = {
         enable = true;
         subdomain = "notes";
