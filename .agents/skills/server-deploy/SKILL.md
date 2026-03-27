@@ -16,6 +16,8 @@ Use this skill only when the user explicitly asks to deploy/apply NixOS config t
 - Commit any changes you want deployed before running the script. The deploy only pushes committed history, so uncommitted local edits are not applied.
 - Serve name must be specified 
 
+Run the deploy script **in the background** (deployments are long-running):
+
 ```bash
 .agents/skills/server-deploy/scripts/deploy-server.sh <server>
 ```
