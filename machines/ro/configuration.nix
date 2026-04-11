@@ -11,6 +11,7 @@
   users.users.leo.home = "/Users/leo";
 
   home-manager.users.leo = {
+    imports = [ ../../modules/home ];
     home.stateVersion = "24.11";
   };
 

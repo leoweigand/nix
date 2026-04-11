@@ -10,37 +10,72 @@ Incrementally bring the personal MacBook (`leo-macbook`, arm64, macOS 15.5) into
 
 ---
 
-## Phase 1 — Minimal skeleton (current focus)
+## Phase 1 — Minimal skeleton ✅
 
 Goal: `darwin-rebuild switch --flake .#ro` works end-to-end with no conflicts.
 
-### Flake changes
-- Add `nix-darwin` input: `github:LnL7/nix-darwin/master`
-- Add `home-manager` input: `github:nix-community/home-manager` (follows nixpkgs)
-- Add `darwinConfigurations.ro` output using `nix-darwin.lib.darwinSystem`
-- System: `aarch64-darwin`
+### Delivered
+- `machines/ro/configuration.nix` — minimal system config
+- Updated `flake.nix` — `nix-darwin` + `home-manager` inputs, `darwinConfigurations.ro` output
 
-### machines/ro/configuration.nix
-Minimal system config only:
-- `nixpkgs.hostPlatform = "aarch64-darwin"`
-- `system.stateVersion = 5`
-- Nix settings: `nix.settings.experimental-features = ["nix-command" "flakes"]`
-- Timezone and locale
-- Wire in Home Manager as a nix-darwin module (empty `home-manager.users.leo` block)
-- `networking.hostName` left unset (keeping `leo-macbook`)
+### Key implementation notes
+
+**`inputs.nixpkgs.follows`** on both `nix-darwin` and `home-manager` — they reuse the repo's nixpkgs pin, one eval, no version mismatches.
+
+**`home-manager.darwinModules.home-manager`** wires HM as a nix-darwin module so `darwin-rebuild switch` drives everything; `home-manager switch` is never needed separately.
+
+**`useGlobalPkgs = true`** — HM reuses the system nixpkgs instance (faster builds, consistent versions).
+
+**`useUserPackages = true`** — HM packages land in `/etc/profiles/per-user/leo/` rather than `~/.nix-profile`, avoiding PATH conflicts.
+
+**`users.users.leo.home = "/Users/leo"`** — nix-darwin's `users.users.<name>.home` defaults to `null`; home-manager's common module reads this to set `home.homeDirectory`, so it must be set on the nix-darwin side explicitly.
+
+### First-time activation gotchas
+- New files must be `git add`-ed (and ideally committed) before `nix run nix-darwin` sees them — nix reads the git object store.
+- `/etc/bashrc` (and possibly `/etc/zshrc`) must be renamed to `*.before-nix-darwin` before activation; nix-darwin refuses to overwrite unrecognized content in `/etc`.
+- Bootstrap command (before `darwin-rebuild` is in PATH):
+  ```bash
+  sudo nix --extra-experimental-features 'nix-command flakes' run nix-darwin -- switch --flake /path/to/repo#ro
+  ```
+- Day-to-day after first activation: `darwin-rebuild switch --flake .#ro`
+
+---
+
+## Phase 2 — Shared Home Manager modules + first programs ✅ (zellij done)
+
+Goal: install and configure new tools (not migrated from chezmoi) declaratively, shared between ro and picard.
+
+### Approach
+Create `modules/home/` — a cross-platform Home Manager module directory imported by both machines.
+
+```
+modules/
+  home/
+    default.nix     # imports all home modules
+    zellij.nix      # first shared program
+```
+
+**Adding HM to picard** — picard currently has no Home Manager; packages live in `environment.systemPackages`. Wire in HM via `home-manager.nixosModules.home-manager` (same pattern as ro but for NixOS), then have it import `modules/home`.
+
+**Wiring into ro** — add `imports = [ ../../modules/home ];` inside `home-manager.users.leo` in `machines/ro/configuration.nix`.
+
+### Zellij
+Home Manager has a first-class `programs.zellij` module. Config goes in `modules/home/zellij.nix`:
+```nix
+programs.zellij = {
+  enable = true;
+  settings = { ... };
+};
+```
 
 ### What this phase does NOT touch
 - Homebrew / Brewfile
 - macOS system defaults
-- Any dotfiles or programs
-
-### Delivery
-- `machines/ro/configuration.nix`
-- Updated `flake.nix`
+- Migrating anything from chezmoi
 
 ---
 
-## Phase 2 — macOS system defaults (sketch)
+## Phase 3 — macOS system defaults (sketch)
 
 Move the `defaults write` commands from chezmoi's `run_once_after_setup-macos-defaults.sh.tmpl` into nix-darwin's `system.defaults.*` options.
 
@@ -50,7 +85,7 @@ Move the `defaults write` commands from chezmoi's `run_once_after_setup-macos-de
 
 ---
 
-## Phase 3 — Homebrew packages (sketch)
+## Phase 4 — Homebrew packages (sketch)
 
 Replace the chezmoi Brewfile + run-once install script with nix-darwin's `homebrew` module (or `nix-homebrew`).
 
@@ -62,7 +97,7 @@ Replace the chezmoi Brewfile + run-once install script with nix-darwin's `homebr
 
 ---
 
-## Phase 4 — Home Manager: programs (sketch)
+## Phase 5 — Home Manager: programs (sketch)
 
 Migrate individual programs from chezmoi into Home Manager, one at a time. Good candidates in roughly increasing order of complexity:
 
@@ -77,7 +112,7 @@ Approach: migrate one program at a time, remove from chezmoi, verify nothing bre
 
 ---
 
-## Phase 5 — System packages via Nix (sketch)
+## Phase 6 — System packages via Nix (sketch)
 
 Move CLI tools currently installed via Homebrew (`neovim`, `ripgrep`, `bat`, `zoxide`, `fzf`, etc.) into `environment.systemPackages` or `home.packages` (Home Manager).
 

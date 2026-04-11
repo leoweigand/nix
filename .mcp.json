@@ -1,7 +1,0 @@
-{
-  "mcpServers": {
-    "1password": {
-      "command": "op-mcp"
-    }
-  }
-}
