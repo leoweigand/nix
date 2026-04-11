@@ -7,9 +7,10 @@
   home-manager.useGlobalPkgs = true;    # reuse the system nixpkgs instance (avoids a second eval)
   home-manager.useUserPackages = true;  # install HM packages into the user profile under /etc/profiles
 
+  # nix-darwin: users.users.<name>.home defaults to null, home-manager picks this up
+  users.users.leo.home = "/Users/leo";
+
   home-manager.users.leo = {
-    # macOS home directory must be set explicitly — nix-darwin doesn't infer it
-    home.homeDirectory = "/Users/leo";
     home.stateVersion = "24.11";
   };
 
