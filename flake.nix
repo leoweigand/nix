@@ -4,6 +4,16 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
+    nix-darwin = {
+      url = "github:LnL7/nix-darwin/master";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    home-manager = {
+      url = "github:nix-community/home-manager";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # 1Password integration for secret management
     opnix = {
       url = "github:brizzbuzz/opnix";
@@ -17,7 +27,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, opnix, disko, ... }@inputs: {
+  outputs = { self, nixpkgs, nix-darwin, home-manager, opnix, disko, ... }@inputs: {
     nixosConfigurations = {
       # Picard - Main homelab server (NixOS VM on Unraid)
       picard = nixpkgs.lib.nixosSystem {
@@ -29,6 +39,17 @@
           ./machines/picard/disko.nix
           disko.nixosModules.disko
           opnix.nixosModules.default
+        ];
+      };
+    };
+
+    darwinConfigurations = {
+      ro = nix-darwin.lib.darwinSystem {
+        system = "aarch64-darwin";
+        specialArgs = { inherit inputs; };
+        modules = [
+          ./machines/ro/configuration.nix
+          home-manager.darwinModules.home-manager
         ];
       };
     };
