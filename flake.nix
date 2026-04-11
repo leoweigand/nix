@@ -39,6 +39,8 @@
           ./machines/picard/disko.nix
           disko.nixosModules.disko
           opnix.nixosModules.default
+          home-manager.nixosModules.home-manager
+          ./modules/users/leo
         ];
       };
     };

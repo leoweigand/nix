@@ -85,5 +85,7 @@ in
     "d ${mounts.fast}/backup/postgres 0750 postgres postgres - -"
   ];
 
+  home-manager.users.leo.home.stateVersion = "24.05";
+
   system.stateVersion = "24.05";
 }
