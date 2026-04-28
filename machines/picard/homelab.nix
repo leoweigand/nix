@@ -64,6 +64,10 @@ in
             "app.immich:///oauth-callback" # mobile app
           ];
         };
+        oidcClients.miniflux = {
+          clientId = "miniflux";
+          trustedRedirectUris = [ "https://news.leolab.party/oauth2/oidc/callback" ];
+        };
       };
 
       mqtt = {
@@ -209,6 +213,16 @@ in
       n8n = {
         enable = true;
         envReference = "op://Homelab/N8n/env";
+      };
+
+      miniflux = {
+        enable = true;
+        adminCredentialsReference = "op://Homelab/Miniflux/admin-env";
+        oidc = {
+          enable = true;
+          issuerUrl = "https://auth.leolab.party";
+          clientSecretReference = "op://Homelab/Miniflux/oidc-env";
+        };
       };
     };
   };
