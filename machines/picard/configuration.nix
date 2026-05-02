@@ -85,7 +85,14 @@ in
     "d ${mounts.fast}/backup/postgres 0750 postgres postgres - -"
   ];
 
-  home-manager.users.leo.home.stateVersion = "24.05";
+  home-manager.useGlobalPkgs = true;    # reuse system nixpkgs (one eval, consistent versions)
+  home-manager.useUserPackages = true;  # install HM packages into /etc/profiles/per-user/leo
+  home-manager.extraSpecialArgs = { hostPlatform = "linux"; };  # consumed by modules/home/default.nix dispatch
+
+  home-manager.users.leo = {
+    imports = [ ../../modules/home ];
+    home.stateVersion = "24.05";
+  };
 
   system.stateVersion = "24.05";
 }

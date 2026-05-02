@@ -1,13 +1,11 @@
-{ ... }:
+{ pkgs, ... }:
 
 {
-  home-manager.useGlobalPkgs = true;    # reuse system nixpkgs (one eval, consistent versions)
-  home-manager.useUserPackages = true;  # install HM packages into /etc/profiles/per-user/leo
-
   users.groups.nixconfig = { };  # shared nix config repo access at /opt/nixos-config
 
   users.users.leo = {
     isNormalUser = true;
+    shell = pkgs.zsh;
     extraGroups = [
       "wheel"      # sudo access
       "nixconfig"  # read/write /opt/nixos-config
@@ -18,7 +16,8 @@
     ];
   };
 
-  home-manager.users.leo = {
-    imports = [ ../../home ];
-  };
+  # System-level zsh: writes /etc/zshrc, sets up completion paths, and links
+  # zsh into /etc/shells so chsh/login accept it. Required when zsh is a
+  # user's login shell on NixOS — home-manager alone won't do this.
+  programs.zsh.enable = true;
 }
