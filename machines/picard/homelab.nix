@@ -173,6 +173,7 @@ in
     apps = {
       paperless = {
         enable = true;
+        subdomain = "documents";
         dataDir = "${mounts.fast}/appdata/paperless";
         mediaDir = "${mounts.fast}/documents/paperless/library";
         consumptionDir = "${mounts.fast}/documents/paperless/import";
