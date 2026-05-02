@@ -1,7 +1,5 @@
 { ... }:
 
 {
-  imports = [
-    ./opencode.nix
-  ];
+  imports = [ ];
 }
