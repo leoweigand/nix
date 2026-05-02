@@ -55,7 +55,7 @@ in
         envReference = "op://Homelab/Tinyauth/env";
         oidcClients.paperless = {
           clientId = "paperless";
-          trustedRedirectUris = [ "https://paperless.leolab.party/accounts/oidc/tinyauth/login/callback/" ];
+          trustedRedirectUris = [ "https://documents.leolab.party/accounts/oidc/tinyauth/login/callback/" ];
         };
         oidcClients.immich = {
           clientId = "immich";
