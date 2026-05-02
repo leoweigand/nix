@@ -144,5 +144,9 @@ in
     services.immich.group = "homelab";
     systemd.tmpfiles.settings.immich."${config.services.immich.mediaLocation}".e.mode = lib.mkForce "0750";
 
+    # Recreate the `immich` group: the upstream module skips it when
+    # services.immich.group is overridden, but opnix secrets still target it
+    # for chgrp on the OIDC client secret.
+    users.groups.immich = { };
   };
 }
