@@ -91,12 +91,14 @@ in
         PAPERLESS_URL = "https://${serviceHost}";
         PAPERLESS_ADMIN_USER = "admin";
         PAPERLESS_TIME_ZONE = "Europe/Berlin";
-        PAPERLESS_OCR_LANGUAGE = "eng";
+        PAPERLESS_OCR_LANGUAGE = "eng+deu";
         PAPERLESS_OCR_USER_ARGS = {
           optimize = 1;
           pdfa_image_compression = "lossless";
         };
-        PAPERLESS_FILENAME_FORMAT = "{created_year}/{document_type}/{title}";
+        # doc_pk is the internal DB primary key — stable, auto-assigned, never reused.
+        # Paperless 2.x requires Jinja-style {{ }} syntax; old single-brace form is deprecated.
+        PAPERLESS_FILENAME_FORMAT = "{{ created_year }}/{{ doc_pk }}";
         PAPERLESS_CONSUMER_IGNORE_PATTERN = [
           ".DS_STORE/*"
           "desktop.ini"
