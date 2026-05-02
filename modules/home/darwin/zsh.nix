@@ -18,8 +18,6 @@
     ];
 
     shellAliases = {
-      vim = "nvim";
-      vi = "nvim";
       l = "ls -l";
       la = "ls -la";
       cat = "bat";
