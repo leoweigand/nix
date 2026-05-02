@@ -10,6 +10,7 @@
   ];
 
   home.packages = with pkgs; [
+    _1password-cli
     cloudflared
     ffmpeg
     skhd
