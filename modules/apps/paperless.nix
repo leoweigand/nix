@@ -1,9 +1,22 @@
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   name = "paperless";
   cfg = config.homelab.apps.${name};
   serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
+
+  llmTitleScript = pkgs.writers.writePython3Bin "paperless-llm-title" {
+    flakeIgnore = [ "E501" "E731" "W503" ];
+  } (builtins.readFile ./paperless-llm-title.py);
+
+  llmEnabled = cfg.llmTitleExtraction.enable;
+
+  llmEnv = {
+    PAPERLESS_LLM_API_USERNAME = "admin";
+    PAPERLESS_LLM_API_PASSWORD_FILE = config.services.onepassword-secrets.secretPaths.paperlessAdminPassword;
+    PAPERLESS_LLM_OPENAI_KEY_FILE = config.services.onepassword-secrets.secretPaths.paperlessOpenaiKey;
+    PAPERLESS_LLM_MODEL = cfg.llmTitleExtraction.model;
+  };
 in
 
 {
@@ -39,6 +52,22 @@ in
       default = null;
       description = "1Password reference to an env file with Paperless OIDC settings";
     };
+
+    llmTitleExtraction = {
+      enable = lib.mkEnableOption "LLM-based title extraction via post-consume hook";
+
+      openaiKeyReference = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "1Password reference to the OpenAI API key used for title extraction";
+      };
+
+      model = lib.mkOption {
+        type = lib.types.str;
+        default = "gpt-5.4-nano";
+        description = "OpenAI model used to extract titles";
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -46,6 +75,10 @@ in
       {
         assertion = config.homelab.baseDomain != "";
         message = "homelab.baseDomain must be set when homelab.apps.${name}.enable = true";
+      }
+      {
+        assertion = !llmEnabled || cfg.llmTitleExtraction.openaiKeyReference != null;
+        message = "homelab.apps.${name}.llmTitleExtraction.openaiKeyReference must be set when llmTitleExtraction.enable = true";
       }
     ];
 
@@ -59,6 +92,13 @@ in
     } // lib.optionalAttrs (cfg.oidcEnvReference != null) {
       paperlessOidcEnv = {
         reference = cfg.oidcEnvReference;
+        owner = "paperless";
+        group = "paperless";
+        mode = "0400";
+      };
+    } // lib.optionalAttrs llmEnabled {
+      paperlessOpenaiKey = {
+        reference = cfg.llmTitleExtraction.openaiKeyReference;
         owner = "paperless";
         group = "paperless";
         mode = "0400";
@@ -106,6 +146,8 @@ in
         ];
         PAPERLESS_TASK_WORKERS = 2;
         PAPERLESS_THREADS_PER_WORKER = 2;
+      } // lib.optionalAttrs llmEnabled {
+        PAPERLESS_POST_CONSUME_SCRIPT = "${llmTitleScript}/bin/paperless-llm-title";
       };
     };
 
@@ -144,16 +186,25 @@ in
       serviceConfig.EnvironmentFile = config.services.onepassword-secrets.secretPaths.paperlessOidcEnv;
     };
 
-    systemd.services.paperless-consumer = lib.mkIf (cfg.oidcEnvReference != null) {
-      after = [ "opnix-secrets.service" ];
-      requires = [ "opnix-secrets.service" ];
-      serviceConfig.EnvironmentFile = config.services.onepassword-secrets.secretPaths.paperlessOidcEnv;
-    };
+    # The post-consume hook actually runs inside paperless-task-queue (the celery
+    # worker), but the consumer also spawns it for some filesystem code paths —
+    # set the env on both to be safe.
+    systemd.services.paperless-consumer = lib.mkMerge [
+      (lib.mkIf (cfg.oidcEnvReference != null) {
+        after = [ "opnix-secrets.service" ];
+        requires = [ "opnix-secrets.service" ];
+        serviceConfig.EnvironmentFile = config.services.onepassword-secrets.secretPaths.paperlessOidcEnv;
+      })
+      (lib.mkIf llmEnabled { environment = llmEnv; })
+    ];
 
-    systemd.services.paperless-task-queue = lib.mkIf (cfg.oidcEnvReference != null) {
-      after = [ "opnix-secrets.service" ];
-      requires = [ "opnix-secrets.service" ];
-      serviceConfig.EnvironmentFile = config.services.onepassword-secrets.secretPaths.paperlessOidcEnv;
-    };
+    systemd.services.paperless-task-queue = lib.mkMerge [
+      (lib.mkIf (cfg.oidcEnvReference != null) {
+        after = [ "opnix-secrets.service" ];
+        requires = [ "opnix-secrets.service" ];
+        serviceConfig.EnvironmentFile = config.services.onepassword-secrets.secretPaths.paperlessOidcEnv;
+      })
+      (lib.mkIf llmEnabled { environment = llmEnv; })
+    ];
   };
 }

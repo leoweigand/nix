@@ -178,6 +178,10 @@ in
         mediaDir = "${mounts.fast}/documents/paperless/library";
         consumptionDir = "${mounts.fast}/documents/paperless/import";
         oidcEnvReference = "op://Homelab/Paperless/oidc-env";
+        llmTitleExtraction = {
+          enable = true;
+          openaiKeyReference = "op://Homelab/Paperless/openai-token";
+        };
       };
 
       homeassistant = {
