@@ -19,28 +19,17 @@ case "$server" in
     ;;
 esac
 
-branch="$(git branch --show-current)"
-commit="$(git rev-parse --short HEAD)"
-
-if [[ -z "$branch" ]]; then
-  echo "Error: unable to determine current branch."
-  exit 1
-fi
-
-if ! git rev-parse --abbrev-ref --symbolic-full-name "@{u}" >/dev/null 2>&1; then
-  echo "Error: current branch '$branch' has no upstream tracking branch."
-  echo "Set one first, for example: git push -u origin $branch"
-  exit 1
-fi
-
 echo "==> Deploy target: $server"
-echo "==> Local context: branch=$branch commit=$commit"
+echo "==> Local context: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'detached')@$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown') (working tree, may include uncommitted changes)"
 
-echo "==> Pushing local branch to tracked remote"
-git push
-
-echo "==> Running remote deploy on $server"
-ssh "$server" "set -euo pipefail; cd /opt/nixos-config; git pull --ff-only; sudo nixos-rebuild switch --flake .#$server"
+# Eval locally (works on darwin since eval is platform-independent), ship the
+# derivation graph to $server over SSH, build there, then activate. No GitHub
+# round-trip, no /opt/nixos-config checkout needed on the target.
+echo "==> Building and activating on $server"
+nix run nixpkgs#nixos-rebuild -- switch \
+  --flake ".#$server" \
+  --build-host "$server" \
+  --target-host "$server" \
+  --sudo
 
 echo "==> Deploy complete for $server"
-echo "==> Applied commit: $commit from branch $branch"
