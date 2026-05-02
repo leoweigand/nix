@@ -4,6 +4,7 @@
   imports = [
     ./cli.nix
     ./fzf.nix
+    ./git.nix
     ./lazygit.nix
     ./neovim.nix
     ./opencode.nix

@@ -1,0 +1,13 @@
+# Font
+font-family = JetBrainsMono Nerd Font
+font-size = 16
+
+# Theme
+theme = sonokai
+
+# Use broadly supported TERM for SSH hosts without ghostty terminfo
+term = xterm-256color
+
+# Keybinds
+keybind = shift+enter=text:\x1b\r
+keybind = super+k=clear_screen
