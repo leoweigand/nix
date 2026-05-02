@@ -55,7 +55,7 @@ in
     };
 
     systemd.tmpfiles.rules = [
-      "d ${cfg.spaceDir} 0750 root root - -"
+      "d ${cfg.spaceDir} 0750 root homelab - -"
     ];
   };
 }

@@ -2,6 +2,7 @@
 
 {
   users.groups.nixconfig = { };  # shared nix config repo access at /opt/nixos-config
+  users.groups.homelab = { };    # read access to per-service data dirs under /mnt/fast/*
 
   users.users.leo = {
     isNormalUser = true;
@@ -9,6 +10,7 @@
     extraGroups = [
       "wheel"      # sudo access
       "nixconfig"  # read/write /opt/nixos-config
+      "homelab"    # read /mnt/fast/* data dirs (paperless, immich, notes, ...)
     ];
     linger = true;  # start user@1000.service at boot (needed for rootless podman socket without active login)
     openssh.authorizedKeys.keys = [

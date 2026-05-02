@@ -133,8 +133,9 @@ in
     networking.firewall.interfaces.podman0.allowedTCPPorts = [ 5432 ];
 
     systemd.tmpfiles.rules = [
-      # n8n container runs as UID 1000 (node user); use numeric UID since it doesn't exist on the host
-      "d ${cfg.dataDir} 0750 1000 1000 - -"
+      # n8n container runs as UID 1000 (node user); use numeric UID since it doesn't exist on the host.
+      # Group `homelab` lets leo read the dir without being in any per-service group.
+      "d ${cfg.dataDir} 0750 1000 homelab - -"
     ];
 
     homelab.infra.edge.proxies.${cfg.subdomain} = {

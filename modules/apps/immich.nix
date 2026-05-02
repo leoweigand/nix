@@ -137,9 +137,12 @@ in
       upstream = "http://${config.services.immich.host}:${toString config.services.immich.port}";
     };
 
-    systemd.tmpfiles.rules = [
-      "d ${cfg.mediaDir} 0750 immich immich - -"
-    ];
+    # Run immich as group `homelab` so the upstream tmpfiles rule it emits
+    # (which is `e` = enforce-on-existing and would otherwise reset to immich:immich)
+    # uses the shared group. The mode is hardcoded to 0700 upstream, so we
+    # overlay just the mode leaf to make it group-readable.
+    services.immich.group = "homelab";
+    systemd.tmpfiles.settings.immich."${config.services.immich.mediaLocation}".e.mode = lib.mkForce "0750";
 
   };
 }

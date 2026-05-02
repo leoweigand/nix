@@ -109,8 +109,8 @@ in
     ];
 
     systemd.tmpfiles.rules = [
-      "d ${cfg.dataDir} 0750 openclaw openclaw - -"
-      "d ${cfg.workspaceDir} 0750 openclaw openclaw - -"
+      "d ${cfg.dataDir} 0750 openclaw homelab - -"
+      "d ${cfg.workspaceDir} 0750 openclaw homelab - -"
     ];
 
     environment.shellAliases = {

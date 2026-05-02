@@ -111,10 +111,22 @@ in
       upstream = "http://127.0.0.1:${toString config.services.paperless.port}";
     };
 
+    # Make paperless's primary group `homelab` so the upstream services.paperless
+    # module's own tmpfiles entries (which derive group from this) emit `homelab`,
+    # giving leo read access via the shared group. The `paperless` group still
+    # exists separately for legacy references (e.g. secrets group ownership).
+    users.users.paperless.group = lib.mkForce "homelab";
+
+    # Explicit rules for the parent dirs of mediaDir/consumptionDir.
+    # Without these, the parents get implicit/inconsistent ownership and
+    # systemd-tmpfiles aborts with "unsafe path transition", silently skipping
+    # the rules below them.
     systemd.tmpfiles.rules = [
-      "d ${config.services.paperless.dataDir} 0750 paperless paperless - -"
-      "d ${config.services.paperless.mediaDir} 0750 paperless paperless - -"
-      "d ${config.services.paperless.consumptionDir} 0750 paperless paperless - -"
+      "d ${builtins.dirOf (builtins.dirOf config.services.paperless.mediaDir)} 0750 paperless homelab - -"
+      "d ${builtins.dirOf config.services.paperless.mediaDir} 0750 paperless homelab - -"
+      # Explicit 0750 on mediaDir: upstream's tmpfiles rule uses `-` for mode
+      # (don't change), and paperless historically left this dir at 0711.
+      "d ${config.services.paperless.mediaDir} 0750 paperless homelab - -"
     ];
 
     systemd.services.paperless-scheduler = {
