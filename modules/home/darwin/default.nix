@@ -5,6 +5,7 @@
     ./gh.nix
     ./ghostty.nix
     ./nvim.nix
+    ./slimg.nix
     ./zed.nix
     ./zsh.nix
   ];
