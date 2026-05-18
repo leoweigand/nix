@@ -8,6 +8,10 @@ When a package or module requires a newer nixpkgs channel, prefer upgrading the 
 
 When a request says "update it" for a nix-managed app, treat that as updating the flake lock (usually `nixpkgs`), while app-level updater settings (like `autoupdate`) belong in the app's managed config (e.g. Home Manager `xdg.configFile`).
 
+## Installing Apps and Tools
+
+For URL-only install prompts, inspect the site metadata/download links early. If the app is macOS-only and distributed as a DMG/`.app`, check for a Homebrew cask and manage it in `machines/ro/configuration.nix` before considering nixpkgs or a custom derivation.
+
 ## Containerized Services (Podman/OCI)
 
 When writing a NixOS module for a containerized service that communicates with a host service (e.g. PostgreSQL), three things must be configured together — missing any one leaves it broken:

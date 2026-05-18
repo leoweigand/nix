@@ -33,6 +33,7 @@
     casks = [
       "1password-cli"
       "blender"
+      "cmux"
       "codex"
       "font-ia-writer-quattro"
       "ghostty"
