@@ -6,6 +6,8 @@ When planning new features, work in markdown files inside `plans/`. The readme a
 
 When a package or module requires a newer nixpkgs channel, prefer upgrading the repository's main nixpkgs input for everything instead of introducing a one-off secondary channel just for that dependency.
 
+When a request says "update it" for a nix-managed app, treat that as updating the flake lock (usually `nixpkgs`), while app-level updater settings (like `autoupdate`) belong in the app's managed config (e.g. Home Manager `xdg.configFile`).
+
 ## Containerized Services (Podman/OCI)
 
 When writing a NixOS module for a containerized service that communicates with a host service (e.g. PostgreSQL), three things must be configured together — missing any one leaves it broken:
