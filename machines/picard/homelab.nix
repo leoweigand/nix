@@ -22,6 +22,9 @@ let
     postgres = [
       "${mounts.fast}/backup/postgres"
     ];
+    esphome = [
+      "/var/lib/esphome"
+    ];
   };
 in
 {
@@ -166,6 +169,20 @@ in
               "--keep-monthly 3"
             ];
           };
+
+          esphome = {
+            schedule = "*-*-* 02:30:00"; # Daily at 2:30 AM, before appdata
+            paths = backupPaths.esphome;
+            exclude = [
+              ".platformio"           # PlatformIO toolchains, regenerable
+              "**/.esphome/build"     # per-device build artifacts, regenerable
+            ];
+            pruneOpts = [
+              "--keep-daily 7"
+              "--keep-weekly 4"
+              "--keep-monthly 3"
+            ];
+          };
         };
       };
     };
@@ -188,6 +205,10 @@ in
         enable = true;
         subdomain = "home";
         configDir = "${mounts.fast}/appdata/homeassistant";
+      };
+
+      esphome = {
+        enable = true;
       };
 
       zigbee2mqtt = {

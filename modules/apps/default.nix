@@ -2,6 +2,7 @@
 
 {
   imports = [
+    ./esphome.nix
     ./homeassistant.nix
     ./immich.nix
     ./miniflux.nix
