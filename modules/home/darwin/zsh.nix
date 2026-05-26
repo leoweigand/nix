@@ -75,6 +75,7 @@
         [ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
 
         eval "$(fnm env --use-on-cd --shell zsh)"
+        export PATH=/Users/leo/.opencode/bin:$PATH
       ''
     ];
   };
