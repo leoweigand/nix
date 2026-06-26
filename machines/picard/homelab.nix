@@ -236,11 +236,6 @@ in
         spaceDir = "${mounts.fast}/notes";
       };
 
-      n8n = {
-        enable = true;
-        envReference = "op://Homelab/N8n/env";
-      };
-
       miniflux = {
         enable = true;
         adminCredentialsReference = "op://Homelab/Miniflux/admin-env";

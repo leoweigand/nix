@@ -12,6 +12,8 @@ When a request says "update it" for a nix-managed app, treat that as updating th
 
 For URL-only install prompts, inspect the site metadata/download links early. If the app is macOS-only and distributed as a DMG/`.app`, check for a Homebrew cask and manage it in `machines/ro/configuration.nix` before considering nixpkgs or a custom derivation.
 
+Do not run `darwin-rebuild` directly. It requires sudo in this environment; when a Darwin build or switch is needed, ask the user to run the exact command.
+
 ## Containerized Services (Podman/OCI)
 
 When writing a NixOS module for a containerized service that communicates with a host service (e.g. PostgreSQL), three things must be configured together — missing any one leaves it broken:
@@ -28,7 +30,7 @@ When writing a NixOS module for a containerized service that communicates with a
 
 3. **Data directory ownership** — bind-mounted host directories must be owned by the UID the container process runs as. This UID usually doesn't exist on the host, so use the numeric form in tmpfiles rules.
    ```nix
-   "d ${cfg.dataDir} 0750 1000 1000 - -"  # 1000 = node user inside n8n container
+   "d ${cfg.dataDir} 0750 1000 1000 - -"  # 1000 = app user inside the container
    ```
 
 **Always use bridge networking (the Podman default). Never use `--network=host`.**
