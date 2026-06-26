@@ -4,6 +4,7 @@
   imports = [
     ./gh.nix
     ./ghostty.nix
+    ./herdr.nix
     ./nvim.nix
     ./slimg.nix
     ./zed.nix
