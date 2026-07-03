@@ -7,7 +7,6 @@
     ./herdr.nix
     ./nvim.nix
     ./slimg.nix
-    ./zed.nix
     ./zsh.nix
   ];
 
