@@ -6,6 +6,14 @@ When a package or module requires a newer nixpkgs channel, prefer upgrading the 
 
 When a request says "update it" for a nix-managed app, treat that as updating the flake lock (usually `nixpkgs`), while app-level updater settings (like `autoupdate`) belong in the app's managed config (e.g. Home Manager `xdg.configFile`).
 
+When a 1Password/opnix secret is changed out-of-band, proactively refresh secrets on the target before validating dependent services:
+
+```bash
+sudo systemctl restart opnix-secrets.service
+```
+
+Then restart or verify the service that consumes the secret. A NixOS deploy may reload changed units, but it does not necessarily re-fetch updated 1Password item contents before the service starts.
+
 ## Installing Apps and Tools
 
 For URL-only install prompts, inspect the site metadata/download links early. If the app is macOS-only and distributed as a DMG/`.app`, check for a Homebrew cask and manage it in `machines/ro/configuration.nix` before considering nixpkgs or a custom derivation.

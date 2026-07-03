@@ -43,6 +43,11 @@ in
             rewrite = "/api/telegram_webhooks";
             upstream = "http://127.0.0.1:8123";
           }
+          {
+            path = "/hermes-telegram";
+            rewrite = "/hermes-telegram";
+            upstream = "http://127.0.0.1:8443";
+          }
         ];
       };
 
