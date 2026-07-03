@@ -9,6 +9,7 @@
 let
   name = "hermes-agent";
   cfg = config.homelab.apps.${name};
+  homeassistantCfg = config.homelab.apps.homeassistant;
   packageSet = inputs.hermes-agent.packages.${pkgs.stdenv.hostPlatform.system};
   basePackage =
     if cfg.telegram.enable then
@@ -147,6 +148,9 @@ in
       environmentFiles = [
         config.services.onepassword-secrets.secretPaths.hermesAgentEnv
       ];
+      environment = lib.optionalAttrs homeassistantCfg.enable {
+        HASS_URL = config.homelab.infra.edge.proxies.${homeassistantCfg.subdomain}.upstream;
+      };
 
       settings = {
         model = {
