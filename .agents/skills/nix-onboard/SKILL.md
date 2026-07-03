@@ -83,4 +83,3 @@ For nixos machines, hand off to the `server-deploy` skill after committing.
 ## Reference
 
 - `modules/home/zellij.nix` — clean example of a `programs.*` module with settings.
-- Wolfgang's repo at `/Users/leo/git/untrusted/notthebee-nix` — look here for tool patterns when unsure.
