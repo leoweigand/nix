@@ -30,6 +30,11 @@
       url = "github:ogulcancelik/herdr";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    hermes-agent = {
+      url = "github:NousResearch/hermes-agent";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = { self, nixpkgs, nix-darwin, home-manager, opnix, disko, ... }@inputs: {
@@ -43,6 +48,7 @@
           ./machines/picard/disko.nix
           disko.nixosModules.disko
           opnix.nixosModules.default
+          inputs.hermes-agent.nixosModules.default
           home-manager.nixosModules.home-manager
           ./modules/users/leo
         ];

@@ -245,6 +245,12 @@ in
           clientSecretReference = "op://Homelab/Miniflux/oidc-env";
         };
       };
+
+      "hermes-agent" = {
+        enable = true;
+        dataDir = "${mounts.fast}/appdata/hermes";
+        envReference = "op://Homelab/Hermes Agent/env";
+      };
     };
   };
 }
