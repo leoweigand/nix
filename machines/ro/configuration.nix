@@ -23,6 +23,7 @@
 
   homebrew = {
     enable = true;
+    enableZshIntegration = true;
     onActivation = {
       autoUpdate = true;
       upgrade = true;
@@ -34,7 +35,6 @@
       "deno"
     ];
     casks = [
-      "1password-cli"
       "blender"
       "cmux"
       "codex"
