@@ -8,10 +8,7 @@ description: Use whenever the user is discussing or working on Home Assistant â€
 Config files live at `/mnt/fast/appdata/homeassistant/` on `picard`. Reading/writing these files requires `sudo`.
 HA is reachable at `https://home.leolab.party`.
 
-The API token is in 1Password â€” retrieve it with:
-```bash
-op read "op://Homelab/Openclaw/ha-token"
-```
+Set the API token in the `HA_TOKEN` environment variable before making API calls.
 
 ## When to use
 

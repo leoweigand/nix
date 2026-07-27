@@ -35,15 +35,10 @@ Split DNS is served by CoreDNS on picard via `modules/infra/edge-dns.nix`, with 
 - Tasmota onboarding baseline: configure MQTT host/user/password, set `SetOption19 1` for Home Assistant MQTT discovery, then restart the device so entities are auto-discovered in HA.
 - Zigbee-native group membership and direct Zigbee binds are managed in Zigbee2MQTT (not in Home Assistant automations) because they react faster and stay in sync better; direct binds are used for blinds and TRADFRI remotes.
 
-## OpenClaw
-- OpenClaw runs as a native systemd service on picard (`modules/apps/openclaw.nix`) and is exposed through Caddy as `https://assistant.leolab.party`.
-- OpenClaw's persisted state and workspaces use the standard layout under `/mnt/fast/appdata/openclaw` (for example `openclaw.json`, `workspace`, and `workspace-labby`).
-- On picard, `openclaw` is a shell alias that runs the CLI as the `openclaw` service user against that persisted state directory.
-
 ## Data Model & Recovery
 
 ### Current Layout
-- Service-owned persistent state is stored under `/mnt/fast/appdata/<appname>` (for example Home Assistant, OpenClaw, Zigbee2MQTT, and Paperless).
+- Service-owned persistent state is stored under `/mnt/fast/appdata/<appname>` (for example Home Assistant, Zigbee2MQTT, and Paperless).
 - User-generated datasets live in dedicated top-level directories on `/mnt/fast` (`/mnt/fast/photos` for Immich uploads, `/mnt/fast/documents` for Paperless media/consume).
 - On picard, active media/documents are stored under `/mnt/fast` (virtiofs from Unraid).
 - Database dump outputs are stored under `/mnt/fast/backup/postgres`.

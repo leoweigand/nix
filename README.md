@@ -8,7 +8,7 @@ NixOS configuration for my homelab.
 - Secret management using 1Password with [opnix](https://github.com/brizzbuzz/opnix)
 - Backups of all critical data to Backblaze B2 using restic
 - Edge reverse proxy on picard with Caddy and wildcard TLS via ACME DNS-01 (Cloudflare)
-- Containerized services (for example Home Assistant) plus native services (for example OpenClaw) with persistent appdata on `/mnt/fast`
+- Containerized and native services with persistent appdata on `/mnt/fast`
 
 ## Machines
 - **picard (Unraid server)**: Runs the homelab edge (reverse proxy, DNS), plus apps (Immich, Paperless-ngx, etc.) in a NixOS VM on an Unraid host with a storage array and SSD cache drives.
@@ -67,7 +67,6 @@ Picard job URLs:
 Service data mapping (all covered by `appdata` job):
 
 - Home Assistant config: `/mnt/fast/appdata/homeassistant/config`
-- OpenClaw state: `/mnt/fast/appdata/openclaw`
 - Zigbee2MQTT config: `/mnt/fast/appdata/ziqbee2mqtt/config`
 - Paperless app state: `/mnt/fast/appdata/paperless`
 

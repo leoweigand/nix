@@ -7,7 +7,6 @@
     ./homeassistant.nix
     ./immich.nix
     ./miniflux.nix
-    ./openclaw.nix
     ./paperless.nix
     ./silverbullet.nix
     ./zigbee2mqtt.nix
