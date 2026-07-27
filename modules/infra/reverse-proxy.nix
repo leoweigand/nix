@@ -42,6 +42,11 @@ in
             # and will still gate the request through tinyauth.
             description = "Forward the authenticated Remote-User header to upstream";
           };
+          headerUp = lib.mkOption {
+            type = lib.types.attrsOf lib.types.str;
+            default = { };
+            description = "Request headers to set before proxying to the upstream";
+          };
         };
       });
     };
@@ -152,7 +157,9 @@ in
                 ${lib.optionalString proxyCfg.passUser "copy_headers Remote-User"}
               }
             ''}
-            reverse_proxy ${proxyCfg.upstream}
+            reverse_proxy ${proxyCfg.upstream} {
+              ${lib.concatMapAttrsStringSep "\n" (name: value: "header_up ${name} ${value}") proxyCfg.headerUp}
+            }
           '';
         }
       ) cfg.proxies;

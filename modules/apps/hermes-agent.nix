@@ -19,6 +19,22 @@ let
   hermesVenv = basePackage.passthru.hermesVenv;
   hermesSource = inputs.hermes-agent;
 
+  # Hermes' lockfile declares this optional package but omits its package
+  # record. Inject the pinned binary after npm's offline install instead of
+  # rebuilding the entire workspace lockfile.
+  linuxEsbuild = pkgs.fetchurl {
+    url = "https://registry.npmjs.org/@esbuild/linux-x64/-/linux-x64-0.28.1.tgz";
+    hash = "sha512-u/anNYF2mmVOEDwLtnQ1wOr3EZ9sTNGLWrsYGYwHWzGA3Si84IOkHXlbWTD1NB+9/1lcnweYKO54uhxZydNzfA==";
+  };
+  hermesWeb = basePackage.passthru.hermesWeb.overrideAttrs (old: {
+    npmRebuildFlags = [ "--ignore-scripts" ];
+    preBuild = (old.preBuild or "") + ''
+      mkdir -p node_modules/@esbuild/linux-x64
+      tar --extract --gzip --file ${linuxEsbuild} \
+        --directory node_modules/@esbuild/linux-x64 --strip-components=1
+    '';
+  });
+
   bundledSkills = lib.cleanSourceWith {
     src = hermesSource + "/skills";
     filter = path: _type: !(lib.hasInfix "/index-cache/" path);
@@ -76,9 +92,9 @@ let
         cp -r ${bundledPlugins} $out/share/hermes-agent/plugins
         cp -r ${bundledLocales} $out/share/hermes-agent/locales
 
-        # The initial Telegram service does not use Hermes' web dashboard or TUI.
-        # Avoid upstream's currently non-reproducible Linux esbuild TUI build.
-        mkdir -p $out/share/hermes-agent/web_dist
+        ${lib.optionalString cfg.dashboard.enable ''
+          cp -r ${hermesWeb} $out/share/hermes-agent/web_dist
+        ''}
 
         ${lib.concatMapStringsSep "\n" wrapHermes [
           "hermes"
@@ -129,6 +145,22 @@ in
       default = true;
       description = "Enable Hermes messaging dependencies for Telegram";
     };
+
+    dashboard = {
+      enable = lib.mkEnableOption "Hermes web dashboard";
+
+      subdomain = lib.mkOption {
+        type = lib.types.str;
+        default = "hermes";
+        description = "Subdomain used to expose the Hermes web dashboard";
+      };
+
+      port = lib.mkOption {
+        type = lib.types.port;
+        default = 9119;
+        description = "Local port where the Hermes web dashboard listens";
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -137,7 +169,9 @@ in
       owner = "hermes";
       group = "hermes";
       mode = "0400";
-      services = [ "hermes-agent" ];
+      services = [
+        "hermes-agent"
+      ] ++ lib.optional cfg.dashboard.enable "hermes-dashboard";
     };
 
     services.hermes-agent = {
@@ -176,6 +210,69 @@ in
         EnvironmentFile = config.services.onepassword-secrets.secretPaths.hermesAgentEnv;
         TimeoutStopSec = "210s";
       };
+    };
+
+    assertions = lib.optional cfg.dashboard.enable {
+      assertion =
+        config.homelab.infra.edge.enable
+        && config.homelab.infra.tinyauth.enable;
+      message = "homelab.apps.hermes-agent.dashboard.enable requires the edge reverse proxy and Tinyauth";
+    };
+
+    homelab.infra.edge.proxies.${cfg.dashboard.subdomain} = lib.mkIf cfg.dashboard.enable {
+      upstream = "http://127.0.0.1:${toString cfg.dashboard.port}";
+      auth = true;
+      # Hermes validates Host and Origin against its loopback bind. Keep the
+      # public forwarded headers intact while presenting the internal origin.
+      headerUp = {
+        Host = "127.0.0.1:${toString cfg.dashboard.port}";
+        Origin = "https://127.0.0.1:${toString cfg.dashboard.port}";
+      };
+    };
+
+    systemd.services.hermes-dashboard = lib.mkIf cfg.dashboard.enable {
+      description = "Hermes Agent web dashboard";
+      wantedBy = [ "multi-user.target" ];
+      after = [
+        "network-online.target"
+        "opnix-secrets.service"
+      ];
+      wants = [ "network-online.target" ];
+      requires = [ "opnix-secrets.service" ];
+
+      environment = {
+        HOME = cfg.dataDir;
+        HERMES_HOME = "${cfg.dataDir}/.hermes";
+        HERMES_MANAGED = "true";
+      };
+
+      serviceConfig = {
+        User = "hermes";
+        Group = "hermes";
+        WorkingDirectory = "${cfg.dataDir}/workspace";
+        EnvironmentFile = config.services.onepassword-secrets.secretPaths.hermesAgentEnv;
+        ExecStart = lib.concatStringsSep " " [
+          "${servicePackage}/bin/hermes"
+          "dashboard"
+          "--host 127.0.0.1"
+          "--port ${toString cfg.dashboard.port}"
+          "--no-open"
+        ];
+        Restart = "always";
+        RestartSec = 5;
+        NoNewPrivileges = true;
+        ProtectSystem = "strict";
+        ProtectHome = false;
+        ReadWritePaths = [ cfg.dataDir ];
+        PrivateTmp = true;
+      };
+
+      path = [
+        servicePackage
+        pkgs.bash
+        pkgs.coreutils
+        pkgs.git
+      ];
     };
   };
 }
