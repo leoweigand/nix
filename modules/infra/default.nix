@@ -6,6 +6,7 @@
     ./backup.nix
     ./cloudflare-tunnel.nix
     ./edge-dns.nix
+    ./homepage.nix
     ./mqtt.nix
     ./reverse-proxy.nix
     ./tailscale.nix

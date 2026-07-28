@@ -4,6 +4,31 @@ let
   cfg = config.homelab.infra.edge;
   domain = config.homelab.baseDomain;
   tinyauth = config.homelab.infra.tinyauth;
+  proxyType = lib.types.submodule {
+    options = {
+      upstream = lib.mkOption {
+        type = lib.types.str;
+        description = "Backend URL to proxy requests to";
+      };
+      auth = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Require tinyauth forward authentication before proxying";
+      };
+      passUser = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        # passUser implies auth; setting this without auth = true is valid
+        # and will still gate the request through tinyauth.
+        description = "Forward the authenticated Remote-User header to upstream";
+      };
+      headerUp = lib.mkOption {
+        type = lib.types.attrsOf lib.types.str;
+        default = { };
+        description = "Request headers to set before proxying to the upstream";
+      };
+    };
+  };
 in
 
 {
@@ -24,31 +49,13 @@ in
     proxies = lib.mkOption {
       description = "Reverse-proxy virtual hosts, keyed by subdomain";
       default = { };
-      type = lib.types.attrsOf (lib.types.submodule {
-        options = {
-          upstream = lib.mkOption {
-            type = lib.types.str;
-            description = "Backend URL to proxy requests to";
-          };
-          auth = lib.mkOption {
-            type = lib.types.bool;
-            default = false;
-            description = "Require tinyauth forward authentication before proxying";
-          };
-          passUser = lib.mkOption {
-            type = lib.types.bool;
-            default = false;
-            # passUser implies auth; setting this without auth = true is valid
-            # and will still gate the request through tinyauth.
-            description = "Forward the authenticated Remote-User header to upstream";
-          };
-          headerUp = lib.mkOption {
-            type = lib.types.attrsOf lib.types.str;
-            default = { };
-            description = "Request headers to set before proxying to the upstream";
-          };
-        };
-      });
+      type = lib.types.attrsOf proxyType;
+    };
+
+    rootProxy = lib.mkOption {
+      type = lib.types.nullOr proxyType;
+      default = null;
+      description = "Optional virtual host for the base domain itself";
     };
 
     webhookRoutes = lib.mkOption {
@@ -128,6 +135,26 @@ in
         "https://*.${domain}" = {
           useACMEHost = domain;
           extraConfig = "abort";
+        };
+      } // lib.optionalAttrs (cfg.rootProxy != null) {
+        "${domain}" = {
+          useACMEHost = domain;
+          extraConfig =
+            let
+              proxyCfg = cfg.rootProxy;
+              needsAuth = (proxyCfg.auth || proxyCfg.passUser) && tinyauth.enable;
+            in
+            ''
+              ${lib.optionalString needsAuth ''
+                forward_auth http://127.0.0.1:${toString tinyauth.port} {
+                  uri /api/auth/caddy
+                  ${lib.optionalString proxyCfg.passUser "copy_headers Remote-User"}
+                }
+              ''}
+              reverse_proxy ${proxyCfg.upstream} {
+                ${lib.concatMapAttrsStringSep "\n" (name: value: "header_up ${name} ${value}") proxyCfg.headerUp}
+              }
+            '';
         };
       } // lib.optionalAttrs (cfg.webhookRoutes != [ ]) {
         # Plain HTTP so cloudflared can connect without TLS verification issues.

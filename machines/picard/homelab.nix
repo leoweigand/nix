@@ -51,6 +51,14 @@ in
         ];
       };
 
+      homepage = {
+        enable = true;
+        categoryOrder = [
+          "Smart Home"
+          "Services"
+        ];
+      };
+
       cloudflareTunnel = {
         enable = true;
         tokenReference = "op://Homelab/Cloudflare/tunnelCredential";
@@ -204,16 +212,34 @@ in
           enable = true;
           openaiKeyReference = "op://Homelab/Paperless/openai-token";
         };
+        homepage = {
+          category = "Services";
+          name = "Paperless";
+          icon = "si-paperlessngx";
+          description = "Document archive and OCR";
+        };
       };
 
       homeassistant = {
         enable = true;
         subdomain = "home";
         configDir = "${mounts.fast}/appdata/homeassistant";
+        homepage = {
+          category = "Smart Home";
+          name = "Home Assistant";
+          icon = "si-homeassistant";
+          description = "Home automation and device control";
+        };
       };
 
       esphome = {
         enable = true;
+        homepage = {
+          category = "Smart Home";
+          name = "ESPHome";
+          icon = "si-esphome";
+          description = "Build and manage smart-home firmware";
+        };
       };
 
       zigbee2mqtt = {
@@ -222,6 +248,12 @@ in
         dataDir = "${mounts.fast}/appdata/ziqbee2mqtt/config";  # existing path, typo intentional
         serialAdapter = "zstack";
         serialPort = "/dev/serial/by-id/usb-ITead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_64f09a5b4dbeed11b2996b2e38a92db5-if00-port0";
+        homepage = {
+          category = "Smart Home";
+          name = "Zigbee2MQTT";
+          icon = "si-zigbee2mqtt";
+          description = "Zigbee device management";
+        };
       };
 
       immich = {
@@ -233,12 +265,24 @@ in
           issuerUrl = "https://auth.leolab.party";
           clientSecretReference = "op://Homelab/Immich/oidc-client-secret";
         };
+        homepage = {
+          category = "Services";
+          name = "Immich";
+          icon = "si-immich";
+          description = "Photo and video library";
+        };
       };
 
       silverbullet = {
         enable = true;
         subdomain = "notes";
         spaceDir = "${mounts.fast}/notes";
+        homepage = {
+          category = "Services";
+          name = "SilverBullet";
+          icon = "mdi-notebook-outline";
+          description = "Markdown notes and knowledge base";
+        };
       };
 
       miniflux = {
@@ -249,6 +293,12 @@ in
           issuerUrl = "https://auth.leolab.party";
           clientSecretReference = "op://Homelab/Miniflux/oidc-env";
         };
+        homepage = {
+          category = "Services";
+          name = "Miniflux";
+          icon = "mdi-rss-box";
+          description = "Personal news and feed reader";
+        };
       };
 
       "hermes-agent" = {
@@ -256,6 +306,13 @@ in
         dataDir = "${mounts.fast}/appdata/hermes";
         envReference = "op://Homelab/Hermes Agent/env";
         dashboard.enable = true;
+        homepage = {
+          category = "Services";
+          name = "Hermes";
+          icon = "mdi-robot-outline";
+          description = "Local AI assistant dashboard";
+          href = "https://hermes.leolab.party";
+        };
       };
     };
   };
