@@ -53,6 +53,15 @@
                 default = null;
                 description = "Optional URL override for apps without a standard subdomain";
               };
+
+              siteMonitor = lib.mkOption {
+                type = lib.types.nullOr (lib.types.either lib.types.bool lib.types.str);
+                default = null;
+                description = ''
+                  Status-monitor URL for Homepage. null derives the app's edge upstream,
+                  false disables monitoring, and a string provides a custom URL.
+                '';
+              };
             };
           };
           default = { };

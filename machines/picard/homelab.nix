@@ -312,6 +312,7 @@ in
           icon = "mdi-robot-outline";
           description = "Local AI assistant dashboard";
           href = "https://hermes.leolab.party";
+          siteMonitor = "http://127.0.0.1:9119";
         };
       };
     };

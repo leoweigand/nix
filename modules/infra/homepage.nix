@@ -14,6 +14,11 @@ let
     appId: app:
     let
       metadata = app.homepage;
+      proxy =
+        if app ? subdomain && builtins.hasAttr app.subdomain edge.proxies then
+          edge.proxies.${app.subdomain}
+        else
+          null;
       href =
         if metadata.href != null then
           metadata.href
@@ -22,6 +27,15 @@ let
         else
           throw "homelab.apps.${appId}.homepage.href must be set because the app has no subdomain";
       name = if metadata.name == "" then appId else metadata.name;
+      siteMonitor =
+        if metadata.siteMonitor == false then
+          null
+        else if builtins.isString metadata.siteMonitor then
+          metadata.siteMonitor
+        else if proxy != null then
+          proxy.upstream
+        else
+          null;
     in
     {
       category = metadata.category;
@@ -30,6 +44,9 @@ let
           inherit href;
           icon = metadata.icon;
           description = metadata.description;
+        }
+        // lib.optionalAttrs (siteMonitor != null) {
+          inherit siteMonitor;
         };
       };
     }
@@ -126,6 +143,19 @@ in
       listenPort = cfg.port;
       allowedHosts = domain;
       services = services;
+      widgets = [
+        {
+          resources = {
+            cpu = true;
+            memory = true;
+            uptime = true;
+            disk = [
+              "/mnt/fast"
+              "/mnt/slow"
+            ];
+          };
+        }
+      ];
       settings = {
         title = "Leo's Homelab";
         headerStyle = "clean";
@@ -160,6 +190,34 @@ in
         #information-widgets {
           padding-left: 1rem;
           padding-right: 1rem;
+        }
+
+        #information-widgets .widget-container > div {
+          gap: 0.75rem;
+        }
+
+        #information-widgets .information-widget-resource {
+          margin-right: 0;
+          padding: 0.75rem 1rem;
+          border: 1px solid rgb(var(--color-200) / 0.2);
+          border-radius: 0.75rem;
+          background-color: rgb(var(--color-100) / 0.2);
+          box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+          transition: background-color 150ms ease;
+        }
+
+        #information-widgets .information-widget-resource:hover {
+          background-color: rgb(var(--color-100) / 0.35);
+        }
+
+        .dark #information-widgets .information-widget-resource {
+          border-color: rgb(var(--color-700) / 0.5);
+          background-color: rgb(var(--color-800) / 0.5);
+          box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+        }
+
+        .dark #information-widgets .information-widget-resource:hover {
+          background-color: rgb(var(--color-800) / 0.8);
         }
 
         #footer,
