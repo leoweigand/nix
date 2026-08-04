@@ -11,21 +11,12 @@
       upgrade = true;
       cleanup = "zap";
     };
-    brews = [
-      # keeping in brew, not migrating to nix
-      "cocoapods"
-      "deno"
-    ];
     casks = [
-      "blender"
-      "cmux"
       "codex"
-      "font-ia-writer-quattro"
       "ghostty"
       "macwhisper"
       "obsidian"
       "raycast"
-      "tailscale-app"
       "zed"
     ];
   };
