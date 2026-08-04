@@ -3,6 +3,8 @@
 {
   imports = [ ../../modules/darwin/common.nix ];
 
+  home-manager.users.leo.home.sessionPath = [ "$HOME/Library/pnpm/bin" ];
+
   homebrew = {
     enable = true;
     enableZshIntegration = true;

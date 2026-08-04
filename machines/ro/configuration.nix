@@ -3,6 +3,8 @@
 {
   imports = [ ../../modules/darwin/common.nix ];
 
+  home-manager.users.leo.imports = [ ../../modules/home/darwin/personal.nix ];
+
   homebrew = {
     enable = true;
     enableZshIntegration = true;
