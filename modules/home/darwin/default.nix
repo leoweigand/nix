@@ -6,6 +6,7 @@
     ./ghostty.nix
     ./herdr.nix
     ./nvim.nix
+    ./opencode.nix
     ./slimg.nix
     ./zsh.nix
   ];
