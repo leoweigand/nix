@@ -3,6 +3,8 @@
 {
   imports = [ ../../modules/darwin/common.nix ];
 
+  home-manager.users.leo.imports = [ ../../modules/home/darwin/claude-code.nix ];
+
   home-manager.users.leo.home.sessionPath = [ "$HOME/Library/pnpm/bin" ];
 
   home-manager.users.leo.programs.ssh = {
