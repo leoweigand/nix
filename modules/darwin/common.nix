@@ -24,6 +24,11 @@
 
   system.primaryUser = "leo";
 
+  system.keyboard = {
+    enableKeyMapping = true;
+    remapCapsLockToEscape = true;
+  };
+
   time.timeZone = "Europe/Berlin";
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
@@ -35,9 +40,16 @@
       KeyRepeat = 2;
       "com.apple.trackpad.scaling" = 7.0;
     };
+    trackpad = {
+      Clicking = true;
+      TrackpadThreeFingerDrag = true;
+      TrackpadThreeFingerVertSwipeGesture = 0;
+    };
+    universalaccess.closeViewScrollWheelToggle = true;
     dock = {
       autohide-delay = 0.0;
       minimize-to-application = true;
+      showAppExposeGestureEnabled = false;
       show-recents = false;
     };
   };
