@@ -42,7 +42,10 @@
       # Picard - Main homelab server (NixOS VM on Unraid)
       picard = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
-        specialArgs = { inherit inputs; };
+        specialArgs = {
+          inherit inputs;
+          machineName = "picard";
+        };
         modules = [
           ./machines/picard/configuration.nix
           ./machines/picard/disko.nix
@@ -58,9 +61,18 @@
     darwinConfigurations = {
       ro = nix-darwin.lib.darwinSystem {
         system = "aarch64-darwin";
-        specialArgs = { inherit inputs; };
+        specialArgs = {
+          inherit inputs;
+          machineName = "ro";
+        };
         modules = [
-          { nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (nixpkgs.lib.getName pkg) [ "1password-cli" ]; }
+          {
+            nixpkgs.config.allowUnfreePredicate =
+              pkg:
+              builtins.elem (nixpkgs.lib.getName pkg) [
+                "1password-cli"
+              ];
+          }
           ./machines/ro/configuration.nix
           home-manager.darwinModules.home-manager
         ];
@@ -68,7 +80,10 @@
 
       geordi = nix-darwin.lib.darwinSystem {
         system = "aarch64-darwin";
-        specialArgs = { inherit inputs; };
+        specialArgs = {
+          inherit inputs;
+          machineName = "geordi";
+        };
         modules = [
           { nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (nixpkgs.lib.getName pkg) [ "1password-cli" ]; }
           ./machines/geordi/configuration.nix

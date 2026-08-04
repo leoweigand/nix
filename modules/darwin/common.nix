@@ -1,6 +1,8 @@
 { inputs, pkgs, ... }:
 
 {
+  imports = [ ../machine-identity.nix ];
+
   nixpkgs.hostPlatform = "aarch64-darwin";
 
   # Home Manager runs as a nix-darwin module, sharing the system package set.
