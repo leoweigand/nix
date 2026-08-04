@@ -26,6 +26,7 @@
     casks = [
       "codex"
       "ghostty"
+      "google-drive"
       "macwhisper"
       "obsidian"
       "raycast"
