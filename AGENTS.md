@@ -14,6 +14,16 @@ sudo systemctl restart opnix-secrets.service
 
 Then restart or verify the service that consumes the secret. A NixOS deploy may reload changed units, but it does not necessarily re-fetch updated 1Password item contents before the service starts.
 
+## Machine-Specific Configuration
+
+Before editing configuration for a specific machine, check which machine the current system is running:
+
+```bash
+cat /etc/nix-machine
+```
+
+The value must match the machine being changed, such as `picard`, `ro`, or `geordi`. If `/etc/nix-machine` is unavailable or identifies a different machine, do not guess or edit machine-specific configuration; ask the user to confirm the target.
+
 ## Installing Apps and Tools
 
 For URL-only install prompts, inspect the site metadata/download links early. If the app is macOS-only and distributed as a DMG/`.app`, check for a Homebrew cask and manage it in `machines/ro/configuration.nix` before considering nixpkgs or a custom derivation.

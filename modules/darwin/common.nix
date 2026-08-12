@@ -4,6 +4,12 @@
   imports = [ ../machine-identity.nix ];
 
   nixpkgs.hostPlatform = "aarch64-darwin";
+  nixpkgs.config.allowUnfreePredicate =
+    pkg:
+    builtins.elem (pkgs.lib.getName pkg) [
+      "1password-cli"
+      "claude-code"
+    ];
 
   # Home Manager runs as a nix-darwin module, sharing the system package set.
   home-manager.useGlobalPkgs = true;
@@ -16,11 +22,17 @@
 
   users.users.leo.home = "/Users/leo";
 
+  homebrew.casks = [
+    "cleanshot"
+    "keepingyouawake"
+  ];
+
   home-manager.users.leo = {
     imports = [
       ../home/common
       ../home/darwin
     ];
+    home.packages = [ pkgs._1password-cli ];
     home.stateVersion = "24.11";
   };
 
@@ -53,6 +65,10 @@
       minimize-to-application = true;
       showAppExposeGestureEnabled = false;
       show-recents = false;
+    };
+    finder = {
+      ShowPathbar = true;
+      ShowStatusBar = true;
     };
   };
 

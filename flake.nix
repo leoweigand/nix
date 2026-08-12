@@ -66,13 +66,6 @@
           machineName = "ro";
         };
         modules = [
-          {
-            nixpkgs.config.allowUnfreePredicate =
-              pkg:
-              builtins.elem (nixpkgs.lib.getName pkg) [
-                "1password-cli"
-              ];
-          }
           ./machines/ro/configuration.nix
           home-manager.darwinModules.home-manager
         ];
@@ -85,14 +78,6 @@
           machineName = "geordi";
         };
         modules = [
-          {
-            nixpkgs.config.allowUnfreePredicate =
-              pkg:
-              builtins.elem (nixpkgs.lib.getName pkg) [
-                "1password-cli"
-                "claude-code"
-              ];
-          }
           ./machines/geordi/configuration.nix
           home-manager.darwinModules.home-manager
         ];
