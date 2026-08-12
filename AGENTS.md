@@ -22,7 +22,7 @@ Before editing configuration for a specific machine, check which machine the cur
 cat /etc/nix-machine
 ```
 
-The value must match the machine being changed, such as `picard`, `ro`, or `geordi`. If `/etc/nix-machine` is unavailable or identifies a different machine, do not guess or edit machine-specific configuration; ask the user to confirm the target.
+The value must match the machine being changed, such as `picard`, `ro`, or `crusher`. If `/etc/nix-machine` is unavailable or identifies a different machine, do not guess or edit machine-specific configuration; ask the user to confirm the target.
 
 ## Installing Apps and Tools
 

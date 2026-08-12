@@ -71,14 +71,14 @@
         ];
       };
 
-      geordi = nix-darwin.lib.darwinSystem {
+      crusher = nix-darwin.lib.darwinSystem {
         system = "aarch64-darwin";
         specialArgs = {
           inherit inputs;
-          machineName = "geordi";
+          machineName = "crusher";
         };
         modules = [
-          ./machines/geordi/configuration.nix
+          ./machines/crusher/configuration.nix
           home-manager.darwinModules.home-manager
         ];
       };
