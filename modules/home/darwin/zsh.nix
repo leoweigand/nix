@@ -1,4 +1,4 @@
-{ lib, pkgs, ... }:
+{ lib, machineName, pkgs, ... }:
 
 {
   programs.zsh = {
@@ -74,12 +74,14 @@
 
         [ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
 
-        eval "$(fnm env --use-on-cd --shell zsh)"
+        ${lib.optionalString (machineName != "crusher") ''
+          eval "$(fnm env --use-on-cd --shell zsh)"
+        ''}
       ''
     ];
   };
 
-  home.packages = [ pkgs.fnm ];
+  home.packages = lib.optional (machineName != "crusher") pkgs.fnm;
 
   home.sessionPath = [
     "$HOME/.lmstudio/bin"

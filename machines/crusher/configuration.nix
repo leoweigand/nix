@@ -1,4 +1,4 @@
-{ ... }:
+{ lib, ... }:
 
 {
   imports = [ ../../modules/darwin/common.nix ];
@@ -6,6 +6,10 @@
   home-manager.users.leo.imports = [ ../../modules/home/darwin/claude-code.nix ];
 
   home-manager.users.leo.home.sessionPath = [ "$HOME/Library/pnpm/bin" ];
+  home-manager.users.leo.programs.zsh.initContent = lib.mkAfter ''
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && . "/opt/homebrew/opt/nvm/nvm.sh"
+  '';
 
   home-manager.users.leo.programs.ssh = {
     enable = true;
@@ -25,6 +29,7 @@
       upgrade = true;
       cleanup = "zap";
     };
+    brews = [ "nvm" ];
     casks = [
       "codex"
       "ghostty"

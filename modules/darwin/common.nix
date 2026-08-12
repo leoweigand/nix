@@ -1,4 +1,4 @@
-{ inputs, pkgs, ... }:
+{ inputs, machineName, pkgs, ... }:
 
 {
   imports = [ ../machine-identity.nix ];
@@ -16,7 +16,7 @@
   home-manager.useUserPackages = true;
   home-manager.backupFileExtension = "backup";
   home-manager.extraSpecialArgs = {
-    inherit inputs;
+    inherit inputs machineName;
     hostPlatform = "darwin";
   };
 
