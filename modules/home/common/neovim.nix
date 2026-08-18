@@ -13,5 +13,10 @@
 
     # Sets EDITOR/VISUAL=nvim via home.sessionVariables (written to ~/.zshenv).
     defaultEditor = true;
+
+    # Load home-manager's generated init.lua (e.g. provider disabling) via a
+    # wrapper flag instead of writing it to ~/.config/nvim/init.lua, which
+    # would collide with the LazyVim config symlinked in nvim.nix.
+    sideloadInitLua = true;
   };
 }
