@@ -8,6 +8,10 @@ theme = sonokai
 # Use broadly supported TERM for SSH hosts without ghostty terminfo
 term = xterm-256color
 
+# Right option sends Esc prefix (Meta) for terminal apps; left option stays
+# dead-key capable for composing special characters
+macos-option-as-alt = right
+
 # Keybinds
 keybind = shift+enter=text:\x1b\r
 keybind = super+k=clear_screen
