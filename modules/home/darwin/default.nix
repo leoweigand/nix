@@ -5,6 +5,7 @@
     ./gh.nix
     ./ghostty.nix
     ./herdr.nix
+    ./llm.nix
     ./nvim.nix
     ./opencode.nix
     ./slimg.nix
