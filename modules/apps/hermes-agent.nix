@@ -52,7 +52,7 @@ let
     pkgs.openssh
     pkgs.ffmpeg
     pkgs.tirith
-  ] ++ lib.optionals pkgs.stdenv.isLinux [
+  ] ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
     pkgs.wl-clipboard
     pkgs.xclip
   ];
