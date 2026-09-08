@@ -1,4 +1,4 @@
-{ lib, pkgs, ... }:
+{ lib, ... }:
 
 {
   imports = [ ../../modules/darwin/common.nix ];
@@ -6,10 +6,6 @@
   home-manager.users.leo.imports = [ ../../modules/home/darwin/claude-code.nix ];
 
   home-manager.users.leo.home.sessionPath = [ "$HOME/Library/pnpm/bin" ];
-
-  # psql (plus pg_dump and friends); nixpkgs has no client-only build, so this is
-  # the full server package with everything in its default output.
-  home-manager.users.leo.home.packages = [ pkgs.postgresql ];
 
   home-manager.users.leo.programs.zsh.initContent = lib.mkAfter ''
     export NVM_DIR="$HOME/.nvm"

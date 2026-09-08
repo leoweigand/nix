@@ -15,6 +15,9 @@
   home.packages = with pkgs; [
     ffmpeg
     pnpm
+    # psql and pg_dump; nixpkgs has no client-only build, so this is the full
+    # server package. No server is enabled.
+    postgresql
     uv
   ];
 
