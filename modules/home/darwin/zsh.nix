@@ -26,7 +26,6 @@
       oprun = "op run --env-file=./.env";
       gs = "git status";
       gp = "git pull";
-      lfg = "claude --dangerously-skip-permissions";
     };
 
     initContent = lib.mkMerge [
