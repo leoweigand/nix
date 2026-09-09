@@ -21,9 +21,10 @@
     uv
   ];
 
-  # pnpm refuses `pnpm add -g` unless PNPM_HOME is set; this is its macOS default.
+  # pnpm's macOS default global root, and the bin dir it links `pnpm add -g`
+  # packages into. It refuses to install globally unless the bin dir is on PATH.
   home.sessionVariables.PNPM_HOME = "$HOME/Library/pnpm";
-  home.sessionPath = [ "$HOME/Library/pnpm" ];
+  home.sessionPath = [ "$HOME/Library/pnpm/bin" ];
 
   home.file.".hushlogin".text = "";
 }
