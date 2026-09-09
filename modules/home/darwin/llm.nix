@@ -18,6 +18,9 @@ let
     { letter = ""; id = "high"; }
     { letter = "h"; id = "high"; }
     { letter = "m"; id = "medium"; }
+    # `l` is also luna's model letter, but specs are always model-then-effort,
+    # so `l` stays luna at high and `ll` is luna at low.
+    { letter = "l"; id = "low"; }
     { letter = "x"; id = "xhigh"; }
   ];
 
@@ -66,7 +69,7 @@ let
     llm [<model><effort>] [args...]
 
       model   o opus   f fable   n sonnet   s sol   t terra   l luna   a astra
-      effort  <omitted>/h high   m medium   x xhigh
+      effort  <omitted>/h high   m medium   l low   x xhigh
 
   '' + lib.concatMapStringsSep "\n"
     ({ m, e }: "  llm ${pad 6 (m.letter + e.letter)}${pad 16 m.label}${pad 8 e.id}${m.harness}")
