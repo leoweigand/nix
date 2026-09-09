@@ -22,6 +22,9 @@ let
     # so `l` stays luna at high and `ll` is luna at low.
     { letter = "l"; id = "low"; }
     { letter = "x"; id = "xhigh"; }
+    # A `!` is only history expansion when followed by a word character, `!`,
+    # `?`, `-`, `#`, `{` or `$`, so a trailing one in `llm o!` reaches us as is.
+    { letter = "!"; id = "max"; }
   ];
 
   # opencode's TUI has no CLI flag for reasoning effort: it is a `variant` on
@@ -69,7 +72,7 @@ let
     llm [<model><effort>] [args...]
 
       model   o opus   f fable   n sonnet   s sol   t terra   l luna   a astra
-      effort  <omitted>/h high   m medium   l low   x xhigh
+      effort  <omitted>/h high   m medium   l low   x xhigh   ! max
 
   '' + lib.concatMapStringsSep "\n"
     ({ m, e }: "  llm ${pad 6 (m.letter + e.letter)}${pad 16 m.label}${pad 8 e.id}${m.harness}")
@@ -117,7 +120,7 @@ in
       if [[ -n ''${1-} && -n ''${_llm_specs[''${1}]-} ]]; then
         spec=$1
         shift
-      elif [[ ''${1-} == [a-z](|[a-z]) ]]; then
+      elif [[ ''${1-} == [a-z](|[a-z]|!) ]]; then
         print -ru2 -- "llm: unknown spec '$1' (try: llm --help)"
         return 2
       fi
