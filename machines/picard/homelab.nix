@@ -1,4 +1,4 @@
-{ ... }:
+{ pkgs, ... }:
 
 let
   mounts = {
@@ -69,6 +69,7 @@ in
         subdomain = "auth";
         dataDir = "${mounts.fast}/appdata/tinyauth";
         envReference = "op://Homelab/Tinyauth/env";
+        userAttributes.leo.email = "leo@leolab.party";
         oidcClients.paperless = {
           clientId = "paperless";
           trustedRedirectUris = [ "https://documents.leolab.party/accounts/oidc/tinyauth/login/callback/" ];
@@ -83,6 +84,10 @@ in
         oidcClients.miniflux = {
           clientId = "miniflux";
           trustedRedirectUris = [ "https://news.leolab.party/oauth2/oidc/callback" ];
+        };
+        oidcClients.linkding = {
+          clientId = "linkding";
+          trustedRedirectUris = [ "https://bookmarks.leolab.party/oidc/callback/" ];
         };
       };
 
@@ -128,6 +133,14 @@ in
           appdata = {
             schedule = "*-*-* 03:00:00"; # Daily at 3:00 AM
             paths = backupPaths.appdata;
+            prepareCommand = ''
+              ${pkgs.systemd}/bin/systemctl start podman-linkding.service
+              ${pkgs.podman}/bin/podman exec linkding \
+                python manage.py full_backup /etc/linkding/data/backup.zip.tmp
+              ${pkgs.coreutils}/bin/mv \
+                ${mounts.fast}/appdata/linkding/backup.zip.tmp \
+                ${mounts.fast}/appdata/linkding/backup.zip
+            '';
             exclude = [
               "**/log"
               "**/logs"
@@ -298,6 +311,22 @@ in
           name = "Miniflux";
           icon = "mdi-rss-box";
           description = "Personal news and feed reader";
+        };
+      };
+
+      linkding = {
+        enable = true;
+        dataDir = "${mounts.fast}/appdata/linkding";
+        oidc = {
+          issuerUrl = "https://auth.leolab.party";
+          clientSecretReference = "op://Homelab/Linkding/oidc-env";
+          disableLocalAuth = true;
+        };
+        homepage = {
+          category = "Services";
+          name = "Linkding";
+          icon = "linkding.svg";
+          description = "Bookmarks and archived web snapshots";
         };
       };
 

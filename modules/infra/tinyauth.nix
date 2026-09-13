@@ -58,6 +58,17 @@ in
         };
       });
     };
+
+    userAttributes = lib.mkOption {
+      description = "OIDC profile attributes for local Tinyauth users";
+      default = { };
+      type = lib.types.attrsOf (lib.types.submodule {
+        options.email = lib.mkOption {
+          type = lib.types.str;
+          description = "Email address emitted in this user's OIDC claims";
+        };
+      });
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -80,7 +91,7 @@ in
       oci-containers = {
         backend = "podman";
         containers.tinyauth = {
-          image = "ghcr.io/steveiliop56/tinyauth:${cfg.imageTag}";
+          image = "ghcr.io/tinyauthapp/tinyauth:${cfg.imageTag}";
           autoStart = true;
           extraOptions = [ "--pull=newer" ];
           ports = [ "127.0.0.1:${toString cfg.port}:3000" ];
@@ -100,7 +111,9 @@ in
               # Comma-separated list of allowed redirect URIs
               "TINYAUTH_OIDC_CLIENTS_${upper}_TRUSTEDREDIRECTURIS" = lib.concatStringsSep "," client.trustedRedirectUris;
             }
-          ) cfg.oidcClients;
+          ) cfg.oidcClients // lib.concatMapAttrs (username: attributes: {
+            "TINYAUTH_AUTH_USERATTRIBUTES_${lib.toUpper username}_EMAIL" = attributes.email;
+          }) cfg.userAttributes;
         };
       };
     };
