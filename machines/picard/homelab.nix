@@ -46,7 +46,7 @@ in
           {
             path = "/hermes-telegram";
             rewrite = "/hermes-telegram";
-            upstream = "http://127.0.0.1:8443";
+            upstream = "http://192.168.2.135:8443";
           }
         ];
       };
@@ -327,21 +327,6 @@ in
           name = "Linkding";
           icon = "linkding.svg";
           description = "Bookmarks and archived web snapshots";
-        };
-      };
-
-      "hermes-agent" = {
-        enable = true;
-        dataDir = "${mounts.fast}/appdata/hermes";
-        envReference = "op://Homelab/Hermes Agent/env";
-        dashboard.enable = true;
-        homepage = {
-          category = "Services";
-          name = "Hermes";
-          icon = "mdi-robot-outline";
-          description = "Local AI assistant dashboard";
-          href = "https://hermes.leolab.party";
-          siteMonitor = "http://127.0.0.1:9119";
         };
       };
     };

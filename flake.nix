@@ -39,10 +39,6 @@
       inputs.rust-overlay.follows = "rust-overlay";
     };
 
-    hermes-agent = {
-      url = "github:NousResearch/hermes-agent";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs = { self, nixpkgs, nix-darwin, home-manager, opnix, disko, ... }@inputs: {
@@ -59,7 +55,6 @@
           ./machines/picard/disko.nix
           disko.nixosModules.disko
           opnix.nixosModules.default
-          inputs.hermes-agent.nixosModules.default
           home-manager.nixosModules.home-manager
           ./modules/users/leo
         ];

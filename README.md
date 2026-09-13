@@ -11,7 +11,8 @@ NixOS configuration for my homelab.
 - Containerized and native services with persistent appdata on `/mnt/fast`
 
 ## Machines
-- **picard (Unraid server)**: Runs the homelab edge (reverse proxy, DNS), plus apps (Immich, Paperless-ngx, etc.) in a NixOS VM on an Unraid host with a storage array and SSD cache drives.
+- **picard (NixOS VM on laforge)**: Runs the homelab edge (reverse proxy, DNS), plus apps (Immich, Paperless-ngx, etc.). Laforge is the Unraid host with the storage array and SSD cache drives.
+- **dax (Ubuntu VM on laforge)**: Runs Hermes independently of Nix. Picard provides its authenticated dashboard route, Telegram webhook forwarding, and backup collection. Dax's application configuration is maintained separately in the private homelab repository.
 
 ## Edge Routing Model
 

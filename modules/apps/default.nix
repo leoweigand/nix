@@ -3,7 +3,6 @@
 {
   imports = [
     ./esphome.nix
-    ./hermes-agent.nix
     ./homeassistant.nix
     ./immich.nix
     ./linkding.nix
