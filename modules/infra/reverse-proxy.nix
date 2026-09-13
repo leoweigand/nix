@@ -4,6 +4,20 @@ let
   cfg = config.homelab.infra.edge;
   domain = config.homelab.baseDomain;
   tinyauth = config.homelab.infra.tinyauth;
+  authConfigType = lib.types.submodule {
+    options = {
+      passUser = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Forward the authenticated Remote-User header to upstream";
+      };
+      bypassPaths = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        description = "Request paths to proxy without forward authentication";
+      };
+    };
+  };
   proxyType = lib.types.submodule {
     options = {
       upstream = lib.mkOption {
@@ -11,16 +25,9 @@ let
         description = "Backend URL to proxy requests to";
       };
       auth = lib.mkOption {
-        type = lib.types.bool;
+        type = lib.types.either lib.types.bool authConfigType;
         default = false;
-        description = "Require tinyauth forward authentication before proxying";
-      };
-      passUser = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
-        # passUser implies auth; setting this without auth = true is valid
-        # and will still gate the request through tinyauth.
-        description = "Forward the authenticated Remote-User header to upstream";
+        description = "Whether to require tinyauth, or its detailed configuration";
       };
       headerUp = lib.mkOption {
         type = lib.types.attrsOf lib.types.str;
@@ -29,6 +36,52 @@ let
       };
     };
   };
+  proxyExtraConfig = proxyCfg:
+    let
+      authCfg =
+        if builtins.isBool proxyCfg.auth then
+          {
+            enable = proxyCfg.auth;
+            passUser = false;
+            bypassPaths = [ ];
+          }
+        else
+          {
+            enable = true;
+            inherit (proxyCfg.auth) passUser bypassPaths;
+          };
+      needsAuth = authCfg.enable && tinyauth.enable;
+      reverseProxy = ''
+        reverse_proxy ${proxyCfg.upstream} {
+          ${lib.concatMapAttrsStringSep "\n" (name: value: "header_up ${name} ${value}") proxyCfg.headerUp}
+        }
+      '';
+    in
+    if needsAuth && authCfg.bypassPaths != [ ] then
+      lib.concatMapStrings (path: ''
+        handle ${path} {
+          ${reverseProxy}
+        }
+      '') authCfg.bypassPaths
+      + ''
+        handle {
+          forward_auth http://127.0.0.1:${toString tinyauth.port} {
+            uri /api/auth/caddy
+            ${lib.optionalString authCfg.passUser "copy_headers Remote-User"}
+          }
+          ${reverseProxy}
+        }
+      ''
+    else
+      ''
+        ${lib.optionalString needsAuth ''
+          forward_auth http://127.0.0.1:${toString tinyauth.port} {
+            uri /api/auth/caddy
+            ${lib.optionalString authCfg.passUser "copy_headers Remote-User"}
+          }
+        ''}
+        ${reverseProxy}
+      '';
 in
 
 {
@@ -139,22 +192,7 @@ in
       } // lib.optionalAttrs (cfg.rootProxy != null) {
         "${domain}" = {
           useACMEHost = domain;
-          extraConfig =
-            let
-              proxyCfg = cfg.rootProxy;
-              needsAuth = (proxyCfg.auth || proxyCfg.passUser) && tinyauth.enable;
-            in
-            ''
-              ${lib.optionalString needsAuth ''
-                forward_auth http://127.0.0.1:${toString tinyauth.port} {
-                  uri /api/auth/caddy
-                  ${lib.optionalString proxyCfg.passUser "copy_headers Remote-User"}
-                }
-              ''}
-              reverse_proxy ${proxyCfg.upstream} {
-                ${lib.concatMapAttrsStringSep "\n" (name: value: "header_up ${name} ${value}") proxyCfg.headerUp}
-              }
-            '';
+          extraConfig = proxyExtraConfig cfg.rootProxy;
         };
       } // lib.optionalAttrs (cfg.webhookRoutes != [ ]) {
         # Plain HTTP so cloudflared can connect without TLS verification issues.
@@ -172,22 +210,9 @@ in
             '';
         };
       } // lib.mapAttrs' (subdomain: proxyCfg:
-        let
-          needsAuth = (proxyCfg.auth || proxyCfg.passUser) && tinyauth.enable;
-        in
         lib.nameValuePair "${subdomain}.${domain}" {
           useACMEHost = domain;
-          extraConfig = ''
-            ${lib.optionalString needsAuth ''
-              forward_auth http://127.0.0.1:${toString tinyauth.port} {
-                uri /api/auth/caddy
-                ${lib.optionalString proxyCfg.passUser "copy_headers Remote-User"}
-              }
-            ''}
-            reverse_proxy ${proxyCfg.upstream} {
-              ${lib.concatMapAttrsStringSep "\n" (name: value: "header_up ${name} ${value}") proxyCfg.headerUp}
-            }
-          '';
+          extraConfig = proxyExtraConfig proxyCfg;
         }
       ) cfg.proxies;
     };
