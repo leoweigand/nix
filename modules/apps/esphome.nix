@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   name = "esphome";
@@ -31,11 +31,15 @@ in
 
     services.esphome = {
       enable = true;
+      package = pkgs.esphome-device-builder;
       address = "127.0.0.1";
       inherit port;
       # mDNS responses from devices can be flaky over the picard bridge network;
       # ping-based online checks are more predictable here.
       usePing = true;
     };
+
+    # nixpkgs still launches the classic dashboard removed in ESPHome 2026.8.
+    systemd.services.esphome.serviceConfig.ExecStart = lib.mkForce "${lib.getExe pkgs.esphome-device-builder} --host 127.0.0.1 --port ${toString port} /var/lib/esphome";
   };
 }
