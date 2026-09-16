@@ -76,6 +76,9 @@
       ShowPathbar = true;
       ShowStatusBar = true;
     };
+    # false = "Only in Stage Manager", so clicking the wallpaper no longer
+    # sweeps every window aside.
+    WindowManager.EnableStandardClickToShowDesktop = false;
   };
 
   fonts.packages = [ pkgs.nerd-fonts.jetbrains-mono ];
