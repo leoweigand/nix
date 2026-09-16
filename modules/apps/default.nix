@@ -6,6 +6,7 @@
     ./hermes-agent.nix
     ./homeassistant.nix
     ./immich.nix
+    ./linkding.nix
     ./miniflux.nix
     ./paperless
     ./silverbullet.nix

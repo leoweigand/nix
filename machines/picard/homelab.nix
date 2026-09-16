@@ -84,6 +84,10 @@ in
           clientId = "miniflux";
           trustedRedirectUris = [ "https://news.leolab.party/oauth2/oidc/callback" ];
         };
+        oidcClients.linkding = {
+          clientId = "linkding";
+          trustedRedirectUris = [ "https://bookmarks.leolab.party/oidc/callback/" ];
+        };
       };
 
       mqtt = {
@@ -270,6 +274,23 @@ in
           name = "Immich";
           icon = "si-immich";
           description = "Photo and video library";
+        };
+      };
+
+      linkding = {
+        enable = true;
+        subdomain = "bookmarks";
+        dataDir = "${mounts.fast}/appdata/linkding";
+        oidc = {
+          enable = true;
+          issuerUrl = "https://auth.leolab.party";
+          clientSecretReference = "op://Homelab/Linkding/oidc-env";
+        };
+        homepage = {
+          category = "Services";
+          name = "Linkding";
+          icon = "mdi-bookmark-multiple-outline";
+          description = "Bookmark manager";
         };
       };
 
