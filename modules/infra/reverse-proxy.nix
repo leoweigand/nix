@@ -197,6 +197,10 @@ in
         80
         443
       ];
+      # Caddy binds UDP 443 and advertises `Alt-Svc: h3=":443"` by default.
+      # Without this the firewall silently drops QUIC, so clients that cached
+      # the Alt-Svc hint stall on HTTP/3 instead of falling back to TCP.
+      allowedUDPPorts = [ 443 ];
     };
   };
 }
