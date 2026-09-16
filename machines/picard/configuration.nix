@@ -47,6 +47,28 @@ in
   # Compressed swap in RAM - good for VMs
   zramSwap.enable = true;
 
+  # zram compresses into RAM, so it adds no real capacity. A nixos-rebuild here
+  # peaks around 4G on a 5.8G machine and has OOM-killed nix-daemon mid-deploy;
+  # this gives it somewhere to spill. Lower priority than zram, which is faster.
+  swapDevices = [
+    {
+      device = "/var/swapfile";
+      size = 8192;
+      priority = 1;
+    }
+  ];
+
+  # Each substitution job buffers its own decompression stream; the default of 16
+  # is what drove nix-daemon to ~4G and OOM-killed it mid-deploy on this VM.
+  nix.settings.max-substitution-jobs = 4;
+
+  systemd.services.nix-daemon.serviceConfig = {
+    # Reclaim pressure well before the kernel resorts to a global OOM kill
+    MemoryHigh = "3G";
+    # If it does come to that, sacrifice the build rather than a live service
+    OOMScoreAdjust = 500;
+  };
+
   services.postgresqlBackup.location = "${mounts.fast}/backup/postgres";
 
   # Refresh collation metadata on ALL databases before ensureDatabases runs.

@@ -1,10 +1,25 @@
-{ lib, ... }:
+{ config, lib, ... }:
 
 {
   imports = [
     ./apps
     ./infra
   ];
+
+  # Containers default to five restarts 100ms apart, then park permanently — a
+  # registry blip or a slow secret fetch is enough to leave one dead until it is
+  # reset by hand. Back off instead, and never stop retrying, so transient
+  # failures heal on their own.
+  config.systemd.services = lib.genAttrs (map (name: "podman-${name}") (
+    builtins.attrNames config.virtualisation.oci-containers.containers
+  )) (_: {
+    startLimitIntervalSec = 0;
+    serviceConfig = {
+      RestartSec = "5s";
+      RestartSteps = 5;
+      RestartMaxDelaySec = "5min";
+    };
+  });
 
   options.homelab = {
     baseDomain = lib.mkOption {
