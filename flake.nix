@@ -39,6 +39,11 @@
       inputs.rust-overlay.follows = "rust-overlay";
     };
 
+    # Coding agent. Left unpinned to our nixpkgs so its own pins (bun2nix, the
+    # rust toolchain) stay exact and the nix-community cache can serve the
+    # ~80k lines of Rust instead of building them here.
+    oh-my-pi.url = "github:can1357/oh-my-pi";
+
     hermes-agent = {
       url = "github:NousResearch/hermes-agent";
       inputs.nixpkgs.follows = "nixpkgs";

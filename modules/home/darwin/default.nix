@@ -7,6 +7,7 @@
     ./herdr.nix
     ./llm.nix
     ./nvim.nix
+    ./omp.nix
     ./opencode.nix
     ./slimg.nix
     ./zsh.nix

@@ -47,6 +47,12 @@
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
+  # Prebuilt omp (oh-my-pi) and other community flake outputs
+  nix.settings.extra-substituters = [ "https://nix-community.cachix.org" ];
+  nix.settings.extra-trusted-public-keys = [
+    "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+  ];
+
   system.defaults = {
     NSGlobalDomain = {
       AppleKeyboardUIMode = 3;  # full keyboard access (tab in dialogs)
