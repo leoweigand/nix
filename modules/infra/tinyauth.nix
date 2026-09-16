@@ -36,7 +36,7 @@ in
     # 1Password reference to an env file containing TINYAUTH_AUTH_USERS and
     # TINYAUTH_OIDC_CLIENTS_<NAME>_CLIENTSECRET for any configured OIDC clients.
     # Generate user entries with (use single $ in env file, not $$):
-    #   docker run -it --rm ghcr.io/steveiliop56/tinyauth:v5 user create --username <user> --password <pass>
+    #   docker run -it --rm ghcr.io/tinyauthapp/tinyauth:v5 user create --username <user> --password <pass>
     envReference = lib.mkOption {
       type = lib.types.str;
       description = "1Password reference to env file with TINYAUTH_AUTH_USERS and OIDC client secrets";
@@ -80,7 +80,9 @@ in
       oci-containers = {
         backend = "podman";
         containers.tinyauth = {
-          image = "ghcr.io/steveiliop56/tinyauth:${cfg.imageTag}";
+          # Upstream moved orgs after v5.0.7; the old path is frozen there and
+          # cannot migrate a database already upgraded by a newer release.
+          image = "ghcr.io/tinyauthapp/tinyauth:${cfg.imageTag}";
           autoStart = true;
           extraOptions = [ "--pull=newer" ];
           ports = [ "127.0.0.1:${toString cfg.port}:3000" ];
