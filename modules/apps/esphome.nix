@@ -1,9 +1,11 @@
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   name = "esphome";
   cfg = config.homelab.apps.${name};
   port = 6052;
+  address = "127.0.0.1";
+  stateDir = "/var/lib/esphome";
 in
 
 {
@@ -31,11 +33,25 @@ in
 
     services.esphome = {
       enable = true;
-      address = "127.0.0.1";
-      inherit port;
+      inherit address port;
       # mDNS responses from devices can be flaky over the picard bridge network;
       # ping-based online checks are more predictable here.
       usePing = true;
+    };
+
+    # ESPHome 2026.8 removed the built-in dashboard, but the nixpkgs module still
+    # runs `esphome dashboard`, which now exits immediately. Drive the extracted
+    # esphome-device-builder package instead; it takes --host where the old
+    # dashboard took --address. Drop this once the module is updated upstream.
+    systemd.services.esphome = {
+      serviceConfig.ExecStart = lib.mkForce (lib.concatStringsSep " " [
+        (lib.getExe pkgs.esphome-device-builder)
+        "--host ${address}"
+        "--port ${toString port}"
+        stateDir
+      ]);
+      # esphome itself stays on PATH — device-builder shells out to it to compile
+      path = [ pkgs.esphome-device-builder ];
     };
   };
 }
