@@ -40,9 +40,10 @@ in
     fsType = "virtiofs";
   };
 
-  fileSystems.${mounts.slow} = {
-    device = "nixos-merged";
+  fileSystems."/mnt/media" = {
+    device = "media-library";
     fsType = "virtiofs";
+    options = [ "ro" "nofail" ];
   };
 
   # Compressed swap in RAM - good for VMs
@@ -80,7 +81,7 @@ in
   # Ensure backup targets exist before first backup run.
   systemd.tmpfiles.rules = [
     "d ${mounts.fast} 0755 root root - -"
-    "d ${mounts.slow} 0755 root root - -"
+    "d /mnt/media 0755 root root - -"
     "d ${mounts.fast}/appdata 0755 root root - -"
     "d ${mounts.fast}/backup 0755 root root - -"
     "d ${mounts.fast}/backup/postgres 0750 postgres postgres - -"

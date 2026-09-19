@@ -26,8 +26,14 @@ NixOS configuration for my homelab.
 ### Picard Storage Tiers
 
 - `homelab.mounts.fast` (`/mnt/fast`) is for active app data with low-latency access needs.
-- `homelab.mounts.slow` (`/mnt/slow`) is for the larger capacity tier exposed from Unraid.
+- `/mnt/media` is the read-only film/TV library exposed from Unraid (`media-library` virtiofs tag). The unused `/mnt/slow` share is no longer attached.
 - On picard, Paperless documents and Immich media live on `/mnt/fast`, so restoring the `documents` repository targets `/mnt/fast/...` paths.
+
+### Jellyfin
+
+Jellyfin runs natively on Picard, managed by `modules/apps/jellyfin.nix`, behind Caddy at `jellyfin.leolab.party`. It reads `/mnt/media/films` and `/mnt/media/tv` without write access. Persistent state is in `/mnt/fast/appdata/jellyfin`; regenerable cache and transcodes are in `/mnt/fast/cache/jellyfin`.
+
+AMD VA-API uses the GPU passed through by Unraid. Encoding settings are reapplied on service start; network settings are seeded only on first start, while accounts and libraries remain managed in Jellyfin. Leave remote connections enabled for Tailscale clients: the trusted proxy forwards their actual IP addresses. Jellyfin listens on loopback and UPnP is disabled.
 
 ### Adding New Secrets
 

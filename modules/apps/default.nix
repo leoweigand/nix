@@ -4,6 +4,7 @@
   imports = [
     ./esphome.nix
     ./homeassistant.nix
+    ./jellyfin.nix
     ./immich.nix
     ./linkding.nix
     ./miniflux.nix

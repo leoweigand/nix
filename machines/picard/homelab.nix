@@ -3,7 +3,6 @@
 let
   mounts = {
     fast = "/mnt/fast";
-    slow = "/mnt/slow";
   };
 
   backupPaths = {
@@ -214,6 +213,10 @@ in
     };
 
     apps = {
+      jellyfin = {
+        enable = true;
+        homepage = { name = "Jellyfin"; icon = "jellyfin"; description = "Movies and TV"; };
+      };
       paperless = {
         enable = true;
         subdomain = "documents";

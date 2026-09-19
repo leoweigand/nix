@@ -151,7 +151,7 @@ in
             uptime = true;
             disk = [
               "/mnt/fast"
-              "/mnt/slow"
+              "/mnt/media"
             ];
           };
         }
