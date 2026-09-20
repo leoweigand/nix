@@ -6,11 +6,11 @@ High-level overview of how traffic flows through the network and how the custom 
 - **Domain**: `leolab.party`
 - **Subdomains**: `service.leolab.party` (e.g., `immich.leolab.party`)
 - **Split DNS (local & Tailscale)**:
-  - Local network DNS resolves every subdomain to the picard LAN IP so nearby clients talk directly to the reverse proxy.
-  - Tailscale split DNS resolves the same hostnames to picard's Tailscale IP so tailnet clients also connect straight to the proxy without tunneling.
+  - Local network DNS resolves every declared edge hostname to the picard LAN IP so nearby clients talk directly to the reverse proxy.
+  - Tailscale split DNS resolves the same declared hostnames to picard's Tailscale IP so tailnet clients also connect straight to the proxy without tunneling.
   - Because both paths keep the DNS name identical, TLS termination happens once on Caddy and every client still gets `https://service.leolab.party` regardless of location.
 
-Split DNS is served by CoreDNS on picard via `modules/infra/edge-dns.nix`, with separate LAN and tailnet listeners that both answer for `leolab.party`. The LAN listener also forwards non-`leolab.party` queries to public upstream resolvers, while the router advertises Cloudflare as secondary DNS for fallback if picard is unavailable.
+Split DNS is served by CoreDNS on picard via `modules/infra/edge-dns.nix`, with separate LAN and tailnet zone files generated from the configured reverse-proxy hosts. Exceptional records are explicit; `link.leolab.party` is a CNAME to Short.io. Unknown names return `NXDOMAIN` instead of matching a wildcard. The LAN listener also forwards non-`leolab.party` queries to public upstream resolvers, while the router advertises Cloudflare as secondary DNS for fallback if picard is unavailable. CoreDNS is prepared to transfer each view to a future persistent secondary, but no secondary is configured yet.
 
 ## Network Architecture
 

@@ -100,10 +100,15 @@ in
 
       edgeDns = {
         enable = true;
+        serial = 2026092001; # Bump whenever DNS names or values change
         lanListenAddress = "192.168.2.4";
         lanAnswerAddress = "192.168.2.4";
         tailnetListenAddress = "100.104.119.103";
         tailnetAnswerAddress = "100.104.119.103";
+        extraRecords.link = {
+          type = "CNAME";
+          value = "cname.short.io.";
+        };
         upstreamResolvers = [
           "192.168.2.1"
         ];
