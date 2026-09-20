@@ -20,6 +20,12 @@
         description = "Path for fast-tier storage";
       };
 
+      media = lib.mkOption {
+        type = lib.types.path;
+        default = "/mnt/media";
+        description = "Path for the shared media tree";
+      };
+
       slow = lib.mkOption {
         type = lib.types.path;
         default = "/mnt/slow";

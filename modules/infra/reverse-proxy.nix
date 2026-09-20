@@ -34,9 +34,15 @@ let
         default = { };
         description = "Request headers to set before proxying to the upstream";
       };
+      redirects = lib.mkOption {
+        type = lib.types.attrsOf lib.types.str;
+        default = { };
+        description = "Exact request paths to redirect before authentication and proxying";
+      };
     };
   };
-  proxyExtraConfig = proxyCfg:
+  proxyExtraConfig =
+    proxyCfg:
     let
       authCfg =
         if builtins.isBool proxyCfg.auth then
@@ -56,32 +62,38 @@ let
           ${lib.concatMapAttrsStringSep "\n" (name: value: "header_up ${name} ${value}") proxyCfg.headerUp}
         }
       '';
+      redirects =
+        lib.concatMapAttrsStringSep "\n" (from: to: "redir ${from} ${to} 302") proxyCfg.redirects
+        + lib.optionalString (proxyCfg.redirects != { }) "\n";
     in
-    if needsAuth && authCfg.bypassPaths != [ ] then
-      lib.concatMapStrings (path: ''
-        handle ${path} {
-          ${reverseProxy}
-        }
-      '') authCfg.bypassPaths
-      + ''
-        handle {
-          forward_auth http://127.0.0.1:${toString tinyauth.port} {
-            uri /api/auth/caddy
-            ${lib.optionalString authCfg.passUser "copy_headers Remote-User"}
+    redirects
+    + (
+      if needsAuth && authCfg.bypassPaths != [ ] then
+        lib.concatMapStrings (path: ''
+          handle ${path} {
+            ${reverseProxy}
           }
-          ${reverseProxy}
-        }
-      ''
-    else
-      ''
-        ${lib.optionalString needsAuth ''
-          forward_auth http://127.0.0.1:${toString tinyauth.port} {
-            uri /api/auth/caddy
-            ${lib.optionalString authCfg.passUser "copy_headers Remote-User"}
+        '') authCfg.bypassPaths
+        + ''
+          handle {
+            forward_auth http://127.0.0.1:${toString tinyauth.port} {
+              uri /api/auth/caddy
+              ${lib.optionalString authCfg.passUser "copy_headers Remote-User"}
+            }
+            ${reverseProxy}
           }
-        ''}
-        ${reverseProxy}
-      '';
+        ''
+      else
+        ''
+          ${lib.optionalString needsAuth ''
+            forward_auth http://127.0.0.1:${toString tinyauth.port} {
+              uri /api/auth/caddy
+              ${lib.optionalString authCfg.passUser "copy_headers Remote-User"}
+            }
+          ''}
+          ${reverseProxy}
+        ''
+    );
 in
 
 {
@@ -114,22 +126,24 @@ in
     webhookRoutes = lib.mkOption {
       description = "Path-based routes for webhooks.{domain}, each rewriting the path before proxying";
       default = [ ];
-      type = lib.types.listOf (lib.types.submodule {
-        options = {
-          path = lib.mkOption {
-            type = lib.types.str;
-            description = "URL path to match (e.g. /telegram)";
+      type = lib.types.listOf (
+        lib.types.submodule {
+          options = {
+            path = lib.mkOption {
+              type = lib.types.str;
+              description = "URL path to match (e.g. /telegram)";
+            };
+            rewrite = lib.mkOption {
+              type = lib.types.str;
+              description = "Path to rewrite matched requests to before proxying";
+            };
+            upstream = lib.mkOption {
+              type = lib.types.str;
+              description = "Backend URL";
+            };
           };
-          rewrite = lib.mkOption {
-            type = lib.types.str;
-            description = "Path to rewrite matched requests to before proxying";
-          };
-          upstream = lib.mkOption {
-            type = lib.types.str;
-            description = "Backend URL";
-          };
-        };
-      });
+        }
+      );
     };
   };
 
@@ -189,12 +203,14 @@ in
           useACMEHost = domain;
           extraConfig = "abort";
         };
-      } // lib.optionalAttrs (cfg.rootProxy != null) {
+      }
+      // lib.optionalAttrs (cfg.rootProxy != null) {
         "${domain}" = {
           useACMEHost = domain;
           extraConfig = proxyExtraConfig cfg.rootProxy;
         };
-      } // lib.optionalAttrs (cfg.webhookRoutes != [ ]) {
+      }
+      // lib.optionalAttrs (cfg.webhookRoutes != [ ]) {
         # Plain HTTP so cloudflared can connect without TLS verification issues.
         # Cloudflare terminates TLS at the edge; the tunnel leg is already encrypted.
         "http://webhooks.${domain}" = {
@@ -209,7 +225,9 @@ in
               respond 404
             '';
         };
-      } // lib.mapAttrs' (subdomain: proxyCfg:
+      }
+      // lib.mapAttrs' (
+        subdomain: proxyCfg:
         lib.nameValuePair "${subdomain}.${domain}" {
           useACMEHost = domain;
           extraConfig = proxyExtraConfig proxyCfg;

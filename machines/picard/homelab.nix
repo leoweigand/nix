@@ -3,6 +3,7 @@
 let
   mounts = {
     fast = "/mnt/fast";
+    media = "/mnt/media";
   };
 
   backupPaths = {
@@ -55,6 +56,7 @@ in
         categoryOrder = [
           "Smart Home"
           "Services"
+          "Entertainment"
         ];
       };
 
@@ -199,8 +201,8 @@ in
             schedule = "*-*-* 02:30:00"; # Daily at 2:30 AM, before appdata
             paths = backupPaths.esphome;
             exclude = [
-              ".platformio"           # PlatformIO toolchains, regenerable
-              "**/.esphome/build"     # per-device build artifacts, regenerable
+              ".platformio" # PlatformIO toolchains, regenerable
+              "**/.esphome/build" # per-device build artifacts, regenerable
             ];
             pruneOpts = [
               "--keep-daily 7"
@@ -215,7 +217,48 @@ in
     apps = {
       jellyfin = {
         enable = true;
-        homepage = { name = "Jellyfin"; icon = "jellyfin"; description = "Movies and TV"; };
+        homepage = {
+          name = "Jellyfin";
+          icon = "jellyfin";
+          description = "Movies and TV";
+        };
+      };
+      sonarr = {
+        enable = true;
+        homepage = {
+          category = "Entertainment";
+          name = "Sonarr";
+          icon = "sonarr";
+          description = "TV library automation";
+        };
+      };
+      radarr = {
+        enable = true;
+        homepage = {
+          category = "Entertainment";
+          name = "Radarr";
+          icon = "radarr";
+          description = "Movie library automation";
+        };
+      };
+      seerr = {
+        enable = true;
+        subdomain = "discover";
+        homepage = {
+          category = "Entertainment";
+          name = "Discover & Request";
+          icon = "seerr";
+          description = "Find and request something to watch";
+        };
+      };
+      syncthing = {
+        enable = true;
+        homepage = {
+          category = "Entertainment";
+          name = "Syncthing";
+          icon = "syncthing";
+          description = "File synchronization";
+        };
       };
       paperless = {
         enable = true;
@@ -261,7 +304,7 @@ in
       zigbee2mqtt = {
         enable = true;
         subdomain = "zigbee";
-        dataDir = "${mounts.fast}/appdata/ziqbee2mqtt/config";  # existing path, typo intentional
+        dataDir = "${mounts.fast}/appdata/ziqbee2mqtt/config"; # existing path, typo intentional
         serialAdapter = "zstack";
         serialPort = "/dev/serial/by-id/usb-ITead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_64f09a5b4dbeed11b2996b2e38a92db5-if00-port0";
         homepage = {

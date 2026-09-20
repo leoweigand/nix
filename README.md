@@ -26,14 +26,18 @@ NixOS configuration for my homelab.
 ### Picard Storage Tiers
 
 - `homelab.mounts.fast` (`/mnt/fast`) is for active app data with low-latency access needs.
-- `/mnt/media` is the read-only film/TV library exposed from Unraid (`media-library` virtiofs tag). The unused `/mnt/slow` share is no longer attached.
+- `/mnt/media` is the single media tree exposed read-write from Unraid (`media` virtiofs tag). App modules hide the full mount and bind only approved subdirectories into each service. The unused `/mnt/slow` share is no longer attached.
 - On picard, Paperless documents and Immich media live on `/mnt/fast`, so restoring the `documents` repository targets `/mnt/fast/...` paths.
 
 ### Jellyfin
 
-Jellyfin runs natively on Picard, managed by `modules/apps/jellyfin.nix`, behind Caddy at `jellyfin.leolab.party`. It reads `/mnt/media/films` and `/mnt/media/tv` without write access. Persistent state is in `/mnt/fast/appdata/jellyfin`; regenerable cache and transcodes are in `/mnt/fast/cache/jellyfin`.
+Jellyfin runs natively on Picard, managed by `modules/apps/jellyfin.nix`, behind Caddy at `jellyfin.leolab.party`. Its private service namespace reads `/media/films` and `/media/tv` without write access; those paths bind to the shared media library. Persistent state is in `/mnt/fast/appdata/jellyfin`; regenerable cache and transcodes are in `/mnt/fast/cache/jellyfin`.
 
 AMD VA-API uses the GPU passed through by Unraid. Encoding settings are reapplied on service start; network settings are seeded only on first start, while accounts and libraries remain managed in Jellyfin. Leave remote connections enabled for Tailscale clients: the trusted proxy forwards their actual IP addresses. Jellyfin listens on loopback and UPnP is disabled.
+
+### Media automation
+
+Sonarr, Radarr, Seerr, and Syncthing run natively on Picard. Their app modules own loopback listeners, Caddy routes, and private systemd mount namespaces. Sonarr can write only the TV library and its download inbox; Radarr can write only the film library and its inbox; Syncthing can write only the seedbox source tree; Seerr has no filesystem access to media. The operational layout is documented in the private homelab repository's `services/media-automation/README.md`.
 
 ### Adding New Secrets
 

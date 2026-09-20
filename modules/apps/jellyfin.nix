@@ -1,7 +1,14 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.homelab.apps.jellyfin;
-in {
+  mediaDir = config.homelab.mounts.media;
+in
+{
   options.homelab.apps.jellyfin = {
     enable = lib.mkEnableOption "Jellyfin media server";
     subdomain = lib.mkOption {
@@ -37,7 +44,10 @@ in {
     hardware.graphics.enable = true;
     hardware.firmware = [ pkgs.linux-firmware ];
     boot.kernelModules = [ "amdgpu" ];
-    users.users.jellyfin.extraGroups = [ "render" "video" ];
+    users.users.jellyfin.extraGroups = [
+      "render"
+      "video"
+    ];
     environment.systemPackages = [ pkgs.libva-utils ];
     systemd.services.jellyfin = {
       # Seed network settings without overwriting later administrator changes.
@@ -60,7 +70,13 @@ in {
       '';
       requires = [ "mnt-media.mount" ];
       after = [ "mnt-media.mount" ];
-      serviceConfig.ReadOnlyPaths = [ "/mnt/media" ];
+      serviceConfig = {
+        InaccessiblePaths = [ mediaDir ];
+        BindReadOnlyPaths = [
+          "${mediaDir}/library/films:/media/films"
+          "${mediaDir}/library/tv:/media/tv"
+        ];
+      };
     };
     homelab.infra.edge.proxies.${cfg.subdomain}.upstream = "http://127.0.0.1:8096";
   };

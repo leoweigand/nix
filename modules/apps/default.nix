@@ -9,66 +9,72 @@
     ./linkding.nix
     ./miniflux.nix
     ./paperless
+    ./radarr.nix
+    ./seerr.nix
     ./silverbullet.nix
+    ./sonarr.nix
+    ./syncthing.nix
     ./zigbee2mqtt.nix
   ];
 
   options.homelab.apps = lib.mkOption {
     type = lib.types.submodule {
-      freeformType = lib.types.attrsOf (lib.types.submodule {
-        options.homepage = lib.mkOption {
-          type = lib.types.submodule {
-            options = {
-              enable = lib.mkOption {
-                type = lib.types.bool;
-                default = true;
-                description = "Publish this app in the Homepage dashboard";
-              };
+      freeformType = lib.types.attrsOf (
+        lib.types.submodule {
+          options.homepage = lib.mkOption {
+            type = lib.types.submodule {
+              options = {
+                enable = lib.mkOption {
+                  type = lib.types.bool;
+                  default = true;
+                  description = "Publish this app in the Homepage dashboard";
+                };
 
-              category = lib.mkOption {
-                type = lib.types.str;
-                default = "Services";
-                description = "Homepage service group";
-              };
+                category = lib.mkOption {
+                  type = lib.types.str;
+                  default = "Services";
+                  description = "Homepage service group";
+                };
 
-              name = lib.mkOption {
-                type = lib.types.str;
-                default = "";
-                description = "Friendly name shown in Homepage";
-              };
+                name = lib.mkOption {
+                  type = lib.types.str;
+                  default = "";
+                  description = "Friendly name shown in Homepage";
+                };
 
-              icon = lib.mkOption {
-                type = lib.types.str;
-                default = "mdi-application";
-                description = "Homepage icon identifier";
-              };
+                icon = lib.mkOption {
+                  type = lib.types.str;
+                  default = "mdi-application";
+                  description = "Homepage icon identifier";
+                };
 
-              description = lib.mkOption {
-                type = lib.types.str;
-                default = "";
-                description = "Short description shown below the service name";
-              };
+                description = lib.mkOption {
+                  type = lib.types.str;
+                  default = "";
+                  description = "Short description shown below the service name";
+                };
 
-              href = lib.mkOption {
-                type = lib.types.nullOr lib.types.str;
-                default = null;
-                description = "Optional URL override for apps without a standard subdomain";
-              };
+                href = lib.mkOption {
+                  type = lib.types.nullOr lib.types.str;
+                  default = null;
+                  description = "Optional URL override for apps without a standard subdomain";
+                };
 
-              siteMonitor = lib.mkOption {
-                type = lib.types.nullOr (lib.types.either lib.types.bool lib.types.str);
-                default = null;
-                description = ''
-                  Status-monitor URL for Homepage. null derives the app's edge upstream,
-                  false disables monitoring, and a string provides a custom URL.
-                '';
+                siteMonitor = lib.mkOption {
+                  type = lib.types.nullOr (lib.types.either lib.types.bool lib.types.str);
+                  default = null;
+                  description = ''
+                    Status-monitor URL for Homepage. null derives the app's edge upstream,
+                    false disables monitoring, and a string provides a custom URL.
+                  '';
+                };
               };
             };
+            default = { };
+            description = "Presentation metadata published to Homepage";
           };
-          default = { };
-          description = "Presentation metadata published to Homepage";
-        };
-      });
+        }
+      );
     };
     default = { };
     description = "Homelab app configuration";

@@ -47,7 +47,9 @@ Split DNS is served by CoreDNS on picard via `modules/infra/edge-dns.nix`, with 
 ### Current Layout
 - Service-owned persistent state is stored under `/mnt/fast/appdata/<appname>` (for example Home Assistant, Zigbee2MQTT, and Paperless).
 - User-generated datasets live in dedicated top-level directories on `/mnt/fast` (`/mnt/fast/photos` for Immich uploads, `/mnt/fast/documents` for Paperless media/consume).
-- On picard, active media/documents are stored under `/mnt/fast` (virtiofs from Unraid).
+- Laforge exports one writable media tree to Picard at `/mnt/media`. The film and TV libraries live under `/mnt/media/library`; seedbox synchronization lands under `/mnt/media/sources/seedbox`.
+- Media services do not receive the full `/mnt/media` tree. Their systemd mount namespaces contain explicit read-only or read-write bindings for the subdirectories each service owns.
+- Other active data and documents are stored under `/mnt/fast` (virtiofs from Unraid).
 - Database dump outputs are stored under `/mnt/fast/backup/postgres`.
 
 ### Home Assistant Workflow Today
