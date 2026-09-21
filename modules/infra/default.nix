@@ -8,6 +8,7 @@
     ./edge-dns.nix
     ./homepage.nix
     ./mqtt.nix
+    ./notification-gateway.nix
     ./reverse-proxy.nix
     ./tailscale.nix
     ./tinyauth.nix

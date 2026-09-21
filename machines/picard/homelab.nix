@@ -39,11 +39,6 @@ in
         cloudflareCredentialsReference = "op://Homelab/Cloudflare/dnsCredentials";
         webhookRoutes = [
           {
-            path = "/ha-telegram-bot";
-            rewrite = "/api/telegram_webhooks";
-            upstream = "http://127.0.0.1:8123";
-          }
-          {
             path = "/hermes-telegram";
             rewrite = "/hermes-telegram";
             upstream = "http://192.168.2.135:8443";
@@ -98,9 +93,14 @@ in
         passwordReference = "op://Homelab/Home Assistant/mqtt-password";
       };
 
+      notificationGateway = {
+        enable = true;
+        environmentReference = "op://Homelab/Notification Gateway/env";
+      };
+
       edgeDns = {
         enable = true;
-        serial = 2026092001; # Bump whenever DNS names or values change
+        serial = 2026092101; # Bump whenever DNS names or values change
         lanListenAddress = "192.168.2.4";
         lanAnswerAddress = "192.168.2.4";
         tailnetListenAddress = "100.104.119.103";

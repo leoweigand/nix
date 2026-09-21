@@ -10,7 +10,7 @@ let
   edge = config.homelab.infra.edge;
   zone = config.homelab.baseDomain;
 
-  proxyNames = builtins.attrNames edge.proxies;
+  proxyNames = builtins.attrNames edge.proxies ++ builtins.attrNames edge.privateProxies;
   edgeRecordNames =
     proxyNames
     ++ lib.optional (edge.rootProxy != null) "@"

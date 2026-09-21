@@ -41,6 +41,18 @@ let
       };
     };
   };
+  privateProxyType = lib.types.submodule {
+    options = {
+      upstream = lib.mkOption {
+        type = lib.types.str;
+        description = "Backend URL to proxy requests to";
+      };
+      allowedClientRanges = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        description = "Client IP ranges permitted to reach this private proxy";
+      };
+    };
+  };
   proxyExtraConfig =
     proxyCfg:
     let
@@ -117,6 +129,12 @@ in
       type = lib.types.attrsOf proxyType;
     };
 
+    privateProxies = lib.mkOption {
+      description = "TLS reverse-proxy virtual hosts restricted by client IP range";
+      default = { };
+      type = lib.types.attrsOf privateProxyType;
+    };
+
     rootProxy = lib.mkOption {
       type = lib.types.nullOr proxyType;
       default = null;
@@ -153,6 +171,10 @@ in
         assertion = domain != "";
         message = "homelab.baseDomain must be set when homelab.infra.edge.enable = true";
       }
+      {
+        assertion = lib.intersectLists (builtins.attrNames cfg.proxies) (builtins.attrNames cfg.privateProxies) == [ ];
+        message = "homelab.infra.edge.proxies and privateProxies must not use the same subdomain";
+      }
     ];
 
     services.onepassword-secrets.secrets.cloudflareAcmeEnvironment = {
@@ -187,6 +209,13 @@ in
       enable = true;
       globalConfig = ''
         auto_https off
+        servers {
+          # cloudflared connects from loopback; use Cloudflare's supplied client IP
+          # so private routes never mistake a tunnel request for a local one.
+          trusted_proxies static 127.0.0.0/8
+          trusted_proxies_strict
+          client_ip_headers CF-Connecting-IP
+        }
       '';
 
       virtualHosts = {
@@ -232,7 +261,20 @@ in
           useACMEHost = domain;
           extraConfig = proxyExtraConfig proxyCfg;
         }
-      ) cfg.proxies;
+      ) cfg.proxies
+      // lib.mapAttrs' (
+        subdomain: proxyCfg:
+        lib.nameValuePair "${subdomain}.${domain}" {
+          useACMEHost = domain;
+          extraConfig = ''
+            @allowed client_ip ${lib.concatStringsSep " " proxyCfg.allowedClientRanges}
+            handle @allowed {
+              reverse_proxy ${proxyCfg.upstream}
+            }
+            respond 403
+          '';
+        }
+      ) cfg.privateProxies;
     };
 
     networking.firewall = {
