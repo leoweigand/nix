@@ -1,0 +1,21 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@jd1378/another-cookiejar@5.0.7": "5.0.7",
+    "jsr:@std/xml@0.2.0": "0.2.0"
+  },
+  "jsr": {
+    "@jd1378/another-cookiejar@5.0.7": {
+      "integrity": "788e22828dd428aaebaedc9acbed6ae7033cc240982a10fcfc34aa72dcf01088"
+    },
+    "@std/xml@0.2.0": {
+      "integrity": "e0b54ae29592bc1fc688109f78ef5c18680bf820ba8aa0a3990a115e709e58d2"
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@jd1378/another-cookiejar@5.0.7",
+      "jsr:@std/xml@0.2.0"
+    ]
+  }
+}

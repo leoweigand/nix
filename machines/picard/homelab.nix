@@ -237,7 +237,6 @@ in
           description = "Tracker integration";
         };
       };
-      seedboxCleanup.enable = true;
       sonarr = {
         enable = true;
         homepage = {
@@ -391,5 +390,11 @@ in
         };
       };
     };
+
+    automation.seedboxCleanup = {
+      enable = true;
+      environmentReference = "op://Homelab/Seedbox Cleanup/env";
+    };
+    automation.mediaImportNotifications.enable = true;
   };
 }

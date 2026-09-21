@@ -1,0 +1,14 @@
+{
+  "lock": {
+    "path": "./deno.lock",
+    "frozen": true
+  },
+  "imports": {
+    "@jd1378/another-cookiejar": "jsr:@jd1378/another-cookiejar@5.0.7",
+    "@std/xml": "jsr:@std/xml@0.2.0"
+  },
+  "tasks": {
+    "test": "deno test --allow-read --allow-write modules/infra/notification-gateway_test.ts modules/automation/seedbox-cleanup/seedbox-cleanup_test.ts modules/apps/paperless/paperless-llm-title_test.ts",
+    "check": "deno check modules/infra/notification-gateway.ts modules/automation/seedbox-cleanup/seedbox-cleanup.ts modules/apps/paperless/paperless-llm-title.ts"
+  }
+}

@@ -10,6 +10,12 @@ NixOS configuration for my homelab.
 - Edge reverse proxy on picard with Caddy and wildcard TLS via ACME DNS-01 (Cloudflare)
 - Containerized and native services with persistent appdata on `/mnt/fast`
 
+## Custom automation
+
+Use TypeScript with Deno for custom automation, including the notification
+gateway. Prefer Deno built-ins; use Nix or shell only for configuration and
+small glue.
+
 ## Machines
 - **picard (NixOS VM on laforge)**: Runs the homelab edge (reverse proxy, DNS), plus apps (Immich, Paperless-ngx, etc.). Laforge is the Unraid host with the storage array and SSD cache drives.
 - **dax (Ubuntu VM on laforge)**: Runs Hermes independently of Nix. Picard provides its authenticated dashboard route, Telegram webhook forwarding, and backup collection. Dax's application configuration is maintained separately in the private homelab repository.
@@ -55,7 +61,7 @@ AMD VA-API uses the GPU passed through by Unraid. Encoding settings are reapplie
 
 Sonarr, Radarr, Prowlarr, Seerr, and Syncthing run natively on Picard. Their app modules own loopback listeners, Caddy routes, and private systemd mount namespaces. Sonarr can write only the TV library and its download inbox; Radarr can write only the film library and its inbox; Syncthing can write only the seedbox source tree; Seerr and Prowlarr have no filesystem access to media. Syncthing initiates outbound connections to the managed SeedHost instance and accepts no inbound peers. Arr imports completed downloads as separate library copies.
 
-`seedbox-cleanup.nix` installs a timer that checks tracker obligations and library-import evidence. It defaults to dry-run; `homelab.apps.seedboxCleanup.apply` controls destructive removal. Its Deluge password comes from opnix, and its local media mounts are read-only. The operational layout and validation stage are documented in the private homelab repository's `services/media-automation/README.md`.
+`seedbox-cleanup` installs a daily 3:00 AM timer that checks tracker obligations and library-import evidence. It defaults to dry-run; `homelab.automation.seedboxCleanup.apply` controls destructive removal. Its connection details come from opnix, and its local media mounts are read-only. The operational layout and validation stage are documented in the private homelab repository's `services/media-automation/README.md`.
 
 ### Adding New Secrets
 
