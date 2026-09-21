@@ -14,6 +14,21 @@ NixOS configuration for my homelab.
 - **picard (NixOS VM on laforge)**: Runs the homelab edge (reverse proxy, DNS), plus apps (Immich, Paperless-ngx, etc.). Laforge is the Unraid host with the storage array and SSD cache drives.
 - **dax (Ubuntu VM on laforge)**: Runs Hermes independently of Nix. Picard provides its authenticated dashboard route, Telegram webhook forwarding, and backup collection. Dax's application configuration is maintained separately in the private homelab repository.
 
+## Darwin Package Policy
+
+Darwin rebuilds should install third-party dependencies and applications from
+binary artifacts, not compile them locally. Prefer, in order:
+
+1. nixpkgs packages available from `cache.nixos.org`
+2. upstream prebuilt binaries wrapped by Nix
+3. Homebrew formulae or casks
+
+Source builds are reserved for locally developed software and explicit
+exceptions. Before adding an external flake package, verify that its complete
+`aarch64-darwin` closure is available from a trusted binary cache. Run
+`scripts/check-darwin-build-plan.sh <machine>` before a rebuild to surface
+unexpected local compilation.
+
 ## Edge Routing Model
 
 - Shared edge settings live in `modules/infra/reverse-proxy.nix`.

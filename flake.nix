@@ -26,19 +26,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # herdr pins an older rust-overlay; follow master so we get its
-    # stdenv.hostPlatform deprecation fixes
-    rust-overlay = {
-      url = "github:oxalica/rust-overlay";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    herdr = {
-      url = "github:ogulcancelik/herdr";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.rust-overlay.follows = "rust-overlay";
-    };
-
   };
 
   outputs = { self, nixpkgs, nix-darwin, home-manager, opnix, disko, ... }@inputs: {

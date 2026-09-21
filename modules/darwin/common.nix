@@ -45,7 +45,13 @@
 
   time.timeZone = "Europe/Berlin";
 
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  nix.settings = {
+    experimental-features = [ "nix-command" "flakes" ];
+    # Keep an accidental source build responsive instead of letting several
+    # highly parallel compiler jobs contend for all CPU and memory.
+    max-jobs = 2;
+    cores = 4;
+  };
 
   system.defaults = {
     NSGlobalDomain = {
