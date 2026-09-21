@@ -34,18 +34,32 @@ in
       configDir = cfg.dataDir;
       databaseDir = cfg.dataDir;
       guiAddress = "127.0.0.1:8384";
-      openDefaultPorts = true;
+      openDefaultPorts = false;
       overrideDevices = true;
       overrideFolders = true;
       settings = {
-        devices = { };
+        devices.seedbox = {
+          id = "7MJGHKA-MAKECI5-HP6Q3TI-KP4TJLG-BGFNVDK-GNJ5ARW-UIWEOMO-OY5JFAI";
+          addresses = [ "tcp://tiny.seedhost.eu:35429" ];
+        };
         folders.seedbox = {
+          id = "seedhost-completed";
           path = "/media/sources/seedbox";
           label = "Seedbox";
-          type = "sendreceive";
-          devices = [ ];
+          type = "receiveonly";
+          devices = [ "seedbox" ];
+          ignorePerms = true;
+          rescanIntervalS = 300;
         };
-        options.urAccepted = -1;
+        options = {
+          urAccepted = -1;
+          # Picard dials the external host; it never accepts inbound sync peers.
+          listenAddresses = [ ];
+          globalAnnounceEnabled = false;
+          localAnnounceEnabled = false;
+          relaysEnabled = false;
+          natEnabled = false;
+        };
       };
     };
 

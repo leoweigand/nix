@@ -9,8 +9,10 @@
     ./linkding.nix
     ./miniflux.nix
     ./paperless
+    ./prowlarr.nix
     ./radarr.nix
     ./seerr.nix
+    ./seedbox-cleanup.nix
     ./silverbullet.nix
     ./sonarr.nix
     ./syncthing.nix

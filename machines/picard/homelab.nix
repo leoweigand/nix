@@ -228,6 +228,16 @@ in
           description = "Movies and TV";
         };
       };
+      prowlarr = {
+        enable = true;
+        homepage = {
+          category = "Entertainment";
+          name = "Prowlarr";
+          icon = "prowlarr";
+          description = "Tracker integration";
+        };
+      };
+      seedboxCleanup.enable = true;
       sonarr = {
         enable = true;
         homepage = {

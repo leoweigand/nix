@@ -38,7 +38,9 @@ AMD VA-API uses the GPU passed through by Unraid. Encoding settings are reapplie
 
 ### Media automation
 
-Sonarr, Radarr, Seerr, and Syncthing run natively on Picard. Their app modules own loopback listeners, Caddy routes, and private systemd mount namespaces. Sonarr can write only the TV library and its download inbox; Radarr can write only the film library and its inbox; Syncthing can write only the seedbox source tree; Seerr has no filesystem access to media. The operational layout is documented in the private homelab repository's `services/media-automation/README.md`.
+Sonarr, Radarr, Prowlarr, Seerr, and Syncthing run natively on Picard. Their app modules own loopback listeners, Caddy routes, and private systemd mount namespaces. Sonarr can write only the TV library and its download inbox; Radarr can write only the film library and its inbox; Syncthing can write only the seedbox source tree; Seerr and Prowlarr have no filesystem access to media. Syncthing initiates outbound connections to the managed SeedHost instance and accepts no inbound peers. Arr imports completed downloads as separate library copies.
+
+`seedbox-cleanup.nix` installs a timer that checks tracker obligations and library-import evidence. It defaults to dry-run; `homelab.apps.seedboxCleanup.apply` controls destructive removal. Its Deluge password comes from opnix, and its local media mounts are read-only. The operational layout and validation stage are documented in the private homelab repository's `services/media-automation/README.md`.
 
 ### Adding New Secrets
 
