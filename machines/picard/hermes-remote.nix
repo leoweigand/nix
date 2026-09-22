@@ -16,7 +16,7 @@ in
   };
 
   homelab.infra.homepage.infrastructureEntries.hermes = {
-    category = "Services";
+    category = "Productivity";
     name = "Hermes";
     href = "https://hermes.${config.homelab.baseDomain}";
     icon = "mdi-robot-outline";

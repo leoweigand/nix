@@ -55,9 +55,10 @@ in
       homepage = {
         enable = true;
         categoryOrder = [
+          "Media"
           "Smart Home"
+          "Productivity"
           "Services"
-          "Entertainment"
         ];
       };
 
@@ -226,6 +227,7 @@ in
       jellyfin = {
         enable = true;
         homepage = {
+          category = "Media";
           name = "Jellyfin";
           icon = "jellyfin";
           description = "Movies and TV";
@@ -234,7 +236,7 @@ in
       prowlarr = {
         enable = true;
         homepage = {
-          category = "Entertainment";
+          category = "Services";
           name = "Prowlarr";
           icon = "prowlarr";
           description = "Tracker integration";
@@ -243,7 +245,7 @@ in
       sonarr = {
         enable = true;
         homepage = {
-          category = "Entertainment";
+          category = "Services";
           name = "Sonarr";
           icon = "sonarr";
           description = "TV library automation";
@@ -252,7 +254,7 @@ in
       radarr = {
         enable = true;
         homepage = {
-          category = "Entertainment";
+          category = "Services";
           name = "Radarr";
           icon = "radarr";
           description = "Movie library automation";
@@ -262,7 +264,7 @@ in
         enable = true;
         subdomain = "discover";
         homepage = {
-          category = "Entertainment";
+          category = "Media";
           name = "Discover & Request";
           icon = "seerr";
           description = "Find and request something to watch";
@@ -271,7 +273,7 @@ in
       syncthing = {
         enable = true;
         homepage = {
-          category = "Entertainment";
+          category = "Services";
           name = "Syncthing";
           icon = "syncthing";
           description = "File synchronization";
@@ -319,7 +321,7 @@ in
           openaiKeyReference = "op://Homelab/Paperless/openai-token";
         };
         homepage = {
-          category = "Services";
+          category = "Productivity";
           name = "Paperless";
           icon = "si-paperlessngx";
           description = "Document archive and OCR";
@@ -375,7 +377,7 @@ in
           autoRegister = false;
         };
         homepage = {
-          category = "Services";
+          category = "Media";
           name = "Immich";
           icon = "si-immich";
           description = "Photo and video library";
@@ -406,7 +408,7 @@ in
         subdomain = "notes";
         spaceDir = "${mounts.fast}/notes";
         homepage = {
-          category = "Services";
+          category = "Productivity";
           name = "SilverBullet";
           icon = "mdi-notebook-outline";
           description = "Markdown notes and knowledge base";
@@ -426,7 +428,7 @@ in
           disableLocalAuth = false;
         };
         homepage = {
-          category = "Services";
+          category = "Productivity";
           name = "Miniflux";
           icon = "mdi-rss-box";
           description = "Personal news and feed reader";
