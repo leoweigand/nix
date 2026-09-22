@@ -5,50 +5,13 @@ let
 
   mediaImportNotify = pkgs.writeShellApplication {
     name = "media-import-notify";
-    runtimeInputs = [ pkgs.curl pkgs.jq ];
+    runtimeInputs = [ pkgs.deno ];
     text = ''
-      set -o errexit -o nounset -o pipefail
-
-      strip_trailing_year() {
-        title="$1"
-        if [[ "$title" =~ ^(.*)[[:space:]]\([0-9]{4}\)$ ]]; then
-          title="''${BASH_REMATCH[1]}"
-        fi
-      }
-
-      if [ -n "''${radarr_eventtype:-}" ]; then
-        [ "$radarr_eventtype" = "Test" ] && exit 0
-        [ "$radarr_eventtype" = "Download" ] || exit 0
-        [ "''${radarr_isupgrade:-False}" = "True" ] && exit 0
-
-        strip_trailing_year "''${radarr_movie_title:?missing Radarr movie title}"
-        message="🎬 New movie: $title"
-      elif [ -n "''${sonarr_eventtype:-}" ]; then
-        [ "$sonarr_eventtype" = "Test" ] && exit 0
-        [ "$sonarr_eventtype" = "Download" ] || exit 0
-        [ "''${sonarr_isupgrade:-False}" = "True" ] && exit 0
-
-        season="''${sonarr_episodefile_seasonnumber:?missing Sonarr season number}"
-        episodes="''${sonarr_episodefile_episodenumbers:?missing Sonarr episode numbers}"
-        episode_label=$(jq --null-input --raw-output \
-          --arg season "$season" --arg episodes "$episodes" '
-          def pad: if length < 2 then "0" + . else . end;
-          ($season | pad) as $season_number |
-          ($episodes | split(",") | map("E" + pad) | join(", ")) as $episode_numbers |
-          "S" + $season_number + $episode_numbers
-        ')
-        strip_trailing_year "''${sonarr_series_title:?missing Sonarr series title}"
-        message="📺 New TV: $title — $episode_label"
-      else
-        exit 0
-      fi
-
-      jq --null-input --arg message "$message" '{ to: "kittypurr", message: $message }' |
-        curl --fail --silent --show-error --retry 2 --retry-delay 2 \
-          --request POST \
-          --header 'Content-Type: application/json' \
-          --data-binary @- \
-          ${lib.escapeShellArg cfg.endpoint}
+      export MEDIA_IMPORT_NOTIFICATION_ENDPOINT=${lib.escapeShellArg cfg.endpoint}
+      exec deno run --no-prompt \
+        --allow-env=MEDIA_IMPORT_NOTIFICATION_ENDPOINT,radarr_eventtype,radarr_isupgrade,radarr_movie_title,sonarr_eventtype,sonarr_isupgrade,sonarr_series_title,sonarr_episodefile_seasonnumber,sonarr_episodefile_episodenumbers,Radarr_EventType,Radarr_IsUpgrade,Radarr_Movie_Title,Sonarr_EventType,Sonarr_IsUpgrade,Sonarr_Series_Title,Sonarr_EpisodeFile_SeasonNumber,Sonarr_EpisodeFile_EpisodeNumbers \
+        --allow-net=notifications.${config.homelab.baseDomain}:443 \
+        ${./media-import-notifications.ts}
     '';
   };
 in
@@ -72,5 +35,17 @@ in
     ];
 
     environment.systemPackages = [ mediaImportNotify ];
+
+    # Deno's V8 runtime uses memory-protection keys on x86_64 Linux.
+    systemd.services.radarr.serviceConfig.SystemCallFilter = lib.mkAfter [
+      "pkey_alloc"
+      "pkey_free"
+      "pkey_mprotect"
+    ];
+    systemd.services.sonarr.serviceConfig.SystemCallFilter = lib.mkAfter [
+      "pkey_alloc"
+      "pkey_free"
+      "pkey_mprotect"
+    ];
   };
 }
