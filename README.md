@@ -10,13 +10,36 @@ NixOS configuration for my homelab.
 - Edge reverse proxy on picard with Caddy and wildcard TLS via ACME DNS-01 (Cloudflare)
 - Containerized and native services with persistent appdata on `/mnt/fast`
 
+## Custom automation
+
+Use TypeScript with Deno for custom automation, including the notification
+gateway. Prefer Deno built-ins; use Nix or shell only for configuration and
+small glue.
+
 ## Machines
-- **picard (Unraid server)**: Runs the homelab edge (reverse proxy, DNS), plus apps (Immich, Paperless-ngx, etc.) in a NixOS VM on an Unraid host with a storage array and SSD cache drives.
+- **picard (NixOS VM on laforge)**: Runs the homelab edge (reverse proxy, DNS), plus apps (Immich, Paperless-ngx, etc.). Laforge is the Unraid host with the storage array and SSD cache drives.
+- **dax (Ubuntu VM on laforge)**: Runs Hermes independently of Nix. Picard provides its authenticated dashboard route, Telegram webhook forwarding, and backup collection. Dax's application configuration is maintained separately in the private homelab repository.
+
+## Darwin Package Policy
+
+Darwin rebuilds should install third-party dependencies and applications from
+binary artifacts, not compile them locally. Prefer, in order:
+
+1. nixpkgs packages available from `cache.nixos.org`
+2. upstream prebuilt binaries wrapped by Nix
+3. Homebrew formulae or casks
+
+Source builds are reserved for locally developed software and explicit
+exceptions. Before adding an external flake package, verify that its complete
+`aarch64-darwin` closure is available from a trusted binary cache. Run
+`scripts/check-darwin-build-plan.sh <machine>` before a rebuild to surface
+unexpected local compilation.
 
 ## Edge Routing Model
 
 - Shared edge settings live in `modules/infra/reverse-proxy.nix`.
 - App modules (for example `modules/apps/immich.nix` and `modules/apps/paperless.nix`) only declare their own `services.caddy.virtualHosts` entries and local upstream target.
+- CoreDNS generates explicit LAN and tailnet records from those declared proxy hosts; non-proxy records are declared separately under `homelab.infra.edgeDns.extraRecords`.
 - `homelab.apps.*` is reserved for subdomain-routed app modules; supporting platform services belong under `homelab.infra.*`.
 - Cloudflare DNS credentials for ACME are sourced through opnix using a secret file that contains `CF_DNS_API_TOKEN=...`.
 
@@ -25,8 +48,20 @@ NixOS configuration for my homelab.
 ### Picard Storage Tiers
 
 - `homelab.mounts.fast` (`/mnt/fast`) is for active app data with low-latency access needs.
-- `homelab.mounts.slow` (`/mnt/slow`) is for the larger capacity tier exposed from Unraid.
+- `/mnt/media` is the single media tree exposed read-write from Unraid (`media` virtiofs tag). App modules hide the full mount and bind only approved subdirectories into each service. The unused `/mnt/slow` share is no longer attached.
 - On picard, Paperless documents and Immich media live on `/mnt/fast`, so restoring the `documents` repository targets `/mnt/fast/...` paths.
+
+### Jellyfin
+
+Jellyfin runs natively on Picard, managed by `modules/apps/jellyfin.nix`, behind Caddy at `jellyfin.leolab.party`. Its private service namespace reads `/media/films` and `/media/tv` without write access; those paths bind to the shared media library. Persistent state is in `/mnt/fast/appdata/jellyfin`; regenerable cache and transcodes are in `/mnt/fast/cache/jellyfin`.
+
+AMD VA-API uses the GPU passed through by Unraid. Encoding settings are reapplied on service start; network settings are seeded only on first start, while accounts and libraries remain managed in Jellyfin. Leave remote connections enabled for Tailscale clients: the trusted proxy forwards their actual IP addresses. Jellyfin listens on loopback and UPnP is disabled.
+
+### Media automation
+
+Sonarr, Radarr, Prowlarr, Seerr, and Syncthing run natively on Picard. Their app modules own loopback listeners, Caddy routes, and private systemd mount namespaces. Sonarr can write only the TV library and its download inbox; Radarr can write only the film library and its inbox; Syncthing can write only the seedbox source tree; Seerr and Prowlarr have no filesystem access to media. Syncthing initiates outbound connections to the managed SeedHost instance and accepts no inbound peers. Arr imports completed downloads as separate library copies.
+
+`seedbox-cleanup` installs a daily 3:00 AM timer that checks tracker obligations and library-import evidence. It defaults to dry-run; `homelab.automation.seedboxCleanup.apply` controls destructive removal. Its connection details come from opnix, and its local media mounts are read-only. The operational layout and validation stage are documented in the private homelab repository's `services/media-automation/README.md`.
 
 ### Adding New Secrets
 

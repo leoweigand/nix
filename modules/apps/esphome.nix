@@ -33,10 +33,13 @@ in
 
     services.esphome = {
       enable = true;
+      package = pkgs.esphome-device-builder;
       inherit address port;
       # mDNS responses from devices can be flaky over the picard bridge network;
       # ping-based online checks are more predictable here.
       usePing = true;
+      # Keep Device Builder's auxiliary peer-link listener behind Caddy too.
+      environment.ESPHOME_REMOTE_BUILD_HOST = "127.0.0.1";
     };
 
     # ESPHome 2026.8 removed the built-in dashboard, but the nixpkgs module still

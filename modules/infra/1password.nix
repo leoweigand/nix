@@ -10,6 +10,10 @@
   systemd.services.opnix-secrets = {
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
+    # Keep dependents queued while Opnix retries transient startup failures.
+    serviceConfig.RestartMode = "direct";
+    # Explicit refreshes are normal when a secret-backed service configuration changes.
+    unitConfig.StartLimitIntervalSec = lib.mkForce 0;
   };
 
   systemd.services.tailscaled-autoconnect = lib.mkIf config.services.tailscale.enable {

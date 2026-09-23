@@ -1,4 +1,10 @@
-{ config, lib, pkgs, modulesPath, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  modulesPath,
+  ...
+}:
 
 let
   mounts = config.homelab.mounts;
@@ -10,6 +16,7 @@ in
     ./hardware-configuration.nix
     ../../modules/default.nix # load shared machine and homelab modules
     ./homelab.nix
+    ./hermes-remote.nix
   ];
 
   networking = {
@@ -23,11 +30,11 @@ in
       enable = true;
       allowedTCPPorts = [
         22
-        21064  # HomeKit Bridge
-        21065  # Dedicated LG TV HomeKit accessory
+        21064 # HomeKit Bridge
+        21065 # Dedicated LG TV HomeKit accessory
       ];
       allowedUDPPorts = [
-        5353   # for mdns
+        5353 # for mdns
       ];
     };
   };
@@ -39,9 +46,10 @@ in
     fsType = "virtiofs";
   };
 
-  fileSystems.${mounts.slow} = {
-    device = "nixos-merged";
+  fileSystems.${mounts.media} = {
+    device = "media";
     fsType = "virtiofs";
+    options = [ "nofail" ];
   };
 
   # Compressed swap in RAM - good for VMs
@@ -101,15 +109,17 @@ in
   # Ensure backup targets exist before first backup run.
   systemd.tmpfiles.rules = [
     "d ${mounts.fast} 0755 root root - -"
-    "d ${mounts.slow} 0755 root root - -"
+    "d ${mounts.media} 0755 root root - -"
     "d ${mounts.fast}/appdata 0755 root root - -"
     "d ${mounts.fast}/backup 0755 root root - -"
     "d ${mounts.fast}/backup/postgres 0750 postgres postgres - -"
   ];
 
-  home-manager.useGlobalPkgs = true;    # reuse system nixpkgs (one eval, consistent versions)
-  home-manager.useUserPackages = true;  # install HM packages into /etc/profiles/per-user/leo
-  home-manager.extraSpecialArgs = { hostPlatform = "linux"; };  # consumed by modules/home/default.nix dispatch
+  home-manager.useGlobalPkgs = true; # reuse system nixpkgs (one eval, consistent versions)
+  home-manager.useUserPackages = true; # install HM packages into /etc/profiles/per-user/leo
+  home-manager.extraSpecialArgs = {
+    hostPlatform = "linux";
+  }; # consumed by modules/home/default.nix dispatch
 
   home-manager.users.leo = {
     imports = [ ../../modules/home ];

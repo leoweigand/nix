@@ -151,7 +151,7 @@ in
             uptime = true;
             disk = [
               "/mnt/fast"
-              "/mnt/slow"
+              "/mnt/media"
             ];
           };
         }
@@ -218,6 +218,11 @@ in
 
         .dark #information-widgets .information-widget-resource:hover {
           background-color: rgb(var(--color-800) / 0.8);
+        }
+
+        /* Homepage always renders uptime last; its bar only tracks seconds within the minute. */
+        #information-widgets .information-widget-resource:last-child .resource-usage {
+          display: none;
         }
 
         #footer,

@@ -37,7 +37,13 @@ in
 
     homelab.infra.edge.proxies.${cfg.subdomain} = {
       upstream = "http://127.0.0.1:3000";
-      auth = true;
+      auth = {
+        # SilverBullet's PWA bootstrap files must load before authentication.
+        bypassPaths = [
+          "/service_worker.js"
+          "/.client/*"
+        ];
+      };
     };
 
     virtualisation = {

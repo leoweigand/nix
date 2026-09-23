@@ -6,18 +6,18 @@ High-level overview of how traffic flows through the network and how the custom 
 - **Domain**: `leolab.party`
 - **Subdomains**: `service.leolab.party` (e.g., `immich.leolab.party`)
 - **Split DNS (local & Tailscale)**:
-  - Local network DNS resolves every subdomain to the picard LAN IP so nearby clients talk directly to the reverse proxy.
-  - Tailscale split DNS resolves the same hostnames to picard's Tailscale IP so tailnet clients also connect straight to the proxy without tunneling.
+  - Local network DNS resolves every declared edge hostname to the picard LAN IP so nearby clients talk directly to the reverse proxy.
+  - Tailscale split DNS resolves the same declared hostnames to picard's Tailscale IP so tailnet clients also connect straight to the proxy without tunneling.
   - Because both paths keep the DNS name identical, TLS termination happens once on Caddy and every client still gets `https://service.leolab.party` regardless of location.
 
-Split DNS is served by CoreDNS on picard via `modules/infra/edge-dns.nix`, with separate LAN and tailnet listeners that both answer for `leolab.party`. The LAN listener also forwards non-`leolab.party` queries to public upstream resolvers, while the router advertises Cloudflare as secondary DNS for fallback if picard is unavailable.
+Split DNS is served by CoreDNS on picard via `modules/infra/edge-dns.nix`, with separate LAN and tailnet zone files generated from the configured reverse-proxy hosts. Exceptional records are explicit; `link.leolab.party` is a CNAME to Short.io. Unknown names return `NXDOMAIN` instead of matching a wildcard. The LAN listener also forwards non-`leolab.party` queries to public upstream resolvers, while the router advertises Cloudflare as secondary DNS for fallback if picard is unavailable. CoreDNS is prepared to transfer each view to a future persistent secondary, but no secondary is configured yet.
 
 ## Network Architecture
 
 ### Reverse Proxy (Caddy on picard)
 - **Port**: `:443` for all HTTPS traffic (local or over Tailscale).
 - **TLS**: Wildcard certificate for `*.leolab.party`, renewed via DNS-01 so the proxy can answer securely on both networks.
-- **Routing**: Caddy proxies each subdomain to the appropriate backend service on picard.
+- **Routing**: Caddy proxies each subdomain to its backend service. Most run on Picard; Hermes runs on the separate Ubuntu VM Dax.
 - **Module ownership**: `modules/infra/reverse-proxy.nix` owns ACME + Caddy defaults, while each app module contributes its own virtual host.
 - **LAN reachability**: Firewall policy keeps DNS (`53/tcp`, `53/udp`) and edge HTTP(S) (`80/tcp`, `443/tcp`) open so local clients can resolve and reach services through the proxy.
 
@@ -30,6 +30,13 @@ Split DNS is served by CoreDNS on picard via `modules/infra/edge-dns.nix`, with 
 - Backend services bind to localhost and only accept traffic that originates from the reverse proxy.
 - Firewalls prevent unintended exposure so the only reachable endpoint is Caddy's TLS listener.
 
+### Hermes on Dax
+
+- Hermes runs as a normal Ubuntu installation on Dax, with administrative control confined to that VM. It has no host filesystem shares.
+- Laforge's persistent libvirt network filter restricts Dax's private-network access and blocks IPv6. The private homelab repository owns that filter and the Ubuntu service definitions.
+- `machines/picard/hermes-remote.nix` retains Tinyauth-protected dashboard routing to Dax port 9119 and a Home Assistant-only TLS listener on port 8444, permitted only from Dax. The existing Telegram webhook route forwards to Dax port 8443.
+- Before the daily appdata backup, Picard pulls a consistent Hermes archive using a forced-command SSH key. Dax briefly stops its Hermes services for the export. Backup credentials remain on Picard.
+
 ## Home Assistant
 - Home Assistant runs in a Podman container on picard (`modules/apps/homeassistant.nix`), while MQTT runs as a native NixOS service (`modules/infra/mqtt.nix`).
 - Tasmota onboarding baseline: configure MQTT host/user/password, set `SetOption19 1` for Home Assistant MQTT discovery, then restart the device so entities are auto-discovered in HA.
@@ -40,7 +47,9 @@ Split DNS is served by CoreDNS on picard via `modules/infra/edge-dns.nix`, with 
 ### Current Layout
 - Service-owned persistent state is stored under `/mnt/fast/appdata/<appname>` (for example Home Assistant, Zigbee2MQTT, and Paperless).
 - User-generated datasets live in dedicated top-level directories on `/mnt/fast` (`/mnt/fast/photos` for Immich uploads, `/mnt/fast/documents` for Paperless media/consume).
-- On picard, active media/documents are stored under `/mnt/fast` (virtiofs from Unraid).
+- Laforge exports one writable media tree to Picard at `/mnt/media`. The film and TV libraries live under `/mnt/media/library`; seedbox synchronization lands under `/mnt/media/sources/seedbox`.
+- Media services do not receive the full `/mnt/media` tree. Their systemd mount namespaces contain explicit read-only or read-write bindings for the subdirectories each service owns.
+- Other active data and documents are stored under `/mnt/fast` (virtiofs from Unraid).
 - Database dump outputs are stored under `/mnt/fast/backup/postgres`.
 
 ### Home Assistant Workflow Today

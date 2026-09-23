@@ -5,9 +5,18 @@ let
   cfg = config.homelab.apps.${name};
   serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
 
-  llmTitleScript = pkgs.writers.writePython3Bin "paperless-llm-title" {
-    flakeIgnore = [ "E501" "E731" "W503" ];
-  } (builtins.readFile ./paperless-llm-title.py);
+  llmTitleScript = pkgs.writeShellApplication {
+    name = "paperless-llm-title";
+    runtimeInputs = [ pkgs.deno ];
+    text = ''
+      exec deno run --no-prompt --no-check --frozen \
+        --config=${../../../deno.json} --lock=${../../../deno.lock} \
+        --allow-env=PAPERLESS_LLM_PAPERLESS_URL,PAPERLESS_LLM_API_USERNAME,PAPERLESS_LLM_API_PASSWORD_FILE,PAPERLESS_LLM_OPENAI_KEY_FILE,PAPERLESS_LLM_MODEL,DOCUMENT_ID \
+        --allow-read=${config.services.onepassword-secrets.secretPaths.paperlessAdminPassword},${config.services.onepassword-secrets.secretPaths.paperlessOpenaiKey} \
+        --allow-net=127.0.0.1:28981,api.openai.com:443 \
+        ${./paperless-llm-title.ts}
+    '';
+  };
 
   llmEnabled = cfg.llmTitleExtraction.enable;
 

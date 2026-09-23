@@ -26,6 +26,7 @@ let
         ${restic} -r ${repository} -p ${secrets.resticPassword} snapshots &>/dev/null || \
           ${restic} -r ${repository} -p ${secrets.resticPassword} init
         ${restic} -r ${repository} -p ${secrets.resticPassword} unlock || true
+        ${job.prepareCommand}
       '';
     };
 
@@ -100,6 +101,12 @@ in
             type = lib.types.listOf lib.types.str;
             default = [ ];
             description = "Restic exclude patterns for this job";
+          };
+
+          prepareCommand = lib.mkOption {
+            type = lib.types.lines;
+            default = "";
+            description = "Command run immediately before restic reads this job's paths";
           };
 
           pruneOpts = lib.mkOption {

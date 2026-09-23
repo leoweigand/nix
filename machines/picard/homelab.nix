@@ -1,9 +1,9 @@
-{ ... }:
+{ pkgs, ... }:
 
 let
   mounts = {
     fast = "/mnt/fast";
-    slow = "/mnt/slow";
+    media = "/mnt/media";
   };
 
   backupPaths = {
@@ -39,14 +39,9 @@ in
         cloudflareCredentialsReference = "op://Homelab/Cloudflare/dnsCredentials";
         webhookRoutes = [
           {
-            path = "/ha-telegram-bot";
-            rewrite = "/api/telegram_webhooks";
-            upstream = "http://127.0.0.1:8123";
-          }
-          {
             path = "/hermes-telegram";
             rewrite = "/hermes-telegram";
-            upstream = "http://127.0.0.1:8443";
+            upstream = "http://192.168.2.135:8443";
           }
         ];
       };
@@ -56,6 +51,7 @@ in
         categoryOrder = [
           "Smart Home"
           "Services"
+          "Entertainment"
         ];
       };
 
@@ -69,6 +65,7 @@ in
         subdomain = "auth";
         dataDir = "${mounts.fast}/appdata/tinyauth";
         envReference = "op://Homelab/Tinyauth/env";
+        userAttributes.leo.email = "leo@leolab.party";
         oidcClients.paperless = {
           clientId = "paperless";
           trustedRedirectUris = [ "https://documents.leolab.party/accounts/oidc/tinyauth/login/callback/" ];
@@ -96,12 +93,22 @@ in
         passwordReference = "op://Homelab/Home Assistant/mqtt-password";
       };
 
+      notificationGateway = {
+        enable = true;
+        environmentReference = "op://Homelab/Notification Gateway/env";
+      };
+
       edgeDns = {
         enable = true;
+        serial = 2026092101; # Bump whenever DNS names or values change
         lanListenAddress = "192.168.2.4";
         lanAnswerAddress = "192.168.2.4";
         tailnetListenAddress = "100.104.119.103";
         tailnetAnswerAddress = "100.104.119.103";
+        extraRecords.link = {
+          type = "CNAME";
+          value = "cname.short.io.";
+        };
         upstreamResolvers = [
           "192.168.2.1"
         ];
@@ -132,6 +139,14 @@ in
           appdata = {
             schedule = "*-*-* 03:00:00"; # Daily at 3:00 AM
             paths = backupPaths.appdata;
+            prepareCommand = ''
+              ${pkgs.systemd}/bin/systemctl start podman-linkding.service
+              ${pkgs.podman}/bin/podman exec linkding \
+                python manage.py full_backup /etc/linkding/data/backup.zip.tmp
+              ${pkgs.coreutils}/bin/mv \
+                ${mounts.fast}/appdata/linkding/backup.zip.tmp \
+                ${mounts.fast}/appdata/linkding/backup.zip
+            '';
             exclude = [
               "**/log"
               "**/logs"
@@ -191,8 +206,8 @@ in
             schedule = "*-*-* 02:30:00"; # Daily at 2:30 AM, before appdata
             paths = backupPaths.esphome;
             exclude = [
-              ".platformio"           # PlatformIO toolchains, regenerable
-              "**/.esphome/build"     # per-device build artifacts, regenerable
+              ".platformio" # PlatformIO toolchains, regenerable
+              "**/.esphome/build" # per-device build artifacts, regenerable
             ];
             pruneOpts = [
               "--keep-daily 7"
@@ -205,6 +220,60 @@ in
     };
 
     apps = {
+      jellyfin = {
+        enable = true;
+        homepage = {
+          name = "Jellyfin";
+          icon = "jellyfin";
+          description = "Movies and TV";
+        };
+      };
+      prowlarr = {
+        enable = true;
+        homepage = {
+          category = "Entertainment";
+          name = "Prowlarr";
+          icon = "prowlarr";
+          description = "Tracker integration";
+        };
+      };
+      sonarr = {
+        enable = true;
+        homepage = {
+          category = "Entertainment";
+          name = "Sonarr";
+          icon = "sonarr";
+          description = "TV library automation";
+        };
+      };
+      radarr = {
+        enable = true;
+        homepage = {
+          category = "Entertainment";
+          name = "Radarr";
+          icon = "radarr";
+          description = "Movie library automation";
+        };
+      };
+      seerr = {
+        enable = true;
+        subdomain = "discover";
+        homepage = {
+          category = "Entertainment";
+          name = "Discover & Request";
+          icon = "seerr";
+          description = "Find and request something to watch";
+        };
+      };
+      syncthing = {
+        enable = true;
+        homepage = {
+          category = "Entertainment";
+          name = "Syncthing";
+          icon = "syncthing";
+          description = "File synchronization";
+        };
+      };
       paperless = {
         enable = true;
         subdomain = "documents";
@@ -249,7 +318,7 @@ in
       zigbee2mqtt = {
         enable = true;
         subdomain = "zigbee";
-        dataDir = "${mounts.fast}/appdata/ziqbee2mqtt/config";  # existing path, typo intentional
+        dataDir = "${mounts.fast}/appdata/ziqbee2mqtt/config"; # existing path, typo intentional
         serialAdapter = "zstack";
         serialPort = "/dev/serial/by-id/usb-ITead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_64f09a5b4dbeed11b2996b2e38a92db5-if00-port0";
         homepage = {
@@ -322,20 +391,12 @@ in
         };
       };
 
-      "hermes-agent" = {
-        enable = true;
-        dataDir = "${mounts.fast}/appdata/hermes";
-        envReference = "op://Homelab/Hermes Agent/env";
-        dashboard.enable = true;
-        homepage = {
-          category = "Services";
-          name = "Hermes";
-          icon = "mdi-robot-outline";
-          description = "Local AI assistant dashboard";
-          href = "https://hermes.leolab.party";
-          siteMonitor = "http://127.0.0.1:9119";
-        };
-      };
     };
+
+    automation.seedboxCleanup = {
+      enable = true;
+      environmentReference = "op://Homelab/Seedbox Cleanup/env";
+    };
+    automation.mediaImportNotifications.enable = true;
   };
 }
