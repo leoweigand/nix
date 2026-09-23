@@ -32,7 +32,10 @@ in
 
     homelab.infra.edge.proxies.${cfg.subdomain} = {
       upstream = "http://127.0.0.1:9696";
-      auth = true;
+      auth.bypassPaths = [
+        "/api/v1/*"
+        "/*/api"
+      ];
     };
   };
 }
