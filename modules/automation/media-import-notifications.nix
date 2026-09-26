@@ -14,7 +14,7 @@ let
         [ "$radarr_eventtype" = "Download" ] || exit 0
         [ "''${radarr_isupgrade:-False}" = "True" ] && exit 0
 
-        message="New movie: ''${radarr_movie_title:?missing Radarr movie title}"
+        message="🎬 New movie: ''${radarr_movie_title:?missing Radarr movie title}"
         if [ -n "''${radarr_movie_year:-}" ]; then
           message="$message ($radarr_movie_year)"
         fi
@@ -23,12 +23,24 @@ let
         [ "$sonarr_eventtype" = "Download" ] || exit 0
         [ "''${sonarr_isupgrade:-False}" = "True" ] && exit 0
 
-        message="New TV: ''${sonarr_series_title:?missing Sonarr series title} — Season ''${sonarr_episodefile_seasonnumber:?missing Sonarr season number}"
+        season="''${sonarr_episodefile_seasonnumber:?missing Sonarr season number}"
+        episodes="''${sonarr_episodefile_episodenumbers:?missing Sonarr episode numbers}"
+        episode_label=$(jq --null-input --raw-output \
+          --arg season "$season" --arg episodes "$episodes" '
+          def pad: if length < 2 then "0" + . else . end;
+          ($season | pad) as $season_number |
+          ($episodes | split(",") | map("E" + pad) | join(", ")) as $episode_numbers |
+          "S" + $season_number + $episode_numbers
+        ')
+        message="📺 New TV: ''${sonarr_series_title:?missing Sonarr series title} — $episode_label"
+        if [ "''${episodes#*,}" = "$episodes" ] && [ -n "''${sonarr_episodefile_episodetitles:-}" ]; then
+          message="$message: $sonarr_episodefile_episodetitles"
+        fi
       else
         exit 0
       fi
 
-      jq --null-input --arg message "$message" '{ message: $message }' |
+      jq --null-input --arg message "$message" '{ to: "kittypurr", message: $message }' |
         curl --fail --silent --show-error --retry 2 --retry-delay 2 \
           --request POST \
           --header 'Content-Type: application/json' \
