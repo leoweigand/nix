@@ -9,15 +9,20 @@ let
     text = ''
       set -o errexit -o nounset -o pipefail
 
+      strip_trailing_year() {
+        title="$1"
+        if [[ "$title" =~ ^(.*)[[:space:]]\([0-9]{4}\)$ ]]; then
+          title="''${BASH_REMATCH[1]}"
+        fi
+      }
+
       if [ -n "''${radarr_eventtype:-}" ]; then
         [ "$radarr_eventtype" = "Test" ] && exit 0
         [ "$radarr_eventtype" = "Download" ] || exit 0
         [ "''${radarr_isupgrade:-False}" = "True" ] && exit 0
 
-        message="🎬 New movie: ''${radarr_movie_title:?missing Radarr movie title}"
-        if [ -n "''${radarr_movie_year:-}" ]; then
-          message="$message ($radarr_movie_year)"
-        fi
+        strip_trailing_year "''${radarr_movie_title:?missing Radarr movie title}"
+        message="🎬 New movie: $title"
       elif [ -n "''${sonarr_eventtype:-}" ]; then
         [ "$sonarr_eventtype" = "Test" ] && exit 0
         [ "$sonarr_eventtype" = "Download" ] || exit 0
@@ -32,10 +37,8 @@ let
           ($episodes | split(",") | map("E" + pad) | join(", ")) as $episode_numbers |
           "S" + $season_number + $episode_numbers
         ')
-        message="📺 New TV: ''${sonarr_series_title:?missing Sonarr series title} — $episode_label"
-        if [ "''${episodes#*,}" = "$episodes" ] && [ -n "''${sonarr_episodefile_episodetitles:-}" ]; then
-          message="$message: $sonarr_episodefile_episodetitles"
-        fi
+        strip_trailing_year "''${sonarr_series_title:?missing Sonarr series title}"
+        message="📺 New TV: $title — $episode_label"
       else
         exit 0
       fi
