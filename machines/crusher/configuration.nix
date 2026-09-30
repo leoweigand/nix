@@ -6,7 +6,10 @@
   home-manager.users.leo.imports = [ ../../modules/home/darwin/claude-code.nix ];
 
   # Headless JDK for the openapi-generator CLI jar; nothing else needs Java.
-  home-manager.users.leo.home.packages = [ pkgs.jdk21 ];
+  home-manager.users.leo.home.packages = [
+    pkgs.cloudflared
+    pkgs.jdk21
+  ];
 
   # Flutter is an fvm-managed SDK, unmanaged by nix, and only the SDK's bin dir
   # goes on PATH. The version is the one elephant's flutter-app/.fvmrc pins, the
@@ -60,7 +63,11 @@
       upgrade = true;
       cleanup = "zap";
     };
-    brews = [ "nvm" ];
+    brews = [
+      "awscli"
+      "cocoapods"
+      "nvm"
+    ];
     casks = [
       "codex"
       "ghostty"

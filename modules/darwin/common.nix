@@ -1,5 +1,35 @@
 { inputs, machineName, pkgs, ... }:
 
+let
+  cleanshot = pkgs.stdenvNoCC.mkDerivation {
+    pname = "cleanshot";
+    version = "4.8.11";
+
+    src = pkgs.fetchurl {
+      url = "https://updates.getcleanshot.com/v3/CleanShot-X-4.8.11.dmg";
+      hash = "sha256-KYr7PQhe5jQ9rpVLoqdCm9YT5q2elCyPeQCGiM6xGoE=";
+    };
+
+    dontUnpack = true;
+    dontStrip = true;
+
+    installPhase = ''
+      runHook preInstall
+      mountPoint="$TMPDIR/cleanshot"
+      mkdir -p "$mountPoint"
+      /usr/bin/hdiutil attach -quiet -readonly -nobrowse -mountpoint "$mountPoint" "$src"
+      trap '/usr/bin/hdiutil detach -quiet "$mountPoint"' EXIT
+      mkdir -p "$out/Applications"
+      cp -R "$mountPoint/CleanShot X.app" "$out/Applications/"
+      runHook postInstall
+    '';
+
+    meta = {
+      license = pkgs.lib.licenses.unfree;
+      platforms = [ "aarch64-darwin" ];
+    };
+  };
+in
 {
   imports = [ ../machine-identity.nix ];
 
@@ -9,6 +39,7 @@
     builtins.elem (pkgs.lib.getName pkg) [
       "1password-cli"
       "claude-code"
+      "cleanshot"
     ];
 
   # Home Manager runs as a nix-darwin module, sharing the system package set.
@@ -23,9 +54,19 @@
   users.users.leo.home = "/Users/leo";
 
   homebrew.casks = [
-    "cleanshot"
     "keepingyouawake"
   ];
+
+  system.activationScripts.homebrew.text = pkgs.lib.mkBefore ''
+    if [ -x /opt/homebrew/bin/brew ] && sudo --user=leo --set-home /opt/homebrew/bin/brew list --cask cleanshot >/dev/null 2>&1; then
+      sudo --user=leo --set-home /opt/homebrew/bin/brew uninstall --cask cleanshot
+    fi
+    if [ -e '/Applications/Nix Apps/CleanShot X.app' ] && [ ! -e '/Applications/CleanShot X.app' ]; then
+      ln -s 'Nix Apps/CleanShot X.app' '/Applications/CleanShot X.app'
+    fi
+  '';
+
+  environment.systemPackages = [ cleanshot ];
 
   home-manager.users.leo = {
     imports = [
