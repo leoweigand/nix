@@ -1,6 +1,23 @@
 const MAX_MESSAGE_LENGTH = 3800;
 const MAX_NOTIFICATION_BODY_BYTES = 8 * 1024;
 const MAX_WEBHOOK_BODY_BYTES = 1024 * 1024;
+const MAX_CAPTION_LENGTH = 1024;
+const MAX_MULTIPART_OVERHEAD_BYTES = 64 * 1024;
+const MEDIA = {
+  image: {
+    method: "sendPhoto",
+    telegramField: "photo",
+    maximumBytes: 10 * 1024 * 1024,
+    mimeTypes: ["image/jpeg", "image/png", "image/webp"],
+  },
+  voice: {
+    method: "sendVoice",
+    telegramField: "voice",
+    maximumBytes: 50 * 1024 * 1024,
+    mimeTypes: ["audio/ogg", "audio/mpeg", "audio/mp4"],
+  },
+};
+type MediaKind = keyof typeof MEDIA;
 
 export interface GatewayConfig {
   telegramBotToken: string;
@@ -75,17 +92,17 @@ export function loadConfig(
   };
 }
 
-async function readBody(
+async function readBytes(
   request: Request,
   maximumBytes: number,
-): Promise<string> {
+): Promise<Uint8Array<ArrayBuffer>> {
   const contentLength = request.headers.get("content-length");
   if (contentLength && Number(contentLength) > maximumBytes) {
     throw new RangeError("request body is too large");
   }
 
   if (!request.body) {
-    return "";
+    return new Uint8Array();
   }
 
   const reader = request.body.getReader();
@@ -99,6 +116,7 @@ async function readBody(
       }
       length += value.byteLength;
       if (length > maximumBytes) {
+        await reader.cancel();
         throw new RangeError("request body is too large");
       }
       chunks.push(value);
@@ -113,7 +131,14 @@ async function readBody(
     body.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return new TextDecoder().decode(body);
+  return body;
+}
+
+async function readBody(
+  request: Request,
+  maximumBytes: number,
+): Promise<string> {
+  return new TextDecoder().decode(await readBytes(request, maximumBytes));
 }
 
 function parseJson(body: string): unknown {
@@ -201,15 +226,17 @@ async function callTelegram(
   config: GatewayConfig,
   dependencies: GatewayDependencies,
   method: string,
-  body: Record<string, unknown>,
+  body: Record<string, unknown> | FormData,
 ): Promise<unknown | undefined> {
   try {
     const response = await dependencies.fetch(
       `https://api.telegram.org/bot${config.telegramBotToken}/${method}`,
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
+        headers: body instanceof FormData
+          ? undefined
+          : { "content-type": "application/json" },
+        body: body instanceof FormData ? body : JSON.stringify(body),
       },
     );
     if (!response.ok) {
@@ -347,6 +374,131 @@ async function handleNotification(
     if (error instanceof RangeError) {
       return new Response(null, { status: 400 });
     }
+    return new Response(null, { status: 400 });
+  }
+}
+
+async function mediaFrom(
+  request: Request,
+  kind: MediaKind,
+): Promise<{ media: string | File; destination?: string; caption?: string }> {
+  const contentType = request.headers.get("content-type") ?? "";
+  const mediaConfig = MEDIA[kind];
+  let value: unknown;
+  if (contentType.toLowerCase().startsWith("application/json")) {
+    value = parseJson(await readBody(request, MAX_NOTIFICATION_BODY_BYTES));
+  } else if (contentType.toLowerCase().startsWith("multipart/form-data")) {
+    // Bound the raw body before formData() buffers and parses uploaded files.
+    const bytes = await readBytes(
+      request,
+      mediaConfig.maximumBytes + MAX_MULTIPART_OVERHEAD_BYTES,
+    );
+    const form = await new Response(bytes, {
+      headers: { "content-type": contentType },
+    }).formData();
+    const fields: Record<string, FormDataEntryValue> = Object.create(null);
+    for (const [key, entry] of form) {
+      if (Object.hasOwn(fields, key)) {
+        throw new TypeError("duplicate form fields are not allowed");
+      }
+      fields[key] = entry;
+    }
+    value = fields;
+  } else {
+    throw new TypeError("request must be JSON or multipart/form-data");
+  }
+
+  if (
+    !isRecord(value) ||
+    Object.keys(value).some((key) => ![kind, "to", "caption"].includes(key))
+  ) {
+    throw new TypeError("request body has unknown fields");
+  }
+  if (
+    value.to !== undefined &&
+    (typeof value.to !== "string" || !/^[a-z][a-z0-9_-]*$/.test(value.to))
+  ) {
+    throw new TypeError("to must be a valid destination name when provided");
+  }
+  if (
+    value.caption !== undefined &&
+    (typeof value.caption !== "string" ||
+      value.caption.length > MAX_CAPTION_LENGTH)
+  ) {
+    throw new TypeError(
+      `caption must be at most ${MAX_CAPTION_LENGTH} characters`,
+    );
+  }
+  const media = value[kind];
+  if (media instanceof File) {
+    if (media.size === 0 || media.size > mediaConfig.maximumBytes) {
+      throw new RangeError("media file is empty or too large");
+    }
+    if (!mediaConfig.mimeTypes.includes(media.type)) {
+      throw new TypeError("unsupported media content type");
+    }
+  } else if (typeof media === "string" && media.length <= 2048) {
+    if (!/^[A-Za-z0-9_-]+$/.test(media)) {
+      const url = new URL(media);
+      if (url.protocol !== "https:" || url.username || url.password) {
+        throw new TypeError(
+          "media must be a public HTTPS URL or Telegram file ID",
+        );
+      }
+    }
+  } else {
+    throw new TypeError("media must be a file, HTTPS URL or Telegram file ID");
+  }
+  return { media, destination: value.to, caption: value.caption };
+}
+
+async function handleMedia(
+  request: Request,
+  config: GatewayConfig,
+  dependencies: GatewayDependencies,
+  kind: MediaKind,
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 400 });
+  }
+  try {
+    const notification = await mediaFrom(request, kind);
+    const destination = destinationFor(config, notification.destination);
+    if (!destination) {
+      return new Response(null, { status: 503 });
+    }
+    const mediaConfig = MEDIA[kind];
+    let body: FormData | Record<string, unknown>;
+    if (notification.media instanceof File) {
+      body = new FormData();
+      body.set("chat_id", destination.chatId);
+      body.set(mediaConfig.telegramField, notification.media);
+      if (notification.caption !== undefined) {
+        body.set("caption", notification.caption);
+      }
+    } else {
+      body = {
+        chat_id: destination.chatId,
+        [mediaConfig.telegramField]: notification.media,
+        ...(notification.caption !== undefined
+          ? { caption: notification.caption }
+          : {}),
+      };
+    }
+    const result = await callTelegram(
+      config,
+      dependencies,
+      mediaConfig.method,
+      body,
+    );
+    if (!isRecord(result) || typeof result.message_id !== "number") {
+      return new Response(null, { status: 502 });
+    }
+    return Response.json(
+      { to: destination.name, message_id: result.message_id },
+      { status: 201 },
+    );
+  } catch {
     return new Response(null, { status: 400 });
   }
 }
@@ -554,6 +706,12 @@ export function createHandler(
     }
     if (pathname === "/v1/notifications") {
       return await handleNotification(request, config, dependencies);
+    }
+    if (pathname === "/v1/images") {
+      return await handleMedia(request, config, dependencies, "image");
+    }
+    if (pathname === "/v1/voice") {
+      return await handleMedia(request, config, dependencies, "voice");
     }
     if (pathname === "/v1/reactions") {
       return await handleReaction(request, config, dependencies);
