@@ -38,6 +38,11 @@ let
   };
   proxyType = lib.types.submodule {
     options = {
+      public = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Publish this hostname through the managed Cloudflare DNS record and tunnel route";
+      };
       upstream = lib.mkOption {
         type = lib.types.str;
         description = "Backend URL to proxy requests to";
@@ -211,6 +216,12 @@ in
           };
         }
       );
+    };
+
+    webhooksPublic = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Publish webhooks.{domain} through Cloudflare; existing dashboard routes are not adopted automatically";
     };
   };
 

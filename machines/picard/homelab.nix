@@ -14,6 +14,7 @@ let
   backupPaths = {
     appdata = [
       "${mounts.fast}/appdata"
+      "/var/lib/private/cloudflare-publication" # DynamicUser's persistent route ownership state
     ];
     paperless = [
       "${mounts.fast}/documents/paperless/library"
@@ -63,6 +64,12 @@ in
       cloudflareTunnel = {
         enable = true;
         tokenReference = "op://Homelab/Cloudflare/tunnelCredential";
+        publication = {
+          enable = true;
+          accountId = "e30f797914bfbb112c2ba5aedd7a5dc3";
+          zoneId = "8a83114a0d2b48c6f55957fae7306ae4";
+          tunnelId = "5a04aacc-3ae3-49d9-8f1c-469f6cdfabd0";
+        };
       };
 
       pocketId = {

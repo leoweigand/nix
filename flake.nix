@@ -29,6 +29,11 @@
   };
 
   outputs = { self, nixpkgs, nix-darwin, home-manager, opnix, disko, ... }@inputs: {
+    checks.x86_64-linux.cloudflare-publication = import ./tests/cloudflare-publication.nix {
+      pkgs = nixpkgs.legacyPackages.x86_64-linux;
+      picard = self.nixosConfigurations.picard;
+    };
+
     checks.x86_64-linux.edge-dns = import ./tests/edge-dns.nix {
       pkgs = nixpkgs.legacyPackages.x86_64-linux;
       picard = self.nixosConfigurations.picard;

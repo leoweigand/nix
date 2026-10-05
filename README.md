@@ -39,9 +39,85 @@ unexpected local compilation.
 
 - Shared edge settings live in `modules/infra/reverse-proxy.nix`.
 - App modules (for example `modules/apps/immich.nix` and `modules/apps/paperless.nix`) only declare their own `services.caddy.virtualHosts` entries and local upstream target.
-- CoreDNS generates private LAN and tailnet records from those declared proxy hosts; additional private overrides go under `homelab.infra.edgeDns.extraRecords`. Other `leolab.party` names resolve directly through Cloudflare (`1.1.1.1` / `1.0.0.1`), so public records are managed only in Cloudflare.
+- CoreDNS generates private LAN and tailnet records from those declared proxy hosts; additional private overrides go under `homelab.infra.edgeDns.extraRecords`. Other `leolab.party` names resolve directly through Cloudflare (`1.1.1.1` / `1.0.0.1`). Public records for external services remain in Cloudflare; opted-in homelab hosts can be published from Nix.
 - `homelab.apps.*` is reserved for subdomain-routed app modules; supporting platform services belong under `homelab.infra.*`.
 - Cloudflare DNS credentials for ACME are sourced through opnix using a secret file that contains `CF_DNS_API_TOKEN=...`.
+
+### Publishing a homelab service
+
+Set the flag on the service's existing edge hostname in `machines/picard/homelab.nix`:
+
+```nix
+homelab.infra.edge.proxies.photos.public = true;
+```
+
+Nix merges this flag with the proxy declared by the app module, so its upstream
+does not need to be repeated. The generated manifest contains only opted-in
+hosts. Once applied, `cloudflare-publication.service` creates a proxied CNAME to
+the configured Cloudflare tunnel and a tunnel route through Caddy, with the
+hostname set for both HTTP and TLS certificate verification. Local and Tailscale
+DNS still point directly to Picard. Caddy's existing authentication rules apply
+to public requests too; any separate login hostname must also be reachable by
+those clients.
+
+`homelab.infra.edge.rootProxy.public` publishes the domain root when a root proxy
+exists. `homelab.infra.edge.webhooksPublic` publishes the shared webhook hostname
+through its HTTP Caddy listener, which serves only the declared webhook routes.
+IP-restricted `privateProxies` do not offer a public flag. Public hostnames must
+be the domain root or a single subdomain label covered by Cloudflare's domain
+certificate.
+
+Picard declares the publication controller, account, zone and existing remote
+tunnel. No hosts are opted in initially. As of 2026-10-05 this controller has been
+built but not deployed. Existing dashboard-managed `webhooks.leolab.party` and
+the external Short.io record for `link.leolab.party` remain unmanaged.
+
+The controller reads its API token through opnix. It accepts a raw token or a
+dotenv field containing `CF_DNS_API_TOKEN` or `CLOUDFLARE_API_TOKEN`. The token
+needs **Zone Read**, **DNS Edit** for the selected zone and **Cloudflare Tunnel
+Edit** for the selected account. `publication.apiTokenReference` defaults to the
+edge ACME credential reference. The existing ACME token cannot read tunnel
+configuration, so publishing requires extending its permissions or selecting a
+dedicated token, for example:
+
+```nix
+homelab.infra.cloudflareTunnel.publication.apiTokenReference =
+  "op://Homelab/Cloudflare/publicationApiToken";
+```
+
+Create that 1Password field before selecting it. Tokens never enter the Nix store.
+With no public flags and no previously owned resources, reconciliation only
+reads zone/DNS metadata and does not require tunnel permissions.
+
+The service runs at boot, after relevant configuration/secret changes and every
+five minutes. A DNS comment marks its records; persistent route ownership lives
+in `/var/lib/private/cloudflare-publication/state.json` and is included in
+Picard's appdata backup. Removing a flag withdraws the owned DNS record before
+removing its tunnel route. Leave `publication.enable = true` until that cleanup
+has completed.
+
+Existing records and tunnel routes are preserved. A collision fails before API
+writes unless adoption is explicitly authorised:
+
+```nix
+homelab.infra.edge.webhooksPublic = true;
+homelab.infra.cloudflareTunnel.publication.adoptExisting = [
+  "webhooks.leolab.party"
+];
+```
+
+Adoption only accepts a proxied CNAME already pointing at this tunnel and a
+single hostname rule without path matching. It deliberately replaces that
+hostname's route with the Caddy route. Remove the adoption entry after it has
+succeeded. A false flag does not privatise an unowned dashboard record.
+
+`nix build .#checks.x86_64-linux.cloudflare-publication` checks the generated Nix
+manifest and controller behaviour with a fake Cloudflare API. The controller's
+`--dry-run` argument reports intended changes without writing Cloudflare or
+local state; its other arguments are `--config`, `--token-file` and `--state`.
+After activation, `sudo systemctl start cloudflare-publication.service` requests
+an immediate reconciliation; inspect its results with
+`journalctl -u cloudflare-publication.service`.
 
 ## Runbook
 

@@ -5,6 +5,8 @@ let
 in
 
 {
+  imports = [ ./cloudflare-publication.nix ];
+
   options.homelab.infra.cloudflareTunnel = {
     enable = lib.mkEnableOption "Cloudflare Tunnel outbound connector";
 
@@ -35,7 +37,7 @@ in
       requires = [ "opnix-secrets.service" ];
       wantedBy = [ "multi-user.target" ];
       path = [ pkgs.cloudflared ];
-      # Ingress rules are configured in the Cloudflare dashboard when using token-based auth.
+      # The publication controller manages opted-in hosts; other remote ingress rules stay in the dashboard.
       # The daemon connects out to Cloudflare; no inbound ports are opened.
       script = ''
         exec cloudflared tunnel --no-autoupdate run \
