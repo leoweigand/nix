@@ -140,6 +140,14 @@ whose required gateway is disabled. The OAuth2 Proxy wrapper is imported but
 currently disabled on Picard. `checks.x86_64-linux.authentication` exercises the
 generated Caddy gates, OIDC login, WebSockets, group restrictions and SQLite backups.
 
+`machines/picard/authentication-migration.nix` defines six optional migration
+stages under `homelab.infra.authenticationMigration`: `gateway`, `linkding`,
+`paperless`, `miniflux`, `immich` and `gates`. All default to disabled. Enabling a
+stage selects its separate Pocket ID credentials; those fields must exist before
+activation. The gates stage requires the gateway stage. The
+`authentication-migration` check verifies staged settings and unchanged Pocket
+ID, Pingvin and tunnel unit derivations.
+
 ### Jellyfin
 
 Jellyfin runs natively on Picard, managed by `modules/apps/jellyfin.nix`, behind Caddy at `jellyfin.leolab.party`. Its private service namespace reads `/media/films` and `/media/tv` without write access; those paths bind to the shared media library. Persistent state is in `/mnt/fast/appdata/jellyfin`; regenerable cache and transcodes are in `/mnt/fast/cache/jellyfin`.
@@ -228,6 +236,12 @@ prepared directory from a staged restic restore, restore numeric UID/GID ownersh
 and restart with the original OIDC client secret from 1Password.
 
 ### Adding New Secrets
+
+`opnix-secrets.service` supports `sudo systemctl reload opnix-secrets.service`
+to refresh out-of-band vault changes without stopping services which require
+the loader. Nix activation also reloads it when its definition changes. Explicit
+per-secret `services` lists can still restart consumers when their values change;
+restarting the loader itself can stop its dependants.
 
 ```nix
 # In any module
