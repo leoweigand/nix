@@ -63,6 +63,53 @@ Sonarr, Radarr, Prowlarr, Seerr, and Syncthing run natively on Picard. Their app
 
 `seedbox-cleanup` installs a daily 3:00 AM timer that checks tracker obligations and library-import evidence. It defaults to dry-run; `homelab.automation.seedboxCleanup.apply` controls destructive removal. Its connection details come from opnix, and its local media mounts are read-only. The operational layout and validation stage are documented in the private homelab repository's `services/media-automation/README.md`.
 
+### Pingvin Share X service module
+
+`modules/apps/pingvin.nix` provides `homelab.apps.pingvin`. It is imported but
+disabled on all machines. Enabling it starts one Podman container, bound to
+`127.0.0.1:3005`, with persistent SQLite, uploads and custom images in
+`/var/lib/pingvin`. Its v2.0.0 image is pinned by digest and supports HTTP range
+requests for seeking in browser-compatible media. The module declares no proxy,
+DNS, tunnel, authentication-provider or backup configuration. Its Homepage entry
+defaults to disabled.
+
+The minimal configuration is:
+
+```nix
+homelab.apps.pingvin.enable = true;
+```
+
+`port`, `dataDir`, `uid` and `gid` are configurable. The container creates its
+application user from the numeric UID/GID (both default to 1000), and tmpfiles
+prepares the data and images directories with matching ownership. Keep the live
+SQLite database on local disk. Mount dependencies prevent the service starting
+before the configured data directory's filesystem is available.
+
+With `settings = { };` and `configFile = null`, configuration stays in Pingvin's
+web interface. The first registered account becomes the administrator; close
+registration in the settings after creating it. The upstream default application
+URL is `http://localhost:3000`, so set it to the URL used to access the service.
+
+For declarative configuration, supply non-secret YAML settings:
+
+```nix
+homelab.apps.pingvin.settings = {
+  general.appUrl = "http://localhost:3005";
+  share.defaultExpiration = "7 days";
+};
+```
+
+Pingvin disables its settings editor whenever a YAML file is mounted, including
+when only a few keys are specified. For settings containing passwords or OIDC
+client secrets, use `configFile = "/run/secrets/pingvin-config.yaml";` instead of
+`settings`. Supply an absolute runtime path as a string, not a Nix path literal,
+to keep the file out of the Nix store. The module copies it through a systemd
+credential to a temporary, read-only container mount; its source can remain
+root-readable. Arrange for the source file to exist before service start and
+restart `podman-pingvin.service` after changing it. When registration is disabled
+before the first start, the YAML must provision an administrator with upstream's
+`initUser` settings or provide another working sign-in flow.
+
 ### Adding New Secrets
 
 ```nix

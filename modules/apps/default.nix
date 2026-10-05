@@ -9,6 +9,7 @@
     ./linkding.nix
     ./miniflux.nix
     ./paperless
+    ./pingvin.nix
     ./prowlarr.nix
     ./radarr.nix
     ./seerr.nix
