@@ -86,7 +86,7 @@ in
         public = true;
       };
 
-      # Enrol passkeys and create the gateway client before enabling its service.
+      # Enable the migration canary after its client credentials are saved.
       oauth2Proxy = {
         enable = false;
         subdomain = "login";
