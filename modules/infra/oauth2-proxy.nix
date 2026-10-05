@@ -95,9 +95,11 @@ in
       after = [
         "opnix-secrets.service"
         "pocket-id.service"
+        "edge-dns.service"
+        "caddy.service"
       ];
       requires = [ "opnix-secrets.service" ];
-      wants = [ "pocket-id.service" ];
+      wants = [ "pocket-id.service" "edge-dns.service" "caddy.service" ];
     };
     homelab.infra.edge.proxies.${cfg.subdomain} = {
       upstream = "http://127.0.0.1:${toString cfg.port}";

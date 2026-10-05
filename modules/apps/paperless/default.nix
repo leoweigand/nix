@@ -4,6 +4,7 @@ let
   name = "paperless";
   cfg = config.homelab.apps.${name};
   serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
+  oidcReference = pkgs.writeText "paperless-oidc-reference" cfg.oidcEnvReference;
 
   llmTitleScript = pkgs.writeShellApplication {
     name = "paperless-llm-title";
@@ -187,12 +188,15 @@ in
       requires = [ "opnix-secrets.service" ];
     } // lib.optionalAttrs (cfg.oidcEnvReference != null) {
       serviceConfig.EnvironmentFile = config.services.onepassword-secrets.secretPaths.paperlessOidcEnv;
+      restartTriggers = [ oidcReference ];
     };
 
     systemd.services.paperless-web = lib.mkIf (cfg.oidcEnvReference != null) {
       after = [ "opnix-secrets.service" ];
       requires = [ "opnix-secrets.service" ];
       serviceConfig.EnvironmentFile = config.services.onepassword-secrets.secretPaths.paperlessOidcEnv;
+      # The runtime filename stays fixed when its vault reference changes.
+      restartTriggers = [ oidcReference ];
     };
 
     # The post-consume hook actually runs inside paperless-task-queue (the celery
@@ -203,6 +207,7 @@ in
         after = [ "opnix-secrets.service" ];
         requires = [ "opnix-secrets.service" ];
         serviceConfig.EnvironmentFile = config.services.onepassword-secrets.secretPaths.paperlessOidcEnv;
+        restartTriggers = [ oidcReference ];
       })
       (lib.mkIf llmEnabled { environment = llmEnv; })
     ];
@@ -212,6 +217,7 @@ in
         after = [ "opnix-secrets.service" ];
         requires = [ "opnix-secrets.service" ];
         serviceConfig.EnvironmentFile = config.services.onepassword-secrets.secretPaths.paperlessOidcEnv;
+        restartTriggers = [ oidcReference ];
       })
       (lib.mkIf llmEnabled { environment = llmEnv; })
     ];
