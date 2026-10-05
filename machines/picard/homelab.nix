@@ -74,12 +74,12 @@ in
 
       pocketId = {
         enable = true;
-        appName = "Leolab";
-        subdomain = "id";
+        appName = "LeoLab";
+        subdomain = "auth";
         encryptionKeyReference = "op://Homelab/Pocket ID/encryption-key";
       };
 
-      edge.proxies.id.public = true;
+      edge.proxies.auth.public = true;
 
       # Enrol passkeys and create the gateway client before enabling its service.
       oauth2Proxy = {
@@ -97,7 +97,7 @@ in
 
       tinyauth = {
         enable = true;
-        subdomain = "auth";
+        subdomain = "tinyauth";
         dataDir = "${mounts.fast}/appdata/tinyauth";
         envReference = "op://Homelab/Tinyauth/env";
         userAttributes.leo.email = "leo@leolab.party";
@@ -135,7 +135,7 @@ in
 
       edgeDns = {
         enable = true;
-        serial = 2026100502; # Bump whenever DNS names or values change
+        serial = 2026100503; # Bump whenever DNS names or values change
         lanListenAddress = "192.168.2.4";
         lanAnswerAddress = "192.168.2.4";
         tailnetListenAddress = "100.104.119.103";
@@ -366,7 +366,7 @@ in
         mediaDir = "${mounts.fast}/photos";
         oidc = {
           enable = true;
-          issuerUrl = "https://auth.leolab.party";
+          issuerUrl = "https://${config.homelab.infra.tinyauth.subdomain}.${config.homelab.baseDomain}";
           clientSecretReference = "op://Homelab/Immich/oidc-client-secret";
         };
         homepage = {
@@ -383,7 +383,7 @@ in
         dataDir = "${mounts.fast}/appdata/linkding";
         oidc = {
           enable = true;
-          issuerUrl = "https://auth.leolab.party";
+          issuerUrl = "https://${config.homelab.infra.tinyauth.subdomain}.${config.homelab.baseDomain}";
           clientSecretReference = "op://Homelab/Linkding/oidc-env";
         };
         homepage = {
@@ -411,7 +411,7 @@ in
         adminCredentialsReference = "op://Homelab/Miniflux/admin-env";
         oidc = {
           enable = true;
-          issuerUrl = "https://auth.leolab.party";
+          issuerUrl = "https://${config.homelab.infra.tinyauth.subdomain}.${config.homelab.baseDomain}";
           clientSecretReference = "op://Homelab/Miniflux/oidc-env";
         };
         homepage = {

@@ -68,7 +68,7 @@ be the domain root or a single subdomain label covered by Cloudflare's domain
 certificate.
 
 Picard runs the publication controller against its declared account, zone and
-existing remote tunnel. Pocket ID (`id.leolab.party`) is opted in for public
+existing remote tunnel. Pocket ID (`auth.leolab.party`) is opted in for public
 access. Existing dashboard-managed `webhooks.leolab.party` and
 the external Short.io record for `link.leolab.party` remain unmanaged.
 
@@ -125,15 +125,16 @@ an immediate reconciliation; inspect its results with
 
 ### Authentication
 
-Pocket ID 2.14.0 runs natively on Picard behind Caddy at `id.leolab.party`.
-Its application name is `Leolab`, managed declaratively in Nix.
+Pocket ID 2.14.0 runs natively on Picard behind Caddy at `auth.leolab.party`.
+Its application name is `LeoLab`, managed declaratively in Nix.
 Its live SQLite database and uploads are on local disk in `/var/lib/pocket-id`;
 `/mnt/fast` is virtiofs and does not hold the live database. Before the existing
 appdata restic job, `pocket-id-backup.service` creates a consistent SQLite backup
 and copies uploads to `/mnt/fast/appdata/pocket-id-backup`. The encryption key is
 loaded from 1Password through systemd credentials and must be preserved for a restore.
 
-Tinyauth remains the active gateway and OIDC issuer. The edge supports selecting
+Tinyauth remains the active gateway and OIDC issuer at `tinyauth.leolab.party`.
+Changing Pocket ID’s hostname requires enrolling passkeys again at the new address. The edge supports selecting
 `tinyauth` or `oauth2-proxy`, globally or per route, and rejects configurations
 whose required gateway is disabled. The OAuth2 Proxy wrapper is imported but
 currently disabled on Picard. `checks.x86_64-linux.authentication` exercises the

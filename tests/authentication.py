@@ -294,7 +294,7 @@ with tempfile.TemporaryDirectory() as temp:
     oauth_port = available_port()
     args = shlex.split(fixture["oauthCommand"])
     args = [arg.replace("127.0.0.1:4180", f"127.0.0.1:{oauth_port}")
-            .replace("https://id.leolab.party", issuer) for arg in args]
+            .replace(fixture["oauthIssuer"], issuer) for arg in args]
     env = {**os.environ, "OAUTH2_PROXY_CLIENT_ID": "test-client", "OAUTH2_PROXY_CLIENT_SECRET": "test-secret",
            "OAUTH2_PROXY_COOKIE_SECRET": b64(b"a" * 32)}
     log = (directory / "oauth2-proxy.log").open("w+")

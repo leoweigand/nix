@@ -29,6 +29,7 @@ let
         name: cfg.services.caddy.virtualHosts."${name}.leolab.party".extraConfig
       );
       oauthCommand = cfg.systemd.services.oauth2-proxy.serviceConfig.ExecStart;
+      oauthIssuer = cfg.homelab.infra.oauth2Proxy.issuerUrl;
       pocketSettings = cfg.services.pocket-id.settings;
       pocketBinary = lib.getExe cfg.services.pocket-id.package;
       backupScript = cfg.systemd.services.pocket-id-backup.serviceConfig.ExecStart;
