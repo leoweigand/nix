@@ -42,7 +42,7 @@ in
       edge = {
         enable = true;
         acmeEmail = "admin@leolab.party";
-        cloudflareCredentialsReference = "op://Homelab/Cloudflare/dnsCredentials";
+        cloudflareCredentialsReference = "op://Homelab/Cloudflare/CLOUFLARE_ACCESS_TOKEN";
         webhookRoutes = [
           {
             path = "/hermes-telegram";
@@ -77,6 +77,8 @@ in
         subdomain = "id";
         encryptionKeyReference = "op://Homelab/Pocket ID/encryption-key";
       };
+
+      edge.proxies.id.public = true;
 
       # Enrol passkeys and create the gateway client before enabling its service.
       oauth2Proxy = {

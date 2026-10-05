@@ -41,7 +41,7 @@ unexpected local compilation.
 - App modules (for example `modules/apps/immich.nix` and `modules/apps/paperless.nix`) only declare their own `services.caddy.virtualHosts` entries and local upstream target.
 - CoreDNS generates private LAN and tailnet records from those declared proxy hosts; additional private overrides go under `homelab.infra.edgeDns.extraRecords`. Other `leolab.party` names resolve directly through Cloudflare (`1.1.1.1` / `1.0.0.1`). Public records for external services remain in Cloudflare; opted-in homelab hosts can be published from Nix.
 - `homelab.apps.*` is reserved for subdomain-routed app modules; supporting platform services belong under `homelab.infra.*`.
-- Cloudflare DNS credentials for ACME are sourced through opnix using a secret file that contains `CF_DNS_API_TOKEN=...`.
+- ACME and public-host reconciliation read the raw API token from `op://Homelab/Cloudflare/CLOUFLARE_ACCESS_TOKEN` through opnix. ACME supplies it to Lego using `CF_DNS_API_TOKEN_FILE` and systemd credentials; the secret stays outside the Nix store.
 
 ### Publishing a homelab service
 
@@ -68,24 +68,20 @@ be the domain root or a single subdomain label covered by Cloudflare's domain
 certificate.
 
 Picard runs the publication controller against its declared account, zone and
-existing remote tunnel. Deployed on 2026-10-05, it reconciles successfully with no
-hosts opted in. Existing dashboard-managed `webhooks.leolab.party` and
+existing remote tunnel. Pocket ID (`id.leolab.party`) is opted in for public
+access. Existing dashboard-managed `webhooks.leolab.party` and
 the external Short.io record for `link.leolab.party` remain unmanaged.
 
-The controller reads its API token through opnix. It accepts a raw token or a
-dotenv field containing `CF_DNS_API_TOKEN` or `CLOUDFLARE_API_TOKEN`. The token
-needs **Zone Read**, **DNS Edit** for the selected zone and **Cloudflare Tunnel
-Edit** for the selected account. `publication.apiTokenReference` defaults to the
-edge ACME credential reference. The existing ACME token cannot read tunnel
-configuration, so publishing requires extending its permissions or selecting a
-dedicated token, for example:
+The controller reads its API token through opnix and systemd credentials. Picard
+uses the same raw `CLOUFLARE_ACCESS_TOKEN` field as ACME; preserve that exact
+1Password field spelling. The controller also accepts legacy dotenv files, but
+Picard's secret contains only the token. It needs **Zone Read**, **DNS Edit** for
+`leolab.party` and **Cloudflare Tunnel Edit** for the selected account.
+`publication.apiTokenReference` defaults to the edge credential reference, so
+both consumers follow the same configured source. The separate `tunnelCredential`
+field remains the connector's run token, rather than its management API credential.
+Tokens never enter the Nix store.
 
-```nix
-homelab.infra.cloudflareTunnel.publication.apiTokenReference =
-  "op://Homelab/Cloudflare/publicationApiToken";
-```
-
-Create that 1Password field before selecting it. Tokens never enter the Nix store.
 With no public flags and no previously owned resources, reconciliation only
 reads zone/DNS metadata and does not require tunnel permissions.
 

@@ -174,7 +174,7 @@ in
 
     cloudflareCredentialsReference = lib.mkOption {
       type = lib.types.str;
-      description = "1Password reference for the ACME DNS-01 environment file";
+      description = "1Password reference to the raw Cloudflare API token for ACME DNS-01";
     };
 
     proxies = lib.mkOption {
@@ -242,7 +242,7 @@ in
       message = "Protected edge route ${name} requires its ${authProvider proxyCfg} authentication gateway to be enabled";
     }) (cfg.proxies // lib.optionalAttrs (cfg.rootProxy != null) { "<root>" = cfg.rootProxy; });
 
-    services.onepassword-secrets.secrets.cloudflareAcmeEnvironment = {
+    services.onepassword-secrets.secrets.cloudflareAcmeToken = {
       reference = cfg.cloudflareCredentialsReference;
       owner = "root";
       group = "root";
@@ -259,7 +259,9 @@ in
         dnsProvider = "cloudflare";
         dnsPropagationCheck = true;
         dnsResolver = "1.1.1.1:53";
-        environmentFile = config.services.onepassword-secrets.secretPaths.cloudflareAcmeEnvironment;
+        # Lego reads the raw token through a private systemd credential file.
+        credentialFiles.CF_DNS_API_TOKEN_FILE =
+          config.services.onepassword-secrets.secretPaths.cloudflareAcmeToken;
         group = config.services.caddy.group;
         reloadServices = [ "caddy.service" ];
       };

@@ -12,9 +12,18 @@ let
       ];
     }).config;
   original = picard.config;
+  acme = original.security.acme.certs."leolab.party";
+  acmeTokenPath = original.services.onepassword-secrets.secretPaths.cloudflareAcmeToken;
   cfg = testConfig.systemd.services.cloudflare-publication;
 in
 assert cfg.serviceConfig.Type == "oneshot";
+assert acme.environmentFile == null;
+assert acme.credentialFiles.CF_DNS_API_TOKEN_FILE == acmeTokenPath;
+assert builtins.elem "CF_DNS_API_TOKEN_FILE:${acmeTokenPath}"
+  original.systemd.services."acme-order-renew-leolab.party".serviceConfig.LoadCredential;
+assert
+  original.services.onepassword-secrets.secrets.cloudflarePublicationToken.reference
+  == original.homelab.infra.edge.cloudflareCredentialsReference;
 assert
   testConfig.environment.etc."edge-dns/lan.zone".text
   == original.environment.etc."edge-dns/lan.zone".text;
@@ -32,7 +41,7 @@ pkgs.runCommand "cloudflare-publication-check" { nativeBuildInputs = [ pkgs.deno
     const manifest = JSON.parse(Deno.readTextFileSync("manifest.json"));
     validateManifest(manifest);
     const hosts = manifest.routes.map(route => route.hostname).sort();
-    if (JSON.stringify(hosts) !== JSON.stringify(["leolab.party", "photos.leolab.party", "webhooks.leolab.party"])) {
+    if (JSON.stringify(hosts) !== JSON.stringify(["id.leolab.party", "leolab.party", "photos.leolab.party", "webhooks.leolab.party"])) {
       throw new Error("Nix did not generate exactly the opted-in hostnames");
     }
   '
