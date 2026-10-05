@@ -67,9 +67,9 @@ IP-restricted `privateProxies` do not offer a public flag. Public hostnames must
 be the domain root or a single subdomain label covered by Cloudflare's domain
 certificate.
 
-Picard declares the publication controller, account, zone and existing remote
-tunnel. No hosts are opted in initially. As of 2026-10-05 this controller has been
-built but not deployed. Existing dashboard-managed `webhooks.leolab.party` and
+Picard runs the publication controller against its declared account, zone and
+existing remote tunnel. Deployed on 2026-10-05, it reconciles successfully with no
+hosts opted in. Existing dashboard-managed `webhooks.leolab.party` and
 the external Short.io record for `link.leolab.party` remain unmanaged.
 
 The controller reads its API token through opnix. It accepts a raw token or a
