@@ -126,6 +126,7 @@ an immediate reconciliation; inspect its results with
 ### Authentication
 
 Pocket ID 2.14.0 runs natively on Picard behind Caddy at `id.leolab.party`.
+Its application name is `Leolab`, managed declaratively in Nix.
 Its live SQLite database and uploads are on local disk in `/var/lib/pocket-id`;
 `/mnt/fast` is virtiofs and does not hold the live database. Before the existing
 appdata restic job, `pocket-id-backup.service` creates a consistent SQLite backup

@@ -74,6 +74,7 @@ in
 
       pocketId = {
         enable = true;
+        appName = "Leolab";
         subdomain = "id";
         encryptionKeyReference = "op://Homelab/Pocket ID/encryption-key";
       };

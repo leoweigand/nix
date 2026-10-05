@@ -21,6 +21,11 @@ in
 {
   options.homelab.infra.pocketId = {
     enable = lib.mkEnableOption "Pocket ID passkey identity provider";
+    appName = lib.mkOption {
+      type = lib.types.str;
+      default = "Pocket ID";
+      description = "Application name shown on the sign-in page and in emails";
+    };
     subdomain = lib.mkOption {
       type = lib.types.str;
       default = "id";
@@ -72,6 +77,7 @@ in
       dataDir = cfg.dataDir;
       credentials.ENCRYPTION_KEY = config.services.onepassword-secrets.secretPaths.pocketIdEncryptionKey;
       settings = {
+        APP_NAME = cfg.appName;
         APP_URL = "https://${serviceHost}";
         HOST = "127.0.0.1";
         PORT = cfg.port;
