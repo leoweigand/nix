@@ -323,6 +323,7 @@ in
           share = {
             defaultExpiration = "7 days";
             shareIdLength = "16";
+            maxSize = "10000000000";
           };
         };
         oidc = {
