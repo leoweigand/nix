@@ -41,7 +41,7 @@ pkgs.runCommand "cloudflare-publication-check" { nativeBuildInputs = [ pkgs.deno
     const manifest = JSON.parse(Deno.readTextFileSync("manifest.json"));
     validateManifest(manifest);
     const hosts = manifest.routes.map(route => route.hostname).sort();
-    if (JSON.stringify(hosts) !== JSON.stringify(["auth.leolab.party", "leolab.party", "photos.leolab.party", "share.leolab.party", "webhooks.leolab.party"])) {
+    if (JSON.stringify(hosts) !== JSON.stringify(["auth.leolab.party", "leolab.party", "login.leolab.party", "photos.leolab.party", "share.leolab.party", "webhooks.leolab.party"])) {
       throw new Error("Nix did not generate exactly the opted-in hostnames");
     }
   '

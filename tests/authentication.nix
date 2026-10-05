@@ -18,6 +18,8 @@ let
   unavailable = picard.extendModules {
     modules = [
       {
+        homelab.infra.authenticationMigration.gateway = lib.mkForce false;
+        homelab.infra.authenticationMigration.gates = lib.mkForce false;
         homelab.infra.tinyauth.enable = lib.mkForce false;
         homelab.infra.oauth2Proxy.enable = lib.mkForce false;
       }

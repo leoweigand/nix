@@ -1,15 +1,27 @@
 { pkgs, picard }:
 
 let
-  original = picard.config;
+  original =
+    (picard.extendModules {
+      modules = [
+        {
+          homelab.infra.authenticationMigration = pkgs.lib.genAttrs
+            [ "gateway" "linkding" "paperless" "miniflux" "immich" "gates" ]
+            (_: pkgs.lib.mkForce false);
+        }
+      ];
+    }).config;
   candidate =
     (picard.extendModules {
       modules = [
         {
-          homelab.infra.authenticationMigration = {
+          homelab.infra.authenticationMigration = pkgs.lib.mapAttrs (_: pkgs.lib.mkForce) {
             gateway = true;
             linkding = true;
             paperless = true;
+            miniflux = false;
+            immich = false;
+            gates = false;
           };
         }
       ];
@@ -23,7 +35,7 @@ let
     (picard.extendModules {
       modules = [
         {
-          homelab.infra.authenticationMigration = {
+          homelab.infra.authenticationMigration = pkgs.lib.mapAttrs (_: pkgs.lib.mkForce) {
             gateway = true;
             linkding = true;
             paperless = true;

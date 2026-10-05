@@ -86,7 +86,13 @@ in
         public = true;
       };
 
-      # Enable the migration canary after its client credentials are saved.
+      authenticationMigration = {
+        gateway = true;
+        linkding = true;
+        paperless = true;
+      };
+
+      # The guarded stage enables this with separate credentials.
       oauth2Proxy = {
         enable = false;
         subdomain = "login";
