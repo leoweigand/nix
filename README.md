@@ -51,6 +51,21 @@ unexpected local compilation.
 - `/mnt/media` is the single media tree exposed read-write from Unraid (`media` virtiofs tag). App modules hide the full mount and bind only approved subdirectories into each service. The unused `/mnt/slow` share is no longer attached.
 - On picard, Paperless documents and Immich media live on `/mnt/fast`, so restoring the `documents` repository targets `/mnt/fast/...` paths.
 
+### Authentication
+
+Pocket ID 2.14.0 runs natively on Picard behind Caddy at `id.leolab.party`.
+Its live SQLite database and uploads are on local disk in `/var/lib/pocket-id`;
+`/mnt/fast` is virtiofs and does not hold the live database. Before the existing
+appdata restic job, `pocket-id-backup.service` creates a consistent SQLite backup
+and copies uploads to `/mnt/fast/appdata/pocket-id-backup`. The encryption key is
+loaded from 1Password through systemd credentials and must be preserved for a restore.
+
+Tinyauth remains the active gateway and OIDC issuer. The edge supports selecting
+`tinyauth` or `oauth2-proxy`, globally or per route, and rejects configurations
+whose required gateway is disabled. The OAuth2 Proxy wrapper is imported but
+currently disabled on Picard. `checks.x86_64-linux.authentication` exercises the
+generated Caddy gates, OIDC login, WebSockets, group restrictions and SQLite backups.
+
 ### Jellyfin
 
 Jellyfin runs natively on Picard, managed by `modules/apps/jellyfin.nix`, behind Caddy at `jellyfin.leolab.party`. Its private service namespace reads `/media/films` and `/media/tv` without write access; those paths bind to the shared media library. Persistent state is in `/mnt/fast/appdata/jellyfin`; regenerable cache and transcodes are in `/mnt/fast/cache/jellyfin`.
@@ -151,6 +166,7 @@ Service data mapping (all covered by `appdata` job):
 - Home Assistant config: `/mnt/fast/appdata/homeassistant/config`
 - Zigbee2MQTT config: `/mnt/fast/appdata/ziqbee2mqtt/config`
 - Paperless app state: `/mnt/fast/appdata/paperless`
+- Pocket ID prepared database and uploads: `/mnt/fast/appdata/pocket-id-backup`
 
 #### 1) Pick restore scope
 
@@ -172,9 +188,15 @@ sudo systemctl stop paperless-scheduler
 #### 3) Discover snapshots
 
 ```bash
-# Must run as root so the wrapper can load credentials from 1Password
-sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/appdata snapshots
-sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/paperless snapshots
+# Enter a root shell and load the existing opnix credentials without printing them
+sudo -i
+set -a
+. /var/lib/opnix/secrets/s3Credentials
+set +a
+export RESTIC_PASSWORD_FILE=/var/lib/opnix/secrets/resticPassword
+
+restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/appdata snapshots
+restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/paperless snapshots
 ```
 
 #### 4) Restore to staging first
@@ -182,8 +204,8 @@ sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/paperle
 ```bash
 # Restore to staging directory, not directly to /
 sudo mkdir -p /tmp/restore-appdata /tmp/restore-paperless
-sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/appdata restore latest --target /tmp/restore-appdata
-sudo restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/paperless restore latest --target /tmp/restore-paperless
+restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/appdata restore latest --target /tmp/restore-appdata
+restic -r s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/paperless restore latest --target /tmp/restore-paperless
 ```
 
 #### 5) Apply restored data and fix ownership
