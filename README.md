@@ -133,20 +133,26 @@ appdata restic job, `pocket-id-backup.service` creates a consistent SQLite backu
 and copies uploads to `/mnt/fast/appdata/pocket-id-backup`. The encryption key is
 loaded from 1Password through systemd credentials and must be preserved for a restore.
 
-Tinyauth remains the active gateway and OIDC issuer at `tinyauth.leolab.party`.
-Changing Pocket ID’s hostname requires enrolling passkeys again at the new address. The edge supports selecting
-`tinyauth` or `oauth2-proxy`, globally or per route, and rejects configurations
-whose required gateway is disabled. The OAuth2 Proxy wrapper is imported but
-currently disabled on Picard. `checks.x86_64-linux.authentication` exercises the
-generated Caddy gates, OIDC login, WebSockets, group restrictions and SQLite backups.
+OAuth2 Proxy provides the shared gateway at `login.leolab.party`, backed by
+Pocket ID and restricted to the `admins` group. Both authentication hostnames
+are public so they can serve publicly exposed protected apps. The apps themselves
+are published only when their edge flag is enabled. Tinyauth and its private
+hostname were removed on 6 October 2026.
 
-`machines/picard/authentication-migration.nix` defines six optional migration
-stages under `homelab.infra.authenticationMigration`: `gateway`, `linkding`,
-`paperless`, `miniflux`, `immich` and `gates`. All default to disabled. Enabling a
-stage selects its separate Pocket ID credentials; those fields must exist before
-activation. The gates stage requires the gateway stage. The
-`authentication-migration` check verifies staged settings and unchanged Pocket
-ID, Pingvin and tunnel unit derivations.
+Linkding, Paperless, Miniflux and Immich use native Pocket ID OIDC, preserving
+existing accounts and data. Their separate client secrets come from the
+`pocket-id-oidc-env` fields in their existing 1Password items, except Immich's
+raw `pocket-id-client-secret`. Paperless's active field contains only its
+`pocket-id` provider. Local recovery login remains available; Miniflux and Immich
+have automatic account creation disabled. Pingvin keeps its separate existing
+Pocket ID client and native login.
+
+Protected edge routes use OAuth2 Proxy and reject configurations with the
+gateway disabled. SilverBullet's PWA paths and Prowlarr's API-key paths retain
+their explicit bypasses. `checks.x86_64-linux.authentication` exercises the
+actual generated gates, OIDC, PKCE, group denial, cookie renewal, WebSockets,
+POST bodies, spoofed headers, exact bypasses and SQLite backups. Changing Pocket
+ID's hostname requires enrolling passkeys again at the new address.
 
 ### Jellyfin
 

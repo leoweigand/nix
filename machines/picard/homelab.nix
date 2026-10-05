@@ -86,52 +86,13 @@ in
         public = true;
       };
 
-      authenticationMigration = {
-        gateway = true;
-        linkding = true;
-        paperless = true;
-      };
-
-      # The guarded stage enables this with separate credentials.
       oauth2Proxy = {
-        enable = false;
+        enable = true;
         subdomain = "login";
         envReference = "op://Homelab/OAuth2 Proxy/env";
         allowedGroups = [ "admins" ];
       };
-
-      edge.proxies.auth-check = lib.mkIf config.homelab.infra.oauth2Proxy.enable {
-        upstream = "http://127.0.0.1:${toString config.homelab.infra.homepage.port}";
-        auth.provider = "oauth2-proxy";
-        headerUp.Host = "leolab.party";
-      };
-
-      tinyauth = {
-        enable = true;
-        subdomain = "tinyauth";
-        dataDir = "${mounts.fast}/appdata/tinyauth";
-        envReference = "op://Homelab/Tinyauth/env";
-        userAttributes.leo.email = "leo@leolab.party";
-        oidcClients.paperless = {
-          clientId = "paperless";
-          trustedRedirectUris = [ "https://documents.leolab.party/accounts/oidc/tinyauth/login/callback/" ];
-        };
-        oidcClients.immich = {
-          clientId = "immich";
-          trustedRedirectUris = [
-            "https://photos.leolab.party/auth/login"
-            "app.immich:///oauth-callback" # mobile app
-          ];
-        };
-        oidcClients.miniflux = {
-          clientId = "miniflux";
-          trustedRedirectUris = [ "https://news.leolab.party/oauth2/oidc/callback" ];
-        };
-        oidcClients.linkding = {
-          clientId = "linkding";
-          trustedRedirectUris = [ "https://bookmarks.leolab.party/oidc/callback/" ];
-        };
-      };
+      edge.proxies.login.public = true;
 
       mqtt = {
         enable = true;
@@ -146,7 +107,7 @@ in
 
       edgeDns = {
         enable = true;
-        serial = 2026100504; # Bump whenever DNS names or values change
+        serial = 2026100601; # Bump whenever DNS names or values change
         lanListenAddress = "192.168.2.4";
         lanAnswerAddress = "192.168.2.4";
         tailnetListenAddress = "100.104.119.103";
@@ -352,7 +313,7 @@ in
         dataDir = "${mounts.fast}/appdata/paperless";
         mediaDir = "${mounts.fast}/documents/paperless/library";
         consumptionDir = "${mounts.fast}/documents/paperless/import";
-        oidcEnvReference = "op://Homelab/Paperless/oidc-env";
+        oidcEnvReference = "op://Homelab/Paperless/pocket-id-oidc-env";
         llmTitleExtraction = {
           enable = true;
           openaiKeyReference = "op://Homelab/Paperless/openai-token";
@@ -407,8 +368,11 @@ in
         mediaDir = "${mounts.fast}/photos";
         oidc = {
           enable = true;
-          issuerUrl = "https://${config.homelab.infra.tinyauth.subdomain}.${config.homelab.baseDomain}";
-          clientSecretReference = "op://Homelab/Immich/oidc-client-secret";
+          issuerUrl = "https://${config.homelab.infra.pocketId.subdomain}.${config.homelab.baseDomain}";
+          clientId = "immich";
+          clientSecretReference = "op://Homelab/Immich/pocket-id-client-secret";
+          buttonText = "Sign in with LeoLab";
+          autoRegister = false;
         };
         homepage = {
           category = "Services";
@@ -424,8 +388,10 @@ in
         dataDir = "${mounts.fast}/appdata/linkding";
         oidc = {
           enable = true;
-          issuerUrl = "https://${config.homelab.infra.tinyauth.subdomain}.${config.homelab.baseDomain}";
-          clientSecretReference = "op://Homelab/Linkding/oidc-env";
+          issuerUrl = "https://${config.homelab.infra.pocketId.subdomain}.${config.homelab.baseDomain}";
+          clientId = "linkding";
+          clientSecretReference = "op://Homelab/Linkding/pocket-id-oidc-env";
+          disableLoginForm = false;
         };
         homepage = {
           category = "Services";
@@ -452,8 +418,12 @@ in
         adminCredentialsReference = "op://Homelab/Miniflux/admin-env";
         oidc = {
           enable = true;
-          issuerUrl = "https://${config.homelab.infra.tinyauth.subdomain}.${config.homelab.baseDomain}";
-          clientSecretReference = "op://Homelab/Miniflux/oidc-env";
+          issuerUrl = "https://${config.homelab.infra.pocketId.subdomain}.${config.homelab.baseDomain}";
+          clientId = "miniflux";
+          clientSecretReference = "op://Homelab/Miniflux/pocket-id-oidc-env";
+          providerName = "LeoLab";
+          autoRegister = false;
+          disableLocalAuth = false;
         };
         homepage = {
           category = "Services";

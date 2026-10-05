@@ -68,7 +68,7 @@ in
 
       buttonText = lib.mkOption {
         type = lib.types.str;
-        default = "Log in with Tinyauth";
+        default = "Sign in with LeoLab";
         description = "Login button text shown by Immich for OIDC";
       };
     };

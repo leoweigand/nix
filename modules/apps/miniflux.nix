@@ -60,7 +60,7 @@ in
 
       providerName = lib.mkOption {
         type = lib.types.str;
-        default = "Tinyauth";
+        default = "LeoLab";
         description = "Display name shown on the Miniflux login button";
       };
 

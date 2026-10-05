@@ -42,7 +42,7 @@ The separate publication module, `modules/infra/cloudflare-publication.nix`, der
 
 - Hermes runs as a normal Ubuntu installation on Dax, with administrative control confined to that VM. It has no host filesystem shares.
 - Laforge's persistent libvirt network filter restricts Dax's private-network access and blocks IPv6. The private homelab repository owns that filter and the Ubuntu service definitions.
-- `machines/picard/hermes-remote.nix` retains Tinyauth-protected dashboard routing to Dax port 9119 and a Home Assistant-only TLS listener on port 8444, permitted only from Dax. The existing Telegram webhook route forwards to Dax port 8443.
+- `machines/picard/hermes-remote.nix` retains dashboard routing to Dax port 9119, protected by OAuth2 Proxy and Pocket ID, and a Home Assistant-only TLS listener on port 8444, permitted only from Dax. The existing Telegram webhook route forwards to Dax port 8443.
 - Before the daily appdata backup, Picard pulls a consistent Hermes archive using a forced-command SSH key. Dax briefly stops its Hermes services for the export. Backup credentials remain on Picard.
 
 ## Home Assistant

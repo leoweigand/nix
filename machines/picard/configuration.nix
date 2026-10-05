@@ -16,7 +16,6 @@ in
     ./hardware-configuration.nix
     ../../modules/default.nix # load shared machine and homelab modules
     ./homelab.nix
-    ./authentication-migration.nix
     ./hermes-remote.nix
   ];
 

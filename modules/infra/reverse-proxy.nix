@@ -3,27 +3,10 @@
 let
   cfg = config.homelab.infra.edge;
   domain = config.homelab.baseDomain;
-  tinyauth = config.homelab.infra.tinyauth;
   oauth2Proxy = config.homelab.infra.oauth2Proxy;
-  providerType = lib.types.enum [
-    "tinyauth"
-    "oauth2-proxy"
-  ];
-  authProvider =
-    proxyCfg:
-    if builtins.isBool proxyCfg.auth || proxyCfg.auth.provider == null then
-      cfg.authProvider
-    else
-      proxyCfg.auth.provider;
   requiresAuth = proxyCfg: if builtins.isBool proxyCfg.auth then proxyCfg.auth else true;
-  providerEnabled = provider: if provider == "tinyauth" then tinyauth.enable else oauth2Proxy.enable;
   authConfigType = lib.types.submodule {
     options = {
-      provider = lib.mkOption {
-        type = lib.types.nullOr providerType;
-        default = null;
-        description = "Optional gateway override while migrating individual routes";
-      };
       passUser = lib.mkOption {
         type = lib.types.bool;
         default = false;
@@ -92,34 +75,25 @@ let
             inherit (proxyCfg.auth) passUser bypassPaths;
           };
       needsAuth = authCfg.enable;
-      provider = authProvider proxyCfg;
       authGate =
-        if provider == "tinyauth" then
-          ''
-            forward_auth http://127.0.0.1:${toString tinyauth.port} {
-              uri /api/auth/caddy
-              ${lib.optionalString authCfg.passUser "copy_headers Remote-User"}
-            }
-          ''
-        else
-          ''
-            # Expanded forward_auth lets renewal cookies reach the browser.
-            reverse_proxy http://127.0.0.1:${toString oauth2Proxy.port} {
-              method GET
-              # Drop the app query so its rd parameter cannot override our return URL.
-              rewrite /?
-              header_up X-Forwarded-Method {method}
-              header_up X-Forwarded-Uri {uri}
-              header_up X-Auth-Request-Redirect https://{host}{uri}
-              @authenticated status 2xx
-              handle_response @authenticated {
-                copy_response_headers {
-                  include Set-Cookie
-                }
-                ${lib.optionalString authCfg.passUser "request_header Remote-User {rp.header.X-Auth-Request-Preferred-Username}"}
+        ''
+          # Expanded forward_auth lets renewal cookies reach the browser.
+          reverse_proxy http://127.0.0.1:${toString oauth2Proxy.port} {
+            method GET
+            # Drop the app query so its rd parameter cannot override our return URL.
+            rewrite /?
+            header_up X-Forwarded-Method {method}
+            header_up X-Forwarded-Uri {uri}
+            header_up X-Auth-Request-Redirect https://{host}{uri}
+            @authenticated status 2xx
+            handle_response @authenticated {
+              copy_response_headers {
+                include Set-Cookie
               }
+              ${lib.optionalString authCfg.passUser "request_header Remote-User {rp.header.X-Auth-Request-Preferred-Username}"}
             }
-          '';
+          }
+        '';
       reverseProxy = ''
         reverse_proxy ${proxyCfg.upstream} {
           ${lib.concatMapAttrsStringSep "\n" (name: value: "header_up ${name} ${value}") proxyCfg.headerUp}
@@ -159,12 +133,6 @@ in
 {
   options.homelab.infra.edge = {
     enable = lib.mkEnableOption "Picard edge reverse proxy and TLS";
-
-    authProvider = lib.mkOption {
-      type = providerType;
-      default = "tinyauth";
-      description = "Default authentication gateway for protected routes";
-    };
 
     acmeEmail = lib.mkOption {
       type = lib.types.str;
@@ -238,8 +206,8 @@ in
       }
     ]
     ++ lib.mapAttrsToList (name: proxyCfg: {
-      assertion = !requiresAuth proxyCfg || providerEnabled (authProvider proxyCfg);
-      message = "Protected edge route ${name} requires its ${authProvider proxyCfg} authentication gateway to be enabled";
+      assertion = !requiresAuth proxyCfg || oauth2Proxy.enable;
+      message = "Protected edge route ${name} requires its oauth2-proxy authentication gateway to be enabled";
     }) (cfg.proxies // lib.optionalAttrs (cfg.rootProxy != null) { "<root>" = cfg.rootProxy; });
 
     services.onepassword-secrets.secrets.cloudflareAcmeToken = {

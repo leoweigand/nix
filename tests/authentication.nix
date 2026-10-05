@@ -6,7 +6,6 @@ let
     modules = [
       {
         homelab.infra.oauth2Proxy.enable = lib.mkForce true;
-        homelab.infra.edge.authProvider = "oauth2-proxy";
         homelab.infra.edge.proxies.identity = {
           upstream = "http://127.0.0.1:3000";
           auth.passUser = true;
@@ -18,10 +17,9 @@ let
   unavailable = picard.extendModules {
     modules = [
       {
-        homelab.infra.authenticationMigration.gateway = lib.mkForce false;
-        homelab.infra.authenticationMigration.gates = lib.mkForce false;
-        homelab.infra.tinyauth.enable = lib.mkForce false;
         homelab.infra.oauth2Proxy.enable = lib.mkForce false;
+        # Keep the public login declaration complete while testing a disabled gateway.
+        homelab.infra.edge.proxies.login.upstream = "http://127.0.0.1:4180";
       }
     ];
   };
