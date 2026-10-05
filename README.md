@@ -154,13 +154,16 @@ Sonarr, Radarr, Prowlarr, Seerr, and Syncthing run natively on Picard. Their app
 
 ### Pingvin Share X service module
 
-`modules/apps/pingvin.nix` provides `homelab.apps.pingvin`. It is imported but
-disabled on all machines. Enabling it starts one Podman container, bound to
+`modules/apps/pingvin.nix` provides `homelab.apps.pingvin`. Picard enables it at
+`https://share.leolab.party`, with native Pocket ID login and public sharing links.
+Enabling it starts one Podman container, bound to
 `127.0.0.1:3005`, with persistent SQLite, uploads and custom images in
 `/var/lib/pingvin`. Its v2.0.0 image is pinned by digest and supports HTTP range
-requests for seeking in browser-compatible media. The module declares no proxy,
-DNS, tunnel, authentication-provider or backup configuration. Its Homepage entry
-defaults to disabled.
+requests for seeking in browser-compatible media. Picard declares the public
+edge route separately; recipients can open shared links without an account.
+Uploading and administration require the Pocket ID `admins` group. Password
+login, local registration and anonymous share creation are disabled. Its
+Homepage entry defaults to disabled; Picard explicitly enables it.
 
 The minimal configuration is:
 
@@ -198,6 +201,31 @@ root-readable. Arrange for the source file to exist before service start and
 restart `podman-pingvin.service` after changing it. When registration is disabled
 before the first start, the YAML must provision an administrator with upstream's
 `initUser` settings or provide another working sign-in flow.
+
+Alternatively, enable `oidc` alongside non-secret `settings`. Set `issuerUrl` and
+`clientSecretReference`; `clientId` defaults to `pingvin`, and `allowedGroup` and
+`adminGroup` default to `admins`. The confidential client needs the exact callback
+`https://share.leolab.party/api/oauth/callback/oidc` and must allow the matching
+Pocket ID group. Pingvin does not send PKCE, so this client uses its secret
+without requiring PKCE. The module requests `openid email profile groups`,
+creates accounts on OIDC sign-in, and maps the `groups` claim to access and
+administration. It disables password login and local registration. `configFile`
+cannot be combined with these OIDC options.
+
+Opnix supplies `op://Homelab/Pingvin/oidc-client-secret` on Picard. Systemd loads
+the root-readable secret as a credential and inserts it into the runtime
+`/run/pingvin/config.yaml`, readable only by the container's UID. The Nix store
+contains the settings template, with no client secret. Set `trustProxy = true`
+behind the HTTPS edge and enable secure cookies in `settings`.
+
+Picard sets `backupDir = "/mnt/fast/appdata/pingvin-backup"`. Before the existing
+appdata restic job, `pingvin-backup.service` stops an active Pingvin container,
+copies its database, uploads and images, verifies SQLite integrity, then restarts
+it even if preparation fails. Sharing is briefly unavailable during preparation;
+this avoids mismatched database and file snapshots. A failed preparation fails
+the restic job. To restore, stop Pingvin, replace `/var/lib/pingvin` with the
+prepared directory from a staged restic restore, restore numeric UID/GID ownership
+and restart with the original OIDC client secret from 1Password.
 
 ### Adding New Secrets
 

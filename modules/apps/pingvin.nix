@@ -9,7 +9,28 @@ let
   cfg = config.homelab.apps.pingvin;
   yaml = pkgs.formats.yaml { };
   generatedConfig = yaml.generate "pingvin-config.yaml" cfg.settings;
-  configPath = if cfg.configFile != null then "/run/pingvin/config.yaml" else generatedConfig;
+  oidcTemplate = pkgs.writeText "pingvin-oidc-template.json" (
+    builtins.toJSON (
+      lib.recursiveUpdate cfg.settings {
+        oauth = {
+          allowRegistration = "true";
+          disablePassword = "true";
+          oidc-enabled = "true";
+          oidc-discoveryUri = cfg.oidc.issuerUrl;
+          oidc-clientId = cfg.oidc.clientId;
+          oidc-scope = "openid email profile groups";
+          oidc-usernameClaim = "preferred_username";
+          oidc-rolePath = "groups";
+          oidc-roleGeneralAccess = cfg.oidc.allowedGroup;
+          oidc-roleAdminAccess = cfg.oidc.adminGroup;
+        };
+        share.allowRegistration = "false";
+        share.allowUnauthenticatedShares = "false";
+      }
+    )
+  );
+  runtimeConfig = cfg.configFile != null || cfg.oidc.enable;
+  configPath = if runtimeConfig then "/run/pingvin/config.yaml" else generatedConfig;
 in
 {
   options.homelab.apps.pingvin = {
@@ -44,6 +65,47 @@ in
       type = lib.types.ints.positive;
       default = 1000;
       description = "GID used inside the container and for persistent file ownership";
+    };
+
+    trustProxy = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Trust forwarded request headers when reached through the HTTPS edge";
+    };
+
+    oidc = {
+      enable = lib.mkEnableOption "native OIDC login with group-based access";
+      issuerUrl = lib.mkOption {
+        type = lib.types.str;
+        default = "";
+        description = "OIDC issuer or discovery URL";
+      };
+      clientId = lib.mkOption {
+        type = lib.types.str;
+        default = "pingvin";
+        description = "Confidential OIDC client ID";
+      };
+      clientSecretReference = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "1Password reference for the OIDC client secret";
+      };
+      allowedGroup = lib.mkOption {
+        type = lib.types.str;
+        default = "admins";
+        description = "Pocket ID group required to sign in and upload files";
+      };
+      adminGroup = lib.mkOption {
+        type = lib.types.str;
+        default = "admins";
+        description = "Pocket ID group granting Pingvin administration";
+      };
+    };
+
+    backupDir = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "Optional prepared state directory included in the appdata restic job";
     };
 
     settings = lib.mkOption {
@@ -91,7 +153,40 @@ in
           assertion = cfg.configFile == null || lib.hasPrefix "/" cfg.configFile;
           message = "homelab.apps.pingvin.configFile must be an absolute runtime path";
         }
+        {
+          assertion =
+            !cfg.oidc.enable
+            || (
+              cfg.configFile == null
+              && cfg.oidc.issuerUrl != ""
+              && cfg.oidc.clientSecretReference != null
+              && cfg.oidc.allowedGroup != ""
+              && cfg.oidc.adminGroup != ""
+            );
+          message = "Pingvin OIDC requires issuerUrl, clientSecretReference and explicit groups; configFile cannot be combined with OIDC";
+        }
+        {
+          assertion =
+            cfg.backupDir == null
+            || (
+              lib.hasPrefix "/" cfg.backupDir
+              && cfg.backupDir != "/"
+              && cfg.backupDir != cfg.dataDir
+              && !(lib.hasPrefix "${cfg.dataDir}/" cfg.backupDir)
+              && !(lib.hasPrefix "${cfg.backupDir}/" cfg.dataDir)
+            );
+          message = "Pingvin backupDir must be an absolute directory outside dataDir";
+        }
       ];
+
+      services.onepassword-secrets.secrets = lib.optionalAttrs cfg.oidc.enable {
+        pingvinOidcClientSecret = {
+          reference = cfg.oidc.clientSecretReference;
+          owner = "root";
+          group = "root";
+          mode = "0400";
+        };
+      };
 
       virtualisation = {
         podman.enable = true;
@@ -105,15 +200,13 @@ in
               PUID = toString cfg.uid;
               PGID = toString cfg.gid;
               TZ = if config.time.timeZone == null then "UTC" else config.time.timeZone;
-              TRUST_PROXY = "false";
+              TRUST_PROXY = lib.boolToString cfg.trustProxy;
             };
             volumes = [
               "${cfg.dataDir}:/opt/app/backend/data"
               "${cfg.dataDir}/images:/opt/app/frontend/public/img"
             ]
-            ++ lib.optional (
-              cfg.settings != { } || cfg.configFile != null
-            ) "${configPath}:/opt/app/config.yaml:ro";
+            ++ lib.optional (cfg.settings != { } || runtimeConfig) "${configPath}:/opt/app/config.yaml:ro";
           };
         };
       };
@@ -121,23 +214,80 @@ in
       systemd.tmpfiles.rules = [
         "d ${cfg.dataDir} 0750 ${toString cfg.uid} ${toString cfg.gid} - -"
         "d ${cfg.dataDir}/images 0750 ${toString cfg.uid} ${toString cfg.gid} - -"
+      ]
+      ++ lib.optionals (cfg.backupDir != null) [
+        "d ${cfg.backupDir} 0700 root root - -"
       ];
 
       systemd.services.podman-pingvin = {
         unitConfig.RequiresMountsFor = [ cfg.dataDir ];
-        restartTriggers = lib.optional (cfg.settings != { }) generatedConfig;
-        serviceConfig = lib.mkIf (cfg.configFile != null) {
-          LoadCredential = [ "config.yaml:${cfg.configFile}" ];
+        after = lib.optionals cfg.oidc.enable [ "opnix-secrets.service" ];
+        requires = lib.optionals cfg.oidc.enable [ "opnix-secrets.service" ];
+        restartTriggers =
+          if cfg.oidc.enable then [ oidcTemplate ] else lib.optional (cfg.settings != { }) generatedConfig;
+        serviceConfig = lib.mkIf runtimeConfig {
+          LoadCredential =
+            if cfg.oidc.enable then
+              [ "oidc-client-secret:${config.services.onepassword-secrets.secretPaths.pingvinOidcClientSecret}" ]
+            else
+              [ "config.yaml:${cfg.configFile}" ];
           RuntimeDirectory = "pingvin";
           RuntimeDirectoryMode = "0700";
         };
-        preStart = lib.mkIf (cfg.configFile != null) (
-          lib.mkBefore ''
-            ${pkgs.coreutils}/bin/install -m 0400 -o ${toString cfg.uid} -g ${toString cfg.gid} \
-              "$CREDENTIALS_DIRECTORY/config.yaml" /run/pingvin/config.yaml
-          ''
+        preStart = lib.mkIf runtimeConfig (
+          lib.mkBefore (
+            if cfg.oidc.enable then
+              ''
+                umask 077
+                # JSON is valid YAML; interpolate the credential only at service start.
+                ${pkgs.jq}/bin/jq --rawfile secret "$CREDENTIALS_DIRECTORY/oidc-client-secret" \
+                  '.oauth["oidc-clientSecret"] = ($secret | rtrimstr("\n"))' \
+                  ${oidcTemplate} > /run/pingvin/config.yaml
+                ${pkgs.coreutils}/bin/chown ${toString cfg.uid}:${toString cfg.gid} /run/pingvin/config.yaml
+                ${pkgs.coreutils}/bin/chmod 0400 /run/pingvin/config.yaml
+              ''
+            else
+              ''
+                ${pkgs.coreutils}/bin/install -m 0400 -o ${toString cfg.uid} -g ${toString cfg.gid} \
+                  "$CREDENTIALS_DIRECTORY/config.yaml" /run/pingvin/config.yaml
+              ''
+          )
         );
       };
+
+      systemd.services.pingvin-backup = lib.mkIf (cfg.backupDir != null) {
+        description = "Prepare Pingvin state for restic with uploads quiesced";
+        unitConfig.RequiresMountsFor = [
+          cfg.dataDir
+          cfg.backupDir
+        ];
+        serviceConfig.Type = "oneshot";
+        path = [
+          pkgs.systemd
+          pkgs.rsync
+          pkgs.sqlite
+        ];
+        script = ''
+          set -euo pipefail
+          umask 077
+          was_active=false
+          if systemctl is-active --quiet podman-pingvin.service; then
+            was_active=true
+            trap 'if "$was_active"; then systemctl start podman-pingvin.service; fi' EXIT
+            systemctl stop podman-pingvin.service
+          fi
+          test -s ${lib.escapeShellArg "${cfg.dataDir}/pingvin-share.db"}
+          rsync -a --delete ${lib.escapeShellArg "${cfg.dataDir}/"} ${lib.escapeShellArg "${cfg.backupDir}/"}
+          test "$(sqlite3 ${lib.escapeShellArg "${cfg.backupDir}/pingvin-share.db"} 'PRAGMA quick_check;')" = ok
+        '';
+      };
+      homelab.infra.backup.jobs.appdata.prepareCommand =
+        lib.mkIf (cfg.backupDir != null && config.homelab.infra.backup.enable)
+          (
+            lib.mkAfter ''
+              ${pkgs.systemd}/bin/systemctl start pingvin-backup.service
+            ''
+          );
     })
   ];
 }

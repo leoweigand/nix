@@ -81,6 +81,11 @@ in
 
       edge.proxies.auth.public = true;
 
+      edge.proxies.share = {
+        upstream = "http://127.0.0.1:${toString config.homelab.apps.pingvin.port}";
+        public = true;
+      };
+
       # Enrol passkeys and create the gateway client before enabling its service.
       oauth2Proxy = {
         enable = false;
@@ -135,7 +140,7 @@ in
 
       edgeDns = {
         enable = true;
-        serial = 2026100503; # Bump whenever DNS names or values change
+        serial = 2026100504; # Bump whenever DNS names or values change
         lanListenAddress = "192.168.2.4";
         lanAnswerAddress = "192.168.2.4";
         tailnetListenAddress = "100.104.119.103";
@@ -303,6 +308,35 @@ in
           name = "Syncthing";
           icon = "syncthing";
           description = "File synchronization";
+        };
+      };
+      pingvin = {
+        enable = true;
+        trustProxy = true;
+        backupDir = "${mounts.fast}/appdata/pingvin-backup";
+        settings = {
+          general = {
+            appName = "LeoLab Share";
+            appUrl = "https://share.leolab.party";
+            secureCookies = "true";
+          };
+          share = {
+            defaultExpiration = "7 days";
+            shareIdLength = "16";
+          };
+        };
+        oidc = {
+          enable = true;
+          issuerUrl = "https://${config.homelab.infra.pocketId.subdomain}.${config.homelab.baseDomain}";
+          clientSecretReference = "op://Homelab/Pingvin/oidc-client-secret";
+        };
+        homepage = {
+          enable = true;
+          name = "Share Files";
+          icon = "pingvin-share";
+          description = "Share files and media through expiring links";
+          href = "https://share.leolab.party";
+          siteMonitor = "http://127.0.0.1:3005/api/health";
         };
       };
       paperless = {
