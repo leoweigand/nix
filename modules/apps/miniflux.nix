@@ -72,6 +72,12 @@ in
           The bootstrap admin can still log in via /login?disable_local_auth=false.
         '';
       };
+
+      autoRegister = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Create new users on OIDC sign-in; disable while relinking an existing account";
+      };
     };
   };
 
@@ -101,7 +107,8 @@ in
         group = "root";
         mode = "0400";
       };
-    } // lib.optionalAttrs cfg.oidc.enable {
+    }
+    // lib.optionalAttrs cfg.oidc.enable {
       minifluxOidcClientSecret = {
         reference = cfg.oidc.clientSecretReference;
         owner = "root";
@@ -116,13 +123,14 @@ in
       config = {
         BASE_URL = "https://${serviceHost}";
         LISTEN_ADDR = "127.0.0.1:${toString cfg.port}";
-      } // lib.optionalAttrs cfg.oidc.enable {
+      }
+      // lib.optionalAttrs cfg.oidc.enable {
         OAUTH2_PROVIDER = "oidc";
         OAUTH2_CLIENT_ID = cfg.oidc.clientId;
         OAUTH2_REDIRECT_URL = "https://${serviceHost}/oauth2/oidc/callback";
         OAUTH2_OIDC_DISCOVERY_ENDPOINT = cfg.oidc.issuerUrl;
         OAUTH2_OIDC_PROVIDER_NAME = cfg.oidc.providerName;
-        OAUTH2_USER_CREATION = "1";
+        OAUTH2_USER_CREATION = if cfg.oidc.autoRegister then "1" else "0";
         DISABLE_LOCAL_AUTH = if cfg.oidc.disableLocalAuth then "true" else "false";
       };
     };

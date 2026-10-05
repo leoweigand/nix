@@ -4,7 +4,6 @@ let
   cfg = config.homelab.infra.homepage;
   domain = config.homelab.baseDomain;
   edge = config.homelab.infra.edge;
-  tinyauth = config.homelab.infra.tinyauth;
 
   enabledApps = lib.filterAttrs (
     _: app: (app.enable or false) && (app.homepage.enable or false)
@@ -131,10 +130,6 @@ in
       {
         assertion = edge.enable;
         message = "homelab.infra.homepage.enable requires homelab.infra.edge.enable";
-      }
-      {
-        assertion = tinyauth.enable;
-        message = "homelab.infra.homepage.enable requires homelab.infra.tinyauth.enable";
       }
     ];
 

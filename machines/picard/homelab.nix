@@ -1,4 +1,9 @@
-{ pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   mounts = {
@@ -60,6 +65,26 @@ in
         tokenReference = "op://Homelab/Cloudflare/tunnelCredential";
       };
 
+      pocketId = {
+        enable = true;
+        subdomain = "id";
+        encryptionKeyReference = "op://Homelab/Pocket ID/encryption-key";
+      };
+
+      # Enrol passkeys and create the gateway client before enabling its service.
+      oauth2Proxy = {
+        enable = false;
+        subdomain = "login";
+        envReference = "op://Homelab/OAuth2 Proxy/env";
+        allowedGroups = [ "admins" ];
+      };
+
+      edge.proxies.auth-check = lib.mkIf config.homelab.infra.oauth2Proxy.enable {
+        upstream = "http://127.0.0.1:${toString config.homelab.infra.homepage.port}";
+        auth.provider = "oauth2-proxy";
+        headerUp.Host = "leolab.party";
+      };
+
       tinyauth = {
         enable = true;
         subdomain = "auth";
@@ -100,7 +125,7 @@ in
 
       edgeDns = {
         enable = true;
-        serial = 2026100501; # Bump whenever DNS names or values change
+        serial = 2026100502; # Bump whenever DNS names or values change
         lanListenAddress = "192.168.2.4";
         lanAnswerAddress = "192.168.2.4";
         tailnetListenAddress = "100.104.119.103";

@@ -93,7 +93,7 @@ in
     };
 
     homelab.infra.edge.proxies.${cfg.subdomain} = {
-      # No forward auth — Linkding drives the OIDC flow against TinyAuth itself,
+      # No forward auth — Linkding drives the OIDC flow against its provider,
       # and a forward_auth gate would break its callback.
       upstream = "http://127.0.0.1:${toString cfg.port}";
     };
@@ -115,11 +115,12 @@ in
             TZ = cfg.timeZone;
             # Django rejects cross-origin POSTs unless the public URL is trusted
             LD_CSRF_TRUSTED_ORIGINS = "https://${cfg.subdomain}.${config.homelab.baseDomain}";
-          } // lib.optionalAttrs cfg.oidc.enable {
+          }
+          // lib.optionalAttrs cfg.oidc.enable {
             LD_ENABLE_OIDC = "True";
             LD_DISABLE_LOGIN_FORM = if cfg.oidc.disableLoginForm then "True" else "False";
             OIDC_RP_CLIENT_ID = cfg.oidc.clientId;
-            # TinyAuth exposes no discovery document, so each endpoint is explicit
+            # Linkding's OIDC backend uses explicit endpoints for both providers.
             OIDC_OP_AUTHORIZATION_ENDPOINT = "${cfg.oidc.issuerUrl}/authorize";
             OIDC_OP_TOKEN_ENDPOINT = "${cfg.oidc.issuerUrl}/api/oidc/token";
             OIDC_OP_USER_ENDPOINT = "${cfg.oidc.issuerUrl}/api/oidc/userinfo";
