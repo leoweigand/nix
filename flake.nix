@@ -29,6 +29,11 @@
   };
 
   outputs = { self, nixpkgs, nix-darwin, home-manager, opnix, disko, ... }@inputs: {
+    checks.x86_64-linux.edge-dns = import ./tests/edge-dns.nix {
+      pkgs = nixpkgs.legacyPackages.x86_64-linux;
+      picard = self.nixosConfigurations.picard;
+    };
+
     nixosConfigurations = {
       # Picard - Main homelab server (NixOS VM on Unraid)
       picard = nixpkgs.lib.nixosSystem {

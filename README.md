@@ -39,7 +39,7 @@ unexpected local compilation.
 
 - Shared edge settings live in `modules/infra/reverse-proxy.nix`.
 - App modules (for example `modules/apps/immich.nix` and `modules/apps/paperless.nix`) only declare their own `services.caddy.virtualHosts` entries and local upstream target.
-- CoreDNS generates explicit LAN and tailnet records from those declared proxy hosts; non-proxy records are declared separately under `homelab.infra.edgeDns.extraRecords`.
+- CoreDNS generates private LAN and tailnet records from those declared proxy hosts; additional private overrides go under `homelab.infra.edgeDns.extraRecords`. Other `leolab.party` names resolve directly through Cloudflare (`1.1.1.1` / `1.0.0.1`), so public records are managed only in Cloudflare.
 - `homelab.apps.*` is reserved for subdomain-routed app modules; supporting platform services belong under `homelab.infra.*`.
 - Cloudflare DNS credentials for ACME are sourced through opnix using a secret file that contains `CF_DNS_API_TOKEN=...`.
 

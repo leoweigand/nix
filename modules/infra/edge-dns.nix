@@ -59,30 +59,72 @@ let
   lanZone = mkZone "lan" cfg.lanListenAddress cfg.lanAnswerAddress;
   tailnetZone = mkZone "tailnet" cfg.tailnetListenAddress cfg.tailnetAnswerAddress;
 
-  corefile = ''
-    .:53 {
-      bind ${cfg.lanListenAddress}
-      file /etc/edge-dns/lan.zone ${zone}
-      ${mkTransferBlock cfg.lanSecondaries}
-      forward . ${lib.concatStringsSep " " cfg.upstreamResolvers}
-      cache 300
-      log
-      errors
-    }
+  cloudflareResolvers = "1.1.1.1 1.0.0.1";
+  expressionList = values: "[${lib.concatMapStringsSep ", " (value: "'${value}'") values}]";
+  hasApexRecord = builtins.elem "@" edgeRecordNames || cfg.extraRecords ? "@";
 
-    ${zone}:53 {
-      bind ${cfg.tailnetListenAddress}
-      file /etc/edge-dns/tailnet.zone ${zone}
-      ${mkTransferBlock cfg.tailnetSecondaries}
-      log
-      errors
-    }
-  '';
+  # Keep connection records private, including HTTPS/SVCB address hints.
+  localApexTypes = [
+    "AXFR"
+    "IXFR"
+  ]
+  ++ lib.optionals hasApexRecord [
+    "A"
+    "AAAA"
+    "CNAME"
+    "HTTPS"
+    "SVCB"
+    "ANY"
+  ];
+
+  mkListener =
+    view: listenAddress: secondaries:
+    let
+      scope = if view == "lan" then "." else zone;
+      localApexExpression =
+        "type() in ${expressionList localApexTypes}"
+        + lib.optionalString (
+          secondaries != [ ]
+        ) " || (type() in ['SOA', 'NS'] && client_ip() in ${expressionList secondaries})";
+    in
+    ''
+      ${scope}:53 {
+        bind ${listenAddress}
+        # The local SOA makes the apex exist even without a record of the requested type.
+        # Route public apex records before file lookup, which would otherwise return NODATA.
+        view ${view}-public-apex {
+          expr name() == '${zone}.' && !(${localApexExpression})
+        }
+        forward . ${cloudflareResolvers}
+        cache 300
+        log
+        errors
+      }
+
+      ${scope}:53 {
+        bind ${listenAddress}
+        file /etc/edge-dns/${view}.zone ${zone} {
+          fallthrough
+        }
+        ${mkTransferBlock secondaries}
+        forward ${zone} ${cloudflareResolvers}
+        ${lib.optionalString (
+          view == "lan"
+        ) "forward . ${lib.concatStringsSep " " cfg.upstreamResolvers}"}
+        cache 300
+        log
+        errors
+      }
+    '';
+
+  corefile =
+    mkListener "lan" cfg.lanListenAddress cfg.lanSecondaries
+    + mkListener "tailnet" cfg.tailnetListenAddress cfg.tailnetSecondaries;
 in
 
 {
   options.homelab.infra.edgeDns = {
-    enable = lib.mkEnableOption "authoritative split DNS for the edge domain";
+    enable = lib.mkEnableOption "private split DNS with Cloudflare fallback for the edge domain";
 
     serial = lib.mkOption {
       type = lib.types.int;
@@ -136,7 +178,7 @@ in
 
     extraRecords = lib.mkOption {
       default = { };
-      description = "Explicit records that do not correspond to a reverse-proxy virtual host";
+      description = "Private DNS overrides that do not correspond to a reverse-proxy virtual host; public records remain in Cloudflare";
       type = lib.types.attrsOf (
         lib.types.submodule {
           options = {
@@ -169,7 +211,7 @@ in
         "1.1.1.1"
         "1.0.0.1"
       ];
-      description = "Recursive upstream resolvers used for non-local DNS lookups";
+      description = "Recursive resolvers for LAN queries outside the edge domain; public edge-domain records resolve directly through Cloudflare";
       example = [
         "9.9.9.9"
         "1.1.1.1"
@@ -210,7 +252,7 @@ in
     };
 
     systemd.services.edge-dns = {
-      description = "CoreDNS authoritative server for split DNS";
+      description = "CoreDNS split DNS with Cloudflare fallback";
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
       wantedBy = [ "multi-user.target" ];
