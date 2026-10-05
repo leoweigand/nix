@@ -277,7 +277,7 @@ in
             systemctl stop podman-pingvin.service
           fi
           test -s ${lib.escapeShellArg "${cfg.dataDir}/pingvin-share.db"}
-          rsync -a --delete ${lib.escapeShellArg "${cfg.dataDir}/"} ${lib.escapeShellArg "${cfg.backupDir}/"}
+          rsync -a --delete --chmod=D700,F600 --chown=root:root ${lib.escapeShellArg "${cfg.dataDir}/"} ${lib.escapeShellArg "${cfg.backupDir}/"}
           test "$(sqlite3 ${lib.escapeShellArg "${cfg.backupDir}/pingvin-share.db"} 'PRAGMA quick_check;')" = ok
         '';
       };
