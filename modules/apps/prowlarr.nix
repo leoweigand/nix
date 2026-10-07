@@ -27,6 +27,14 @@ in
       };
     };
 
+    # StateDirectory takes over ownership for DynamicUser. Tmpfiles must not
+    # reset the live bind mount to root:root on subsequent NixOS activations.
+    systemd.tmpfiles.settings."10-prowlarr".${config.services.prowlarr.dataDir}.d = {
+      mode = lib.mkForce ":0700";
+      user = lib.mkForce ":root";
+      group = lib.mkForce ":root";
+    };
+
     # Indexer access needs no library or download filesystem access.
     systemd.services.prowlarr.serviceConfig.InaccessiblePaths = [ config.homelab.mounts.media ];
 
