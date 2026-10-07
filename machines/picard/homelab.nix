@@ -437,6 +437,7 @@ in
 
     automation.seedboxCleanup = {
       enable = true;
+      apply = true;
       environmentReference = "op://Homelab/Seedbox Cleanup/env";
     };
     automation.mediaImportNotifications.enable = true;
