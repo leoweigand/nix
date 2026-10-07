@@ -64,8 +64,8 @@ in
     systemd.timers.seedbox-cleanup = {
       wantedBy = [ "timers.target" ];
       timerConfig = {
-        OnCalendar = "*-*-* 03:00:00"; # Daily at 3:00 AM
-        Persistent = true;
+        OnBootSec = "5min";
+        OnUnitInactiveSec = "15min";
       };
     };
   };

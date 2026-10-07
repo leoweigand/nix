@@ -44,9 +44,11 @@ const sidecars = new Set([
   ".ass",
   ".ssa",
   ".sfv",
+  ".srr", // ReScene archive metadata; the extracted video is checked separately.
 ]);
 
 type Json = Record<string, any>;
+export type CleanupTrigger = "ratio" | "seeding-time" | "either";
 
 interface SeedboxConfig {
   completedPath: string;
@@ -116,7 +118,7 @@ function duration(value: string): number {
   const parts = [...text.matchAll(pattern)];
   requireEvidence(
     parts.length > 0 &&
-      text.replace(pattern, "").trim().replaceAll(",", "") === "",
+      text.replace(pattern, "").replaceAll(",", "").trim() === "",
     "unknown tracker time format",
   );
   return parts.reduce(
@@ -142,6 +144,7 @@ export function trackerClearance(
   page: string,
   torrentId: string,
   minimum: number,
+  trigger?: CleanupTrigger,
 ): void {
   const table = page.match(
     /<table\b[^>]*id="profile-snatchListTable"[^>]*>(.*?)<\/table>/s,
@@ -164,7 +167,8 @@ export function trackerClearance(
     "HnR",
   ];
   requireEvidence(
-    headers.slice(0, 11).every((header, index) => header === expected[index]),
+    headers.length >= 11 &&
+      headers.slice(0, 11).every((header, index) => header === expected[index]),
     "tracker columns changed",
   );
   const found: string[][] = [];
@@ -198,7 +202,11 @@ export function trackerClearance(
     if (!(error instanceof Hold)) throw error;
   }
   requireEvidence(
-    seeded >= minimum * day || number(cells[5]) >= 1,
+    trigger === "ratio"
+      ? number(cells[5]) >= 1
+      : trigger === "seeding-time"
+      ? seeded >= minimum * day
+      : seeded >= minimum * day || number(cells[5]) >= 1,
     "tracker obligation not yet satisfied",
   );
 }
@@ -254,6 +262,7 @@ async function stableCopy(
   source: string,
   target: string,
   expectedSize: number,
+  verifiedCopies?: Record<string, string>,
 ): Promise<void> {
   const [beforeSource, beforeTarget] = await Promise.all([
     lstat(source),
@@ -267,6 +276,11 @@ async function stableCopy(
     beforeSource.size === expectedSize && beforeTarget.size === expectedSize,
     "file size differs from torrent",
   );
+  const cacheKey = JSON.stringify([source, target, expectedSize]);
+  const fingerprint = `${statFingerprint(beforeSource)}|${
+    statFingerprint(beforeTarget)
+  }`;
+  if (verifiedCopies?.[cacheKey] === fingerprint) return;
   requireEvidence(
     await digest(source) === await digest(target),
     "library bytes differ from download",
@@ -280,6 +294,7 @@ async function stableCopy(
       statFingerprint(beforeTarget) === statFingerprint(afterTarget),
     "file changed during verification",
   );
+  if (verifiedCopies) verifiedCopies[cacheKey] = fingerprint;
 }
 
 export async function importProof(
@@ -287,6 +302,7 @@ export async function importProof(
   history: Json[],
   app: string,
   mediaRoot = media,
+  verifiedCopies?: Record<string, string>,
 ): Promise<number> {
   const inbox = join(mediaRoot, "sources/seedbox/deluge", app);
   const library = join(mediaRoot, "library", app === "sonarr" ? "tv" : "films");
@@ -333,7 +349,7 @@ export async function importProof(
         "import receipt outside library",
       );
       const target = await safePath(library, imported.slice(prefix.length));
-      await stableCopy(path, target, entry.size);
+      await stableCopy(path, target, entry.size, verifiedCopies);
       count++;
     } else {
       requireEvidence(
@@ -350,7 +366,7 @@ export function torrentGate(
   torrent: Json,
   minimum: number,
   completedPath: string,
-): void {
+): CleanupTrigger {
   requireEvidence(
     ["sonarr", "radarr"].includes(torrent.label),
     "unmanaged label",
@@ -384,20 +400,32 @@ export function torrentGate(
       ),
     "selective download",
   );
-  requireEvidence(
-    torrent.seeding_time >= (minimum + 1) * day,
-    "minimum seeding time plus margin not reached",
-  );
   const hosts = (torrent.trackers as Json[] | undefined)?.map((entry) =>
     new URL(entry.url).hostname
   );
   requireEvidence(
     hosts?.length &&
       hosts.every((host) =>
-        ["tracker.torrentleech.org", "tracker.torrentleech.cc"].includes(host)
+        [
+          "tracker.torrentleech.org",
+          "tracker.torrentleech.cc",
+          "tracker.tleechreload.org",
+        ].includes(host)
       ),
     "unknown or mixed tracker policy",
   );
+  const ratioReached = Number.isFinite(torrent.ratio) && torrent.ratio >= 1;
+  const timeReached = Number.isFinite(torrent.seeding_time) &&
+    torrent.seeding_time >= (minimum + 1) * day;
+  requireEvidence(
+    ratioReached || timeReached,
+    "neither minimum ratio nor seeding time plus margin reached",
+  );
+  return ratioReached && timeReached
+    ? "either"
+    : ratioReached
+    ? "ratio"
+    : "seeding-time";
 }
 
 export function trackerId(history: Json[]): string {
@@ -534,6 +562,7 @@ class Deluge {
       "progress",
       "state",
       "seeding_time",
+      "ratio",
       "trackers",
     ];
     return await this.call("core.get_torrents_status", [{}, fields]);
@@ -619,6 +648,19 @@ async function writeJson(path: string, data: unknown): Promise<void> {
   await Deno.rename(temporary, path);
 }
 
+// Checks run every fifteen minutes; a gap of an hour resets the proof window.
+export function eligibility(
+  previous: Json | undefined,
+  manifest: string,
+  now: number,
+): Json {
+  const continuous = previous?.manifest === manifest &&
+    Number.isFinite(previous.since) && Number.isFinite(previous.lastSeen) &&
+    previous.since <= previous.lastSeen && previous.lastSeen <= now &&
+    now - previous.lastSeen < 3600;
+  return { since: continuous ? previous.since : now, lastSeen: now, manifest };
+}
+
 export async function run(
   apply: boolean,
   stateDirectory: string,
@@ -655,6 +697,7 @@ export async function run(
   const report: Json = {
     checkedAt: Math.floor(Date.now() / 1000),
     apply,
+    complete: false,
     accountClass,
     overallRatio: ratio,
     torrents: {},
@@ -667,11 +710,18 @@ export async function run(
   } catch (error) {
     if (!(error instanceof Deno.errors.NotFound)) throw error;
   }
+  const copyCachePath = join(stateDirectory, "verified-copies.json");
+  let verifiedCopies: Record<string, string> = {};
+  try {
+    verifiedCopies = JSON.parse(await Deno.readTextFile(copyCachePath));
+  } catch (error) {
+    if (!(error instanceof Deno.errors.NotFound)) throw error;
+  }
   const eligible: Json = {};
   let snatches: string | undefined;
   for (const [infohash, torrent] of Object.entries(torrents)) {
     try {
-      torrentGate(torrent, minimum, seedbox.completedPath);
+      const trigger = torrentGate(torrent, minimum, seedbox.completedPath);
       const files = filePaths(torrent);
       for (const [otherHash, other] of Object.entries(torrents)) {
         if (otherHash !== infohash) {
@@ -686,20 +736,20 @@ export async function run(
       );
       const torrentIdentifier = trackerId(history);
       snatches ??= await trackerClient.page("snatchlist");
-      trackerClearance(snatches, torrentIdentifier, minimum);
-      const count = await importProof(torrent, history, torrent.label);
+      trackerClearance(snatches, torrentIdentifier, minimum, trigger);
+      // Cache immutable copies between checks; deletion below always rehashes.
+      const count = await importProof(
+        torrent,
+        history,
+        torrent.label,
+        media,
+        verifiedCopies,
+      );
       const manifest = createHash("sha256").update(
         JSON.stringify(torrent.files),
       ).digest("hex");
-      const old = previous[infohash] ?? {};
       const now = Date.now() / 1000;
-      const continuous = old.manifest === manifest &&
-        now - (old.lastSeen ?? 0) < 3600;
-      eligible[infohash] = {
-        since: continuous ? old.since : now,
-        lastSeen: now,
-        manifest,
-      };
+      eligible[infohash] = eligibility(previous[infohash], manifest, now);
       requireEvidence(
         now - eligible[infohash].since >= 3600,
         "eligibility must remain proven for one hour",
@@ -707,7 +757,11 @@ export async function run(
       if (apply) {
         const fresh = await deluge.torrents();
         requireEvidence(infohash in fresh, "torrent disappeared");
-        torrentGate(fresh[infohash], minimum, seedbox.completedPath);
+        const freshTrigger = torrentGate(
+          fresh[infohash],
+          minimum,
+          seedbox.completedPath,
+        );
         requireEvidence(
           JSON.stringify(fresh[infohash].files) ===
             JSON.stringify(torrent.files),
@@ -732,6 +786,7 @@ export async function run(
           await trackerClient.page("snatchlist"),
           torrentIdentifier,
           minimum,
+          freshTrigger,
         );
         await importProof(
           fresh[infohash],
@@ -749,6 +804,7 @@ export async function run(
       report.torrents[infohash] = {
         status: apply ? "removed" : "eligible-dry-run",
         verifiedMediaFiles: count,
+        trigger,
       };
     } catch (error) {
       report.torrents[infohash] = {
@@ -760,8 +816,12 @@ export async function run(
           : "unknown error",
       };
     }
+    // Large batches can exceed the service deadline; keep each completed check.
+    await writeJson(copyCachePath, verifiedCopies);
+    await writeJson(statePath, eligible);
+    await writeJson(join(stateDirectory, "report.json"), report);
   }
-  await writeJson(statePath, eligible);
+  report.complete = true;
   await writeJson(join(stateDirectory, "report.json"), report);
   console.log(JSON.stringify(report));
 }

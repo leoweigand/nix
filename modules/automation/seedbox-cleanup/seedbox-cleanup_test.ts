@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import {
+  eligibility,
   Hold,
   importProof,
   safePath,
@@ -22,6 +23,7 @@ function torrent() {
     progress: 100,
     save_path: `${completedPath}/sonarr`,
     seeding_time: 7 * day,
+    ratio: 0.4,
     files: [{ path: "Season/one.mkv", size: 4 }, {
       path: "Season/two.mkv",
       size: 4,
@@ -71,10 +73,86 @@ function table(
   }</tr><tr>${cells.map((cell) => `<td>${cell}</td>`).join("")}</tr></table>`;
 }
 
-Deno.test("seven active days, not six or a high ratio, are required", () => {
-  torrentGate(torrent(), 6, completedPath);
-  const partial = { ...torrent(), seeding_time: 7 * day - 1, ratio: 100 };
-  assert.throws(() => torrentGate(partial, 6, completedPath), Hold);
+Deno.test("time and ratio are independent cleanup triggers", () => {
+  assert.equal(torrentGate(torrent(), 6, completedPath), "seeding-time");
+  assert.equal(
+    torrentGate({ ...torrent(), seeding_time: 0, ratio: 1 }, 6, completedPath),
+    "ratio",
+  );
+  assert.equal(
+    torrentGate({ ...torrent(), ratio: 1 }, 6, completedPath),
+    "either",
+  );
+  for (const ratio of [0.999, undefined, NaN, Infinity]) {
+    assert.throws(
+      () =>
+        torrentGate(
+          { ...torrent(), seeding_time: 7 * day - 1, ratio },
+          6,
+          completedPath,
+        ),
+      Hold,
+    );
+  }
+  for (const minimum of [4, 6, 7, 8, 10]) {
+    assert.equal(
+      torrentGate(
+        { ...torrent(), seeding_time: (minimum + 1) * day },
+        minimum,
+        completedPath,
+      ),
+      "seeding-time",
+    );
+    assert.throws(
+      () =>
+        torrentGate(
+          { ...torrent(), seeding_time: (minimum + 1) * day - 1 },
+          minimum,
+          completedPath,
+        ),
+      Hold,
+    );
+  }
+});
+
+Deno.test("TorrentLeech's alternate announce host is accepted without permitting mixed trackers", () => {
+  torrentGate(
+    {
+      ...torrent(),
+      trackers: [...torrent().trackers, {
+        url: "https://tracker.tleechreload.org/example/announce",
+      }],
+    },
+    6,
+    completedPath,
+  );
+  assert.throws(
+    () =>
+      torrentGate(
+        {
+          ...torrent(),
+          ratio: 100,
+          trackers: [...torrent().trackers, {
+            url: "https://evil.example/announce",
+          }],
+        },
+        6,
+        completedPath,
+      ),
+    Hold,
+  );
+});
+
+Deno.test("quarter-hour checks accumulate an hour of unchanged evidence", () => {
+  let proof = eligibility(undefined, "manifest", 10000);
+  for (const now of [10900, 11800, 12700, 13600]) {
+    proof = eligibility(proof, "manifest", now);
+    assert.equal(proof.since, 10000);
+  }
+  assert.equal(proof.lastSeen - proof.since, 3600);
+  assert.equal(eligibility(proof, "changed", 14500).since, 14500);
+  assert.equal(eligibility(proof, "manifest", 17200).since, 17200);
+  assert.equal(eligibility(proof, "manifest", 10000).since, 10000);
 });
 
 Deno.test("partial, paused, unknown tracker, and wrong-path torrents are retained", () => {
@@ -90,7 +168,8 @@ Deno.test("partial, paused, unknown tracker, and wrong-path torrents are retaine
     ]
   ) {
     assert.throws(
-      () => torrentGate({ ...torrent(), ...delta }, 6, completedPath),
+      () =>
+        torrentGate({ ...torrent(), ratio: 100, ...delta }, 6, completedPath),
       Hold,
     );
   }
@@ -99,6 +178,23 @@ Deno.test("partial, paused, unknown tracker, and wrong-path torrents are retaine
 Deno.test("tracker clearance requires known time or ratio evidence", () => {
   trackerClearance(table(), "123", 6);
   trackerClearance(table("1.1", "0 days"), "123", 6);
+  trackerClearance(table("1", "0 days"), "123", 6, "ratio");
+  trackerClearance(table("0.4", "6 days"), "123", 6, "either");
+  trackerClearance(table("1", "0 days"), "123", 6, "either");
+  trackerClearance(
+    table("0.4", "6 days, 21 hrs, 18 secs"),
+    "123",
+    6,
+    "seeding-time",
+  );
+  assert.throws(
+    () => trackerClearance(table("0.4", "6 days"), "123", 6, "ratio"),
+    Hold,
+  );
+  assert.throws(
+    () => trackerClearance(table("1", "5 days"), "123", 6, "seeding-time"),
+    Hold,
+  );
   for (
     const page of [
       table("0.4", "5 days"),
@@ -166,19 +262,38 @@ Deno.test("every media file must be imported with matching bytes", async () => {
         },
       });
     }
-    assert.equal(await importProof(torrent(), history, "sonarr", root), 2);
+    await Deno.writeTextFile(join(inbox, "release.srr"), "meta");
+    const withMetadata = {
+      ...torrent(),
+      files: [...torrent().files, { path: "Season/release.srr", size: 4 }],
+    };
+    const verifiedCopies: Record<string, string> = {};
+    assert.equal(
+      await importProof(withMetadata, history, "sonarr", root, verifiedCopies),
+      2,
+    );
+    assert.equal(Object.keys(verifiedCopies).length, 2);
+    assert.equal(
+      await importProof(withMetadata, history, "sonarr", root, verifiedCopies),
+      2,
+    );
     await assert.rejects(
-      () => importProof(torrent(), history.slice(0, 1), "sonarr", root),
+      () => importProof(withMetadata, history.slice(0, 1), "sonarr", root),
       Hold,
     );
+    await new Promise((resolve) => setTimeout(resolve, 10));
     await Deno.writeTextFile(join(library, "two.mkv"), "evil");
     await assert.rejects(
-      () => importProof(torrent(), history, "sonarr", root),
+      () => importProof(withMetadata, history, "sonarr", root, verifiedCopies),
+      Hold,
+    );
+    await assert.rejects(
+      () => importProof(withMetadata, history, "sonarr", root),
       Hold,
     );
     await Deno.remove(join(library, "two.mkv"));
     await assert.rejects(
-      () => importProof(torrent(), history, "sonarr", root),
+      () => importProof(withMetadata, history, "sonarr", root),
       Hold,
     );
   } finally {
