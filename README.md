@@ -166,6 +166,13 @@ Sonarr, Radarr, Prowlarr, Seerr, and Syncthing run natively on Picard. Their app
 
 `seedbox-cleanup` checks tracker obligations and library-import evidence every fifteen minutes after the preceding run. It removes managed torrents after the account class's required seed time plus one day, or after reaching a per-torrent ratio of 1.0, with matching tracker confirmation. Eligibility must persist for an hour, and library copies are verified again before removal. The module defaults to dry-run; Picard sets `homelab.automation.seedboxCleanup.apply = true`. Its connection details come from opnix, and its local media mounts are read-only. The operational layout and validation stage are documented in the private homelab repository's `services/media-automation/README.md`.
 
+With `homelab.automation.mediaArchiveExtraction.enable`, native Unpackerr polls
+the enabled Arr apps for completed archive downloads and waits for Syncthing
+transfers before extraction. It sees only the writable download inboxes and
+removes its extracted copies five minutes after import, retaining original
+archives. Arr keys are loaded from existing configuration via systemd credentials
+at startup; no secrets enter the Nix store. Picard enables this service.
+
 ### Pingvin Share X service module
 
 `modules/apps/pingvin.nix` provides `homelab.apps.pingvin`. Picard enables it at

@@ -435,6 +435,8 @@ in
 
     };
 
+    automation.mediaArchiveExtraction.enable = true;
+
     automation.seedboxCleanup = {
       enable = true;
       apply = true;
