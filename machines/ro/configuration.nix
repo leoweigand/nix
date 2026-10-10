@@ -26,7 +26,6 @@
       "ghostty"
       "macwhisper"
       "obsidian"
-      "raycast"
       "tailscale-app"
       "zed"
     ];

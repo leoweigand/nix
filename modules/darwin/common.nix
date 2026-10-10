@@ -53,7 +53,15 @@ in
 
   users.users.leo.home = "/Users/leo";
 
+  homebrew.taps = [
+    {
+      name = "abue-ammar/tinycast";
+      trusted = true;
+    }
+  ];
+
   homebrew.casks = [
+    "abue-ammar/tinycast/tinycast"
     "keepingyouawake"
   ];
 
