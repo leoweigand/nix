@@ -63,18 +63,24 @@
       upgrade = true;
       cleanup = "zap";
     };
+    taps = [
+      {
+        name = "abue-ammar/tinycast";
+        trusted = true;
+      }
+    ];
     brews = [
       "awscli"
       "cocoapods"
       "nvm"
     ];
     casks = [
+      "abue-ammar/tinycast/tinycast"
       "codex"
       "ghostty"
       "google-drive"
       "macwhisper"
       "obsidian"
-      "raycast"
       "tailscale-app"
       "zed"
     ];
