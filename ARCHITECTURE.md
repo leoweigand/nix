@@ -25,7 +25,7 @@ The separate publication module, `modules/infra/cloudflare-publication.nix`, der
 ### Reverse Proxy (Caddy on picard)
 - **Port**: `:443` for all HTTPS traffic (local or over Tailscale).
 - **TLS**: Wildcard certificate for `*.leolab.party`, renewed via DNS-01 so the proxy can answer securely on both networks.
-- **Routing**: Caddy proxies each subdomain to its backend service. Most run on Picard; Hermes runs on the separate Ubuntu VM Dax.
+- **Routing**: Caddy proxies each subdomain to its backend service on Picard.
 - **Module ownership**: `modules/infra/reverse-proxy.nix` owns ACME + Caddy defaults, while each app module contributes its own virtual host.
 - **LAN reachability**: Firewall policy keeps DNS (`53/tcp`, `53/udp`) and edge HTTP(S) (`80/tcp`, `443/tcp`) open so local clients can resolve and reach services through the proxy.
 
@@ -37,13 +37,6 @@ The separate publication module, `modules/infra/cloudflare-publication.nix`, der
 ### Service Isolation
 - Backend services bind to localhost and only accept traffic that originates from the reverse proxy.
 - Firewalls prevent unintended exposure so the only reachable endpoint is Caddy's TLS listener.
-
-### Hermes on Dax
-
-- Hermes runs as a normal Ubuntu installation on Dax, with administrative control confined to that VM. It has no host filesystem shares.
-- Laforge's persistent libvirt network filter restricts Dax's private-network access and blocks IPv6. The private homelab repository owns that filter and the Ubuntu service definitions.
-- `machines/picard/hermes-remote.nix` retains dashboard routing to Dax port 9119, protected by OAuth2 Proxy and Pocket ID, and a Home Assistant-only TLS listener on port 8444, permitted only from Dax. The existing Telegram webhook route forwards to Dax port 8443.
-- Before the daily appdata backup, Picard pulls a consistent Hermes archive using a forced-command SSH key. Dax briefly stops its Hermes services for the export. Backup credentials remain on Picard.
 
 ## Home Assistant
 - Home Assistant runs in a Podman container on picard (`modules/apps/homeassistant.nix`), while MQTT runs as a native NixOS service (`modules/infra/mqtt.nix`).
