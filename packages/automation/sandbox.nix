@@ -6,6 +6,9 @@ landrun.overrideAttrs (old: {
     # These scripts use no pathname UNIX sockets; upstream's ABI 9 right would
     # otherwise make the sandbox fail on Linux 6.18. Do not use best-effort mode.
     substituteInPlace internal/sandbox/sandbox.go \
-      --replace-fail $'syscall.AccessFSIoctlDev |\n\t\tsyscall.AccessFSResolveUnix' 'syscall.AccessFSIoctlDev'
+      --replace-fail $'syscall.AccessFSIoctlDev |\n\t\tsyscall.AccessFSResolveUnix'  'syscall.AccessFSIoctlDev'
+    # The ABI 9 UNIX-socket option deliberately remains unavailable in this build.
+    substituteInPlace test.sh \
+      --replace-fail 'run_test "UNIX socket path allowed with --unix"' 'false && run_test "UNIX socket path allowed with --unix"'
   '';
 })
