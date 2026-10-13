@@ -43,13 +43,6 @@ in
         enable = true;
         acmeEmail = "admin@leolab.party";
         cloudflareCredentialsReference = "op://Homelab/Cloudflare/CLOUFLARE_ACCESS_TOKEN";
-        webhookRoutes = [
-          {
-            path = "/hermes-telegram";
-            rewrite = "/hermes-telegram";
-            upstream = "http://192.168.2.135:8443";
-          }
-        ];
       };
 
       homepage = {
@@ -108,7 +101,7 @@ in
 
       edgeDns = {
         enable = true;
-        serial = 2026100601; # Bump whenever DNS names or values change
+        serial = 2026101301; # Bump whenever DNS names or values change
         lanListenAddress = "192.168.2.4";
         lanAnswerAddress = "192.168.2.4";
         tailnetListenAddress = "100.104.119.103";
