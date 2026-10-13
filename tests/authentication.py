@@ -286,7 +286,13 @@ with tempfile.TemporaryDirectory() as temp:
     finally:
         stop(caddy)
 
-    assert len([message for message in fixture["assertionFailures"] if "Protected edge route" in message]) >= 8
+    assert {"notes", "prowlarr"} <= set(fixture["protectedRoutes"])
+    expected_denials = {
+        f"Protected edge route {name} requires its oauth2-proxy authentication gateway to be enabled"
+        for name in fixture["protectedRoutes"]
+    }
+    actual_denials = {message for message in fixture["assertionFailures"] if "Protected edge route" in message}
+    assert actual_denials == expected_denials, (actual_denials, expected_denials)
     print("Caddy: denials, outages, bypass boundaries, cookies, user headers and POST bodies passed", flush=True)
 
     idp = serve(IdP)

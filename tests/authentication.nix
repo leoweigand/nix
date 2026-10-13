@@ -35,6 +35,14 @@ let
       backupScript = cfg.systemd.services.pocket-id-backup.serviceConfig.ExecStart;
       dataDir = cfg.homelab.infra.pocketId.dataDir;
       backupDir = cfg.homelab.infra.pocketId.backupDir;
+      protectedRoutes = builtins.attrNames (
+        lib.filterAttrs (_: proxy: if builtins.isBool proxy.auth then proxy.auth else true) (
+          unavailable.config.homelab.infra.edge.proxies
+          // lib.optionalAttrs (unavailable.config.homelab.infra.edge.rootProxy != null) {
+            "<root>" = unavailable.config.homelab.infra.edge.rootProxy;
+          }
+        )
+      );
       assertionFailures = map (a: a.message) (lib.filter (a: !a.assertion) unavailable.config.assertions);
     }
   );
