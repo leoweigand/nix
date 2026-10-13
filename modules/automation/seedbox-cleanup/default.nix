@@ -1,7 +1,36 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.homelab.automation.seedboxCleanup;
+  launcher = pkgs.callPackage ../../../packages/automation/launcher.nix { } {
+    name = "seedbox-cleanup";
+    script = "modules/automation/seedbox-cleanup/seedbox-cleanup.ts";
+    connectPorts = [
+      443
+      7878
+      8989
+    ];
+    environmentNames = [
+      "SEEDBOX_DELUGE_URL"
+      "SEEDBOX_COMPLETED_PATH"
+    ];
+    readPaths = [
+      "${config.homelab.mounts.fast}/appdata/sonarr/config.xml"
+      "${config.homelab.mounts.fast}/appdata/radarr/config.xml"
+      "${config.homelab.mounts.fast}/appdata/prowlarr"
+      "${config.homelab.mounts.media}/library/tv"
+      "${config.homelab.mounts.media}/library/films"
+      "${config.homelab.mounts.media}/sources/seedbox/deluge/sonarr"
+      "${config.homelab.mounts.media}/sources/seedbox/deluge/radarr"
+      config.services.onepassword-secrets.secretPaths.seedboxDelugePassword
+    ];
+    writePaths = [ "/var/lib/seedbox-cleanup" ];
+  };
 in
 {
   options.homelab.automation.seedboxCleanup = {
@@ -21,10 +50,12 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    assertions = [{
-      assertion = cfg.environmentReference != "";
-      message = "homelab.automation.seedboxCleanup.environmentReference must be set when cleanup is enabled";
-    }];
+    assertions = [
+      {
+        assertion = cfg.environmentReference != "";
+        message = "homelab.automation.seedboxCleanup.environmentReference must be set when cleanup is enabled";
+      }
+    ];
 
     services.onepassword-secrets.secrets.seedboxDelugePassword = {
       reference = "op://Homelab/Deluge/password";
@@ -37,18 +68,26 @@ in
     };
     systemd.services.seedbox-cleanup = {
       description = "Verify tracker obligations and library copies before SeedHost cleanup";
-      after = [ "network-online.target" "sonarr.service" "radarr.service" "prowlarr.service" "opnix-secrets.service" ];
+      after = [
+        "network-online.target"
+        "sonarr.service"
+        "radarr.service"
+        "prowlarr.service"
+        "opnix-secrets.service"
+      ];
       requires = [ "opnix-secrets.service" ];
       wants = [ "network-online.target" ];
-      unitConfig.RequiresMountsFor = [ config.homelab.mounts.media config.homelab.mounts.fast ];
+      unitConfig.RequiresMountsFor = [
+        config.homelab.mounts.media
+        config.homelab.mounts.fast
+      ];
       serviceConfig = {
         Type = "oneshot";
-        ExecStart = "${pkgs.deno}/bin/deno run --no-prompt --no-check --frozen --config=${../../../deno.json} --lock=${../../../deno.lock} --allow-env=SEEDBOX_DELUGE_URL,SEEDBOX_COMPLETED_PATH --allow-read=${config.homelab.mounts.media},${config.homelab.mounts.fast},${config.services.onepassword-secrets.secretPaths.seedboxDelugePassword},/var/lib/seedbox-cleanup --allow-write=/var/lib/seedbox-cleanup --allow-net=127.0.0.1:7878,127.0.0.1:8989,tiny.seedhost.eu:443,www.torrentleech.org:443 ${./seedbox-cleanup.ts} --deluge-password-file ${config.services.onepassword-secrets.secretPaths.seedboxDelugePassword}${lib.optionalString cfg.apply " --apply"}";
+        ExecStart = "${launcher}/bin/seedbox-cleanup --deluge-password-file ${config.services.onepassword-secrets.secretPaths.seedboxDelugePassword}${lib.optionalString cfg.apply " --apply"}";
         EnvironmentFile = config.services.onepassword-secrets.secretPaths.seedboxCleanupEnv;
         StateDirectory = "seedbox-cleanup";
         StateDirectoryMode = "0700";
         UMask = "0077";
-        Environment = "DENO_DIR=/var/lib/seedbox-cleanup/deno";
         TimeoutStartSec = "45min";
         Nice = 10;
         IOSchedulingClass = "idle";
@@ -58,7 +97,10 @@ in
         NoNewPrivileges = true;
         RestrictSUIDSGID = true;
         # Deletion is a remote Deluge API call. Local library files are read-only.
-        ReadOnlyPaths = [ config.homelab.mounts.media config.homelab.mounts.fast ];
+        ReadOnlyPaths = [
+          config.homelab.mounts.media
+          config.homelab.mounts.fast
+        ];
       };
     };
     systemd.timers.seedbox-cleanup = {

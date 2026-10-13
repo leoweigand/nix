@@ -1,3 +1,4 @@
+import { test } from "node:test";
 import { notificationMessage } from "./media-import-notifications.ts";
 
 function equal(actual: unknown, expected: unknown): void {
@@ -6,7 +7,7 @@ function equal(actual: unknown, expected: unknown): void {
   }
 }
 
-Deno.test("formats a newly imported Radarr movie", () => {
+test("formats a newly imported Radarr movie", () => {
   equal(
     notificationMessage({
       radarr_eventtype: "Download",
@@ -16,7 +17,7 @@ Deno.test("formats a newly imported Radarr movie", () => {
   );
 });
 
-Deno.test("ignores Radarr test and upgrade events", () => {
+test("ignores Radarr test and upgrade events", () => {
   equal(notificationMessage({ radarr_eventtype: "Test" }), undefined);
   equal(
     notificationMessage({
@@ -27,7 +28,7 @@ Deno.test("ignores Radarr test and upgrade events", () => {
   );
 });
 
-Deno.test("formats a Sonarr import completion", () => {
+test("formats a Sonarr import completion", () => {
   equal(
     notificationMessage({
       sonarr_eventtype: "Download",
@@ -39,7 +40,7 @@ Deno.test("formats a Sonarr import completion", () => {
   );
 });
 
-Deno.test("accepts the environment-variable casing in Arr source", () => {
+test("accepts the environment-variable casing in Arr source", () => {
   equal(
     notificationMessage({
       Radarr_EventType: "Download",

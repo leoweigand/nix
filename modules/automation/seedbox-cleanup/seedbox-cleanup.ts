@@ -1,14 +1,31 @@
-/** Conservative Deluge cleanup. Missing evidence always retains the torrent.
- *
- * Only torrents grabbed by Arr and fully copied into its library are managed.
- * Tracker HTML is a read-only input, never a source of commands or URLs to follow.
- */
-
+import { restrictedFetch } from "../../runtime/network.ts";
+import { createReadStream, readFileSync, type Stats } from "node:fs";
+import {
+  lstat as nodeLstat,
+  mkdir,
+  readFile,
+  rename,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { CookieJar, wrapFetch } from "@jd1378/another-cookiejar";
 import { isElement, isText, parse } from "@std/xml";
 import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { dirname, isAbsolute, join, posix, relative, resolve } from "node:path";
+
+const automationFetch = restrictedFetch([
+  "http://127.0.0.1:7878",
+  "http://127.0.0.1:8989",
+  "https://tiny.seedhost.eu",
+  "https://www.torrentleech.org",
+]);
+
+/** Conservative Deluge cleanup. Missing evidence always retains the torrent.
+ *
+ * Only torrents grabbed by Arr and fully copied into its library are managed.
+ * Tracker HTML is a read-only input, never a source of commands or URLs to follow.
+ */
 
 const day = 86_400;
 const appdata = "/mnt/fast/appdata";
@@ -65,7 +82,7 @@ function requireEvidence(
 }
 
 function requiredEnvironment(name: string): string {
-  const value = Deno.env.get(name)?.trim();
+  const value = process.env[name]?.trim();
   requireEvidence(value, `${name} must be set`);
   return value;
 }
@@ -88,17 +105,21 @@ export function loadSeedboxConfig(): SeedboxConfig {
 }
 
 function plain(value: string): string {
-  return value.replace(/<[^>]*>/g, " ").replace(
-    /&(?:amp|lt|gt|quot|#39);/g,
-    (entity) =>
-      ({
-        "&amp;": "&",
-        "&lt;": "<",
-        "&gt;": ">",
-        "&quot;": '"',
-        "&#39;": "'",
-      })[entity]!,
-  ).replace(/\s+/g, " ").trim();
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(
+      /&(?:amp|lt|gt|quot|#39);/g,
+      (entity) =>
+        ({
+          "&amp;": "&",
+          "&lt;": "<",
+          "&gt;": ">",
+          "&quot;": '"',
+          "&#39;": "'",
+        })[entity]!,
+    )
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function number(value: string): number {
@@ -150,9 +171,9 @@ export function trackerClearance(
     /<table\b[^>]*id="profile-snatchListTable"[^>]*>(.*?)<\/table>/s,
   );
   requireEvidence(table, "tracker snatchlist format changed");
-  const headers = [...table[1].matchAll(/<th\b[^>]*>(.*?)<\/th>/gs)].map((
-    match,
-  ) => plain(match[1]));
+  const headers = [...table[1].matchAll(/<th\b[^>]*>(.*?)<\/th>/gs)].map(
+    (match) => plain(match[1]),
+  );
   const expected = [
     "Name",
     "Size",
@@ -180,8 +201,8 @@ export function trackerClearance(
     ].map((match) => match[1]);
     if (ids.includes(String(torrentId))) {
       found.push(
-        [...row[1].matchAll(/<td\b[^>]*>(.*?)<\/td>/gs)].map((match) =>
-          match[1]
+        [...row[1].matchAll(/<td\b[^>]*>(.*?)<\/td>/gs)].map(
+          (match) => match[1],
         ),
       );
     }
@@ -205,17 +226,17 @@ export function trackerClearance(
     trigger === "ratio"
       ? number(cells[5]) >= 1
       : trigger === "seeding-time"
-      ? seeded >= minimum * day
-      : seeded >= minimum * day || number(cells[5]) >= 1,
+        ? seeded >= minimum * day
+        : seeded >= minimum * day || number(cells[5]) >= 1,
     "tracker obligation not yet satisfied",
   );
 }
 
-async function lstat(path: string): Promise<Deno.FileInfo | undefined> {
+async function lstat(path: string): Promise<Stats | undefined> {
   try {
-    return await Deno.lstat(path);
+    return await nodeLstat(path);
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return undefined;
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
     throw error;
   }
 }
@@ -223,8 +244,10 @@ async function lstat(path: string): Promise<Deno.FileInfo | undefined> {
 export async function safePath(root: string, input: string): Promise<string> {
   const relativePath = posix.normalize(input);
   requireEvidence(
-    !posix.isAbsolute(input) && relativePath !== "." &&
-      !relativePath.startsWith("../") && !relativePath.includes("/../"),
+    !posix.isAbsolute(input) &&
+      relativePath !== "." &&
+      !relativePath.startsWith("../") &&
+      !relativePath.includes("/../"),
     "unsafe payload path",
   );
   const path = join(root, ...relativePath.split("/"));
@@ -239,23 +262,27 @@ export async function safePath(root: string, input: string): Promise<string> {
     current = dirname(current)
   ) {
     const info = await lstat(current);
-    requireEvidence(!info?.isSymlink, "symlink in payload/library path");
+    requireEvidence(!info?.isSymbolicLink(), "symlink in payload/library path");
     if (current === root) break;
   }
   return path;
 }
 
 async function digest(path: string): Promise<string> {
-  const file = await Deno.open(path, { read: true });
+  const file = createReadStream(path);
   const hash = createHash("sha256");
-  // Async iteration closes the file when its readable stream is exhausted.
-  for await (const chunk of file.readable) hash.update(chunk);
+  // Async iteration closes the stream, including when hashing fails.
+  for await (const chunk of file) hash.update(chunk);
   return hash.digest("hex");
 }
 
-function statFingerprint(info: Deno.FileInfo): string {
-  return [info.ino, info.size, info.mtime?.getTime(), info.ctime?.getTime()]
-    .join(":");
+function statFingerprint(info: Stats): string {
+  return [
+    info.ino,
+    info.size,
+    info.mtime?.getTime(),
+    info.ctime?.getTime(),
+  ].join(":");
 }
 
 async function stableCopy(
@@ -269,7 +296,10 @@ async function stableCopy(
     lstat(target),
   ]);
   requireEvidence(
-    beforeSource?.isFile && beforeTarget?.isFile,
+    beforeSource !== undefined &&
+      beforeTarget !== undefined &&
+      beforeSource.isFile() &&
+      beforeTarget.isFile(),
     "imported file or mirror missing",
   );
   requireEvidence(
@@ -277,17 +307,17 @@ async function stableCopy(
     "file size differs from torrent",
   );
   const cacheKey = JSON.stringify([source, target, expectedSize]);
-  const fingerprint = `${statFingerprint(beforeSource)}|${
-    statFingerprint(beforeTarget)
-  }`;
+  const fingerprint = `${statFingerprint(beforeSource)}|${statFingerprint(
+    beforeTarget,
+  )}`;
   if (verifiedCopies?.[cacheKey] === fingerprint) return;
   requireEvidence(
-    await digest(source) === await digest(target),
+    (await digest(source)) === (await digest(target)),
     "library bytes differ from download",
   );
   const [afterSource, afterTarget] = await Promise.all([
-    Deno.stat(source),
-    Deno.stat(target),
+    stat(source),
+    stat(target),
   ]);
   requireEvidence(
     statFingerprint(beforeSource) === statFingerprint(afterSource) &&
@@ -331,13 +361,13 @@ export async function importProof(
       ? `.${filename.split(".").at(-1)!.toLowerCase()}`
       : "";
     const stem = filename.replace(/\.[^.]+$/, "");
-    const sample = parts.slice(0, -1).some((part) =>
-      part.toLowerCase() === "sample"
-    ) || /(^|[._ -])sample([._ -]|$)/i.test(stem);
+    const sample =
+      parts.slice(0, -1).some((part) => part.toLowerCase() === "sample") ||
+      /(^|[._ -])sample([._ -]|$)/i.test(stem);
     if (video.has(suffix) && !sample) {
       const candidates =
         imports.get(`/media/sources/seedbox/deluge/${app}/${entry.path}`) ??
-          new Set();
+        new Set();
       requireEvidence(
         candidates.size === 1 && !candidates.has(undefined),
         "missing or ambiguous media import receipt",
@@ -373,7 +403,8 @@ export function torrentGate(
   );
   requireEvidence(torrent.private === true, "not a private tracker torrent");
   requireEvidence(
-    torrent.state === "Seeding" && torrent.is_finished === true &&
+    torrent.state === "Seeding" &&
+      torrent.is_finished === true &&
       torrent.progress === 100,
     "not fully seeding",
   );
@@ -395,13 +426,13 @@ export function torrentGate(
   requireEvidence(
     Array.isArray(torrent.file_priorities) &&
       torrent.file_priorities.length === torrent.files.length &&
-      torrent.file_priorities.every((value: unknown) =>
-        typeof value === "number" && value > 0
+      torrent.file_priorities.every(
+        (value: unknown) => typeof value === "number" && value > 0,
       ),
     "selective download",
   );
-  const hosts = (torrent.trackers as Json[] | undefined)?.map((entry) =>
-    new URL(entry.url).hostname
+  const hosts = (torrent.trackers as Json[] | undefined)?.map(
+    (entry) => new URL(entry.url).hostname,
   );
   requireEvidence(
     hosts?.length &&
@@ -410,12 +441,13 @@ export function torrentGate(
           "tracker.torrentleech.org",
           "tracker.torrentleech.cc",
           "tracker.tleechreload.org",
-        ].includes(host)
+        ].includes(host),
       ),
     "unknown or mixed tracker policy",
   );
   const ratioReached = Number.isFinite(torrent.ratio) && torrent.ratio >= 1;
-  const timeReached = Number.isFinite(torrent.seeding_time) &&
+  const timeReached =
+    Number.isFinite(torrent.seeding_time) &&
     torrent.seeding_time >= (minimum + 1) * day;
   requireEvidence(
     ratioReached || timeReached,
@@ -424,8 +456,8 @@ export function torrentGate(
   return ratioReached && timeReached
     ? "either"
     : ratioReached
-    ? "ratio"
-    : "seeding-time";
+      ? "ratio"
+      : "seeding-time";
 }
 
 export function trackerId(history: Json[]): string {
@@ -441,7 +473,7 @@ export function trackerId(history: Json[]): string {
 }
 
 async function jsonRequest(url: string, init: RequestInit): Promise<Json> {
-  const response = await fetch(url, {
+  const response = await automationFetch(url, {
     ...init,
     signal: AbortSignal.timeout(30_000),
   });
@@ -458,8 +490,8 @@ function textContent(
   element: ReturnType<typeof parse>["root"],
   name: string,
 ): string | undefined {
-  const child = element.children.find((node) =>
-    isElement(node) && node.name.local === name
+  const child = element.children.find(
+    (node) => isElement(node) && node.name.local === name,
   );
   if (!child || !isElement(child)) return undefined;
   const text = child.children.find(isText);
@@ -475,7 +507,7 @@ class Arr {
       app === "sonarr" ? "8989" : "7878"
     }/api/v3/`;
     const document = parse(
-      Deno.readTextFileSync(join(appdata, app, "config.xml")),
+      readFileSync(join(appdata, app, "config.xml"), "utf8"),
     );
     this.key = textContent(document.root, "ApiKey") ?? "";
     requireEvidence(this.key, "Arr API key missing");
@@ -497,8 +529,9 @@ class Arr {
       });
       const data = await this.get(`history?${query}`);
       records.push(
-        ...(data.records as Json[]).filter((record) =>
-          record.downloadId?.toLowerCase() === infohash.toLowerCase()
+        ...(data.records as Json[]).filter(
+          (record) =>
+            record.downloadId?.toLowerCase() === infohash.toLowerCase(),
         ),
       );
       if (page * 1000 >= data.totalRecords) return records;
@@ -509,21 +542,25 @@ class Arr {
 
 class Deluge {
   private readonly fetch: typeof globalThis.fetch;
+  private readonly url: string;
+  private readonly password: string;
 
-  constructor(
-    private readonly url: string,
-    private readonly password: string,
-  ) {
-    this.fetch = wrapFetch({ cookieJar: new CookieJar() });
+  constructor(url: string, password: string) {
+    this.url = url;
+    this.password = password;
+    this.fetch = wrapFetch({
+      cookieJar: new CookieJar(),
+      fetch: automationFetch,
+    });
   }
 
   async connect(): Promise<void> {
     requireEvidence(
-      await this.call("auth.login", [this.password]) === true,
+      (await this.call("auth.login", [this.password])) === true,
       "Deluge authentication failed",
     );
-    if (!await this.call("web.connected", [])) {
-      const hosts = await this.call("web.get_hosts", []) as unknown[];
+    if (!(await this.call("web.connected", []))) {
+      const hosts = (await this.call("web.get_hosts", [])) as unknown[];
       requireEvidence(hosts.length === 1, "ambiguous provider daemon");
       await this.call("web.connect", [(hosts[0] as unknown[])[0]]);
     }
@@ -534,17 +571,14 @@ class Deluge {
   }
 
   async call(method: string, params: unknown[]): Promise<any> {
-    const response = await this.fetch(
-      this.url,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id: 1, method, params }),
-        signal: AbortSignal.timeout(30_000),
-      },
-    );
+    const response = await this.fetch(this.url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: 1, method, params }),
+      signal: AbortSignal.timeout(30_000),
+    });
     requireEvidence(response.ok, "Deluge HTTP request failed");
-    const result = await response.json() as Json;
+    const result = (await response.json()) as Json;
     requireEvidence(!result.error, `Deluge RPC failed: ${method}`);
     return result.result;
   }
@@ -579,9 +613,11 @@ class Tracker {
       join(appdata, "prowlarr", "prowlarr.db"),
       { readOnly: true },
     );
-    const rows = database.prepare(
-      "SELECT s.Cookies, i.Settings FROM IndexerStatus s JOIN Indexers i ON i.Id=s.ProviderId WHERE i.Name='TorrentLeech'",
-    ).all() as Json[];
+    const rows = database
+      .prepare(
+        "SELECT s.Cookies, i.Settings FROM IndexerStatus s JOIN Indexers i ON i.Id=s.ProviderId WHERE i.Name='TorrentLeech'",
+      )
+      .all() as Json[];
     database.close();
     requireEvidence(rows.length === 1, "missing tracker session");
     const cookies = JSON.parse(rows[0].Cookies);
@@ -593,12 +629,14 @@ class Tracker {
       "unsupported tracker username",
     );
     requireEvidence(
-      typeof cookies === "object" && cookies !== null &&
+      typeof cookies === "object" &&
+        cookies !== null &&
         Object.keys(cookies).length > 0,
       "missing tracker cookies",
     );
     this.headers = new Headers({
-      cookie: Object.entries(cookies).map(([name, value]) => `${name}=${value}`)
+      cookie: Object.entries(cookies)
+        .map(([name, value]) => `${name}=${value}`)
         .join("; "),
       "user-agent": "Mozilla/5.0",
     });
@@ -609,9 +647,9 @@ class Tracker {
       setTimeout(
         resolve,
         Math.max(0, 4200 - (performance.now() - this.lastRequest)),
-      )
+      ),
     );
-    const response = await fetch(
+    const response = await automationFetch(
       `${tracker}/profile/${this.username}/${suffix}`,
       {
         headers: this.headers,
@@ -637,15 +675,15 @@ class Tracker {
 function filePaths(torrent: Json): Set<string> {
   return new Set(
     (torrent.files as Json[]).map((entry) =>
-      posix.join(torrent.save_path, entry.path)
+      posix.join(torrent.save_path, entry.path),
     ),
   );
 }
 
 async function writeJson(path: string, data: unknown): Promise<void> {
   const temporary = path.replace(/\.json$/, ".tmp");
-  await Deno.writeTextFile(temporary, `${JSON.stringify(data, null, 2)}\n`);
-  await Deno.rename(temporary, path);
+  await writeFile(temporary, `${JSON.stringify(data, null, 2)}\n`);
+  await rename(temporary, path);
 }
 
 // Checks run every fifteen minutes; a gap of an hour resets the proof window.
@@ -654,9 +692,12 @@ export function eligibility(
   manifest: string,
   now: number,
 ): Json {
-  const continuous = previous?.manifest === manifest &&
-    Number.isFinite(previous.since) && Number.isFinite(previous.lastSeen) &&
-    previous.since <= previous.lastSeen && previous.lastSeen <= now &&
+  const continuous =
+    previous?.manifest === manifest &&
+    Number.isFinite(previous.since) &&
+    Number.isFinite(previous.lastSeen) &&
+    previous.since <= previous.lastSeen &&
+    previous.lastSeen <= now &&
     now - previous.lastSeen < 3600;
   return { since: continuous ? previous.since : now, lastSeen: now, manifest };
 }
@@ -668,9 +709,9 @@ export async function run(
 ): Promise<void> {
   const seedbox = loadSeedboxConfig();
   const arrs = { sonarr: new Arr("sonarr"), radarr: new Arr("radarr") };
-  const clients = (await arrs.sonarr.get("downloadclient") as Json[]).filter((
-    client,
-  ) => client.implementation === "Deluge" && client.enable);
+  const clients = ((await arrs.sonarr.get("downloadclient")) as Json[]).filter(
+    (client) => client.implementation === "Deluge" && client.enable,
+  );
   requireEvidence(clients.length === 1, "expected one enabled Deluge client");
   const fields = Object.fromEntries(
     (clients[0].fields as Json[]).map((field) => [field.name, field.value]),
@@ -681,7 +722,7 @@ export async function run(
   );
   const deluge = new Deluge(
     seedbox.delugeUrl,
-    (await Deno.readTextFile(passwordFile)).trim(),
+    (await readFile(passwordFile, "utf8")).trim(),
   );
   await deluge.connect();
   const trackerClient = new Tracker();
@@ -702,20 +743,20 @@ export async function run(
     overallRatio: ratio,
     torrents: {},
   };
-  await Deno.mkdir(stateDirectory, { recursive: true });
+  await mkdir(stateDirectory, { recursive: true });
   const statePath = join(stateDirectory, "eligible.json");
   let previous: Json = {};
   try {
-    previous = JSON.parse(await Deno.readTextFile(statePath));
+    previous = JSON.parse(await readFile(statePath, "utf8"));
   } catch (error) {
-    if (!(error instanceof Deno.errors.NotFound)) throw error;
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
   const copyCachePath = join(stateDirectory, "verified-copies.json");
   let verifiedCopies: Record<string, string> = {};
   try {
-    verifiedCopies = JSON.parse(await Deno.readTextFile(copyCachePath));
+    verifiedCopies = JSON.parse(await readFile(copyCachePath, "utf8"));
   } catch (error) {
-    if (!(error instanceof Deno.errors.NotFound)) throw error;
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
   const eligible: Json = {};
   let snatches: string | undefined;
@@ -731,9 +772,8 @@ export async function run(
           );
         }
       }
-      const history = await arrs[torrent.label as "sonarr" | "radarr"].history(
-        infohash,
-      );
+      const history =
+        await arrs[torrent.label as "sonarr" | "radarr"].history(infohash);
       const torrentIdentifier = trackerId(history);
       snatches ??= await trackerClient.page("snatchlist");
       trackerClearance(snatches, torrentIdentifier, minimum, trigger);
@@ -745,9 +785,9 @@ export async function run(
         media,
         verifiedCopies,
       );
-      const manifest = createHash("sha256").update(
-        JSON.stringify(torrent.files),
-      ).digest("hex");
+      const manifest = createHash("sha256")
+        .update(JSON.stringify(torrent.files))
+        .digest("hex");
       const now = Date.now() / 1000;
       eligible[infohash] = eligibility(previous[infohash], manifest, now);
       requireEvidence(
@@ -796,7 +836,7 @@ export async function run(
           fresh[infohash].label,
         );
         requireEvidence(
-          await deluge.call("core.remove_torrent", [infohash, true]) === true,
+          (await deluge.call("core.remove_torrent", [infohash, true])) === true,
           "Deluge did not confirm removal",
         );
         delete eligible[infohash];
@@ -809,11 +849,12 @@ export async function run(
     } catch (error) {
       report.torrents[infohash] = {
         status: "retained",
-        reason: error instanceof Hold
-          ? error.message
-          : error instanceof Error
-          ? error.name
-          : "unknown error",
+        reason:
+          error instanceof Hold
+            ? error.message
+            : error instanceof Error
+              ? error.name
+              : "unknown error",
       };
     }
     // Large batches can exceed the service deadline; keep each completed check.
@@ -826,9 +867,11 @@ export async function run(
   console.log(JSON.stringify(report));
 }
 
-function argumentsFrom(
-  args: string[],
-): { apply: boolean; stateDirectory: string; passwordFile: string } {
+function argumentsFrom(args: string[]): {
+  apply: boolean;
+  stateDirectory: string;
+  passwordFile: string;
+} {
   let apply = false;
   let stateDirectory = "/var/lib/seedbox-cleanup";
   let passwordFile: string | undefined;
@@ -845,23 +888,24 @@ function argumentsFrom(
 }
 
 if (import.meta.main) {
-  const args = argumentsFrom(Deno.args);
+  const args = argumentsFrom(process.argv.slice(2));
   try {
     await run(args.apply, args.stateDirectory, args.passwordFile);
   } catch (error) {
     const failure = {
       checkedAt: Math.floor(Date.now() / 1000),
       status: "cleanup-interrupted",
-      reason: error instanceof Hold
-        ? error.message
-        : error instanceof Error
-        ? error.name
-        : "unknown error",
+      reason:
+        error instanceof Hold
+          ? error.message
+          : error instanceof Error
+            ? error.name
+            : "unknown error",
     };
-    await Deno.mkdir(args.stateDirectory, { recursive: true });
+    await mkdir(args.stateDirectory, { recursive: true });
     await writeJson(join(args.stateDirectory, "report.json"), failure);
     await writeJson(join(args.stateDirectory, "eligible.json"), {});
     console.log(JSON.stringify(failure));
-    Deno.exit(1);
+    process.exit(1);
   }
 }

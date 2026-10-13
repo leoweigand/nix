@@ -1,3 +1,5 @@
+import { restrictedFetch } from "../runtime/network.ts";
+
 type Environment = Record<string, string | undefined>;
 
 function value(
@@ -22,9 +24,10 @@ function stripTrailingYear(title: string): string {
 
 function episodeLabel(season: string, episodes: string): string {
   const pad = (number: string) => number.padStart(2, "0");
-  return `S${pad(season)}${
-    episodes.split(",").map((episode) => `E${pad(episode)}`).join(", ")
-  }`;
+  return `S${pad(season)}${episodes
+    .split(",")
+    .map((episode) => `E${pad(episode)}`)
+    .join(", ")}`;
 }
 
 export function notificationMessage(
@@ -85,17 +88,18 @@ export function notificationMessage(
         "missing Sonarr series title, season number, or episode numbers",
       );
     }
-    return `📺 New TV: ${stripTrailingYear(title)} — ${
-      episodeLabel(season, episodes)
-    }`;
+    return `📺 New TV: ${stripTrailingYear(title)} — ${episodeLabel(
+      season,
+      episodes,
+    )}`;
   }
 }
 
 async function send(message: string): Promise<void> {
-  const endpoint = Deno.env.get("MEDIA_IMPORT_NOTIFICATION_ENDPOINT");
+  const endpoint = process.env.MEDIA_IMPORT_NOTIFICATION_ENDPOINT;
   if (!endpoint) throw new Error("missing notification-gateway endpoint");
 
-  const response = await fetch(endpoint, {
+  const response = await restrictedFetch([new URL(endpoint).origin])(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ to: "kittypurr", message }),
@@ -125,7 +129,7 @@ if (import.meta.main) {
     "Sonarr_EpisodeFile_EpisodeNumbers",
   ];
   const environment = Object.fromEntries(
-    names.map((name) => [name, Deno.env.get(name)]),
+    names.map((name) => [name, process.env[name]]),
   );
   const message = notificationMessage(environment);
   if (message) await send(message);

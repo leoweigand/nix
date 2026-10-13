@@ -1,3 +1,8 @@
+import { restrictedFetch } from "../runtime/network.ts";
+import { open, readFile, rename } from "node:fs/promises";
+
+const automationFetch = restrictedFetch(["https://api.cloudflare.com"]);
+
 export interface Route {
   hostname?: string;
   service: string;
@@ -40,7 +45,13 @@ interface Envelope<T> {
 }
 
 export class Cloudflare {
-  constructor(private token: string, private fetcher = fetch) {}
+  private token: string;
+  private fetcher: typeof fetch;
+
+  constructor(token: string, fetcher = automationFetch) {
+    this.token = token;
+    this.fetcher = fetcher;
+  }
 
   async request<T>(
     path: string,
@@ -69,12 +80,13 @@ export class Cloudflare {
       );
     }
     if (
-      !response.ok || envelope.success !== true ||
+      !response.ok ||
+      envelope.success !== true ||
       !Object.hasOwn(envelope, "result")
     ) {
       // Do not log response bodies or credentials; permission failures still include API error codes.
-      const codes = envelope.errors?.map((error) => error.code).join(",") ??
-        "unknown";
+      const codes =
+        envelope.errors?.map((error) => error.code).join(",") ?? "unknown";
       throw new Error(
         `Cloudflare ${method} ${path} failed (HTTP ${response.status}; codes ${codes})`,
       );
@@ -104,14 +116,11 @@ export class Cloudflare {
 export function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (value !== null && typeof value === "object") {
-    return `{${
-      Object.entries(value).filter(([, item]) => item !== undefined).sort((
-        [a],
-        [b],
-      ) => a.localeCompare(b)).map(([key, item]) =>
-        `${JSON.stringify(key)}:${canonical(item)}`
-      ).join(",")
-    }}`;
+    return `{${Object.entries(value)
+      .filter(([, item]) => item !== undefined)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`)
+      .join(",")}}`;
   }
   return JSON.stringify(value);
 }
@@ -131,7 +140,8 @@ export function validateManifest(config: Manifest): void {
   if (
     !/^[a-z0-9]+(?:[.-][a-z0-9]+)*$/.test(config.domain) ||
     !/^[a-zA-Z0-9:._-]{1,120}$/.test(config.owner) ||
-    !Array.isArray(config.routes) || !Array.isArray(config.adoptExisting)
+    !Array.isArray(config.routes) ||
+    !Array.isArray(config.adoptExisting)
   ) {
     throw new Error("Invalid publication manifest");
   }
@@ -142,9 +152,10 @@ export function validateManifest(config: Manifest): void {
       !name ||
       (name !== config.domain &&
         !new RegExp(
-          `^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.${
-            config.domain.replaceAll(".", "\\.")
-          }$`,
+          `^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.${config.domain.replaceAll(
+            ".",
+            "\\.",
+          )}$`,
         ).test(name)) ||
       seen.has(name)
     ) {
@@ -189,7 +200,9 @@ function owned(record: RecordEntry, config: Manifest): boolean {
 
 function validateState(state: State, config: Manifest): void {
   if (
-    state.version !== 1 || !state.claims || typeof state.claims !== "object" ||
+    state.version !== 1 ||
+    !state.claims ||
+    typeof state.claims !== "object" ||
     Array.isArray(state.claims)
   ) {
     throw new Error(
@@ -197,7 +210,8 @@ function validateState(state: State, config: Manifest): void {
     );
   }
   if (
-    state.identity !== identity(config) && Object.keys(state.claims).length > 0
+    state.identity !== identity(config) &&
+    Object.keys(state.claims).length > 0
   ) {
     throw new Error(
       "Publication state belongs to a different account, zone, tunnel or owner",
@@ -206,9 +220,10 @@ function validateState(state: State, config: Manifest): void {
   for (const [name, claims] of Object.entries(state.claims)) {
     if (
       (name !== config.domain && !name.endsWith(`.${config.domain}`)) ||
-      !Array.isArray(claims) || claims.length === 0 ||
-      claims.some((route) =>
-        route.hostname !== name || typeof route.service !== "string"
+      !Array.isArray(claims) ||
+      claims.length === 0 ||
+      claims.some(
+        (route) => route.hostname !== name || typeof route.service !== "string",
       )
     ) {
       throw new Error("Invalid route ownership in publication state");
@@ -240,13 +255,14 @@ export async function reconcile(
 ): Promise<Action[]> {
   validateManifest(config);
   if (previous) validateState(previous, config);
-  const state: State = previous && previous.identity === identity(config)
-    ? structuredClone(previous)
-    : { version: 1, identity: identity(config), claims: {} };
+  const state: State =
+    previous && previous.identity === identity(config)
+      ? structuredClone(previous)
+      : { version: 1, identity: identity(config), claims: {} };
   const zonePath = `/zones/${config.zoneId}`;
-  const zone =
-    (await api.request<{ name: string; account: { id: string } }>(zonePath))
-      .result;
+  const zone = (
+    await api.request<{ name: string; account: { id: string } }>(zonePath)
+  ).result;
   if (zone.name !== config.domain || zone.account.id !== config.accountId) {
     throw new Error(
       "Cloudflare zone does not match the declared domain and account",
@@ -255,12 +271,13 @@ export async function reconcile(
   const records = await api.records(config.zoneId);
   const ownedRecords = records.filter((record) => owned(record, config));
   if (
-    config.routes.length === 0 && ownedRecords.length === 0 &&
+    config.routes.length === 0 &&
+    ownedRecords.length === 0 &&
     Object.keys(state.claims).length === 0
-  ) return [];
+  )
+    return [];
 
-  const tunnelPath =
-    `/accounts/${config.accountId}/cfd_tunnel/${config.tunnelId}/configurations`;
+  const tunnelPath = `/accounts/${config.accountId}/cfd_tunnel/${config.tunnelId}/configurations`;
   const current = (await api.request<TunnelReply>(tunnelPath)).result;
   if (
     current.source !== "cloudflare" ||
@@ -291,17 +308,20 @@ export async function reconcile(
     ...ownedRecords.map((record) => hostname(record.name)),
     ...desired.keys(),
   ]);
-  const dnsPlans: Array<
-    { route: Route; record?: RecordEntry; body: Record<string, unknown> }
-  > = [];
+  const dnsPlans: Array<{
+    route: Route;
+    record?: RecordEntry;
+    body: Record<string, unknown>;
+  }> = [];
   const actions: Action[] = [];
 
   // Validate all collisions before changing either Cloudflare or local ownership state.
   for (const route of config.routes) {
     const name = route.hostname!;
-    const collisions = records.filter((record) =>
-      hostname(record.name) === name &&
-      ["A", "AAAA", "CNAME", "NS"].includes(record.type)
+    const collisions = records.filter(
+      (record) =>
+        hostname(record.name) === name &&
+        ["A", "AAAA", "CNAME", "NS"].includes(record.type),
     );
     if (collisions.length > 1) {
       throw new Error(
@@ -310,17 +330,21 @@ export async function reconcile(
     }
     const record = collisions[0];
     if (
-      record && !owned(record, config) &&
-      (!adopted.has(name) || record.type !== "CNAME" ||
-        hostname(record.content) !== target || !record.proxied)
+      record &&
+      !owned(record, config) &&
+      (!adopted.has(name) ||
+        record.type !== "CNAME" ||
+        hostname(record.content) !== target ||
+        !record.proxied)
     ) {
       throw new Error(
         `Unmanaged DNS record conflicts with ${name}; matching tunnel CNAMEs require explicit adoptExisting`,
       );
     }
-    const comment = record && owned(record, config)
-      ? record.comment!
-      : [marker(config), record?.comment].filter(Boolean).join("\n");
+    const comment =
+      record && owned(record, config)
+        ? record.comment!
+        : [marker(config), record?.comment].filter(Boolean).join("\n");
     const body = {
       name,
       type: "CNAME",
@@ -334,7 +358,7 @@ export async function reconcile(
       Object.entries(body).some(([key, value]) =>
         key === "content"
           ? hostname(record.content) !== value
-          : record[key as keyof RecordEntry] !== value
+          : record[key as keyof RecordEntry] !== value,
       )
     ) {
       dnsPlans.push({ route, record, body });
@@ -346,8 +370,8 @@ export async function reconcile(
   }
 
   for (const name of managed) {
-    const existing = current.config.ingress.filter((route) =>
-      route.hostname && hostname(route.hostname) === name
+    const existing = current.config.ingress.filter(
+      (route) => route.hostname && hostname(route.hostname) === name,
     );
     if (existing.length > 1 || existing.some((route) => route.path)) {
       throw new Error(
@@ -363,9 +387,10 @@ export async function reconcile(
       // DNS ownership can recover a lost state file only for our known, generated route shape.
       const recovery = wanted ?? {
         hostname: name,
-        service: name === `webhooks.${config.domain}`
-          ? "http://127.0.0.1:80"
-          : "https://127.0.0.1:443",
+        service:
+          name === `webhooks.${config.domain}`
+            ? "http://127.0.0.1:80"
+            : "https://127.0.0.1:443",
         originRequest: {
           httpHostHeader: name,
           ...(name === `webhooks.${config.domain}`
@@ -373,11 +398,12 @@ export async function reconcile(
             : { originServerName: name, noTLSVerify: false }),
         },
       };
-      const recoverable = ownedRecords.some((record) =>
-        hostname(record.name) === name
-      ) && canonical(existing[0]) === canonical(recovery);
+      const recoverable =
+        ownedRecords.some((record) => hostname(record.name) === name) &&
+        canonical(existing[0]) === canonical(recovery);
       if (
-        !recoverable && !(claim.length === 0 && wanted && adopted.has(name))
+        !recoverable &&
+        !(claim.length === 0 && wanted && adopted.has(name))
       ) {
         throw new Error(
           `Unmanaged or externally changed tunnel route conflicts with ${name}; use explicit adoption for existing routes`,
@@ -393,8 +419,8 @@ export async function reconcile(
     }
   }
 
-  const staleRecords = ownedRecords.filter((record) =>
-    !desired.has(hostname(record.name))
+  const staleRecords = ownedRecords.filter(
+    (record) => !desired.has(hostname(record.name)),
   );
   for (const record of staleRecords) {
     actions.push({ operation: "delete-dns", hostname: record.name });
@@ -403,10 +429,10 @@ export async function reconcile(
     ...current.config,
     ingress: [
       ...[...desired.values()].sort((a, b) =>
-        a.hostname!.localeCompare(b.hostname!)
+        a.hostname!.localeCompare(b.hostname!),
       ),
-      ...current.config.ingress.filter((route) =>
-        !route.hostname || !managed.has(hostname(route.hostname))
+      ...current.config.ingress.filter(
+        (route) => !route.hostname || !managed.has(hostname(route.hostname)),
       ),
     ],
   };
@@ -464,8 +490,9 @@ export async function reconcile(
 export function apiToken(contents: string): string {
   const text = contents.trim();
   const match =
-    /^(?:export\s+)?(?:CLOUDFLARE_API_TOKEN|CF_DNS_API_TOKEN)\s*=\s*(.*?)\s*$/m
-      .exec(text);
+    /^(?:export\s+)?(?:CLOUDFLARE_API_TOKEN|CF_DNS_API_TOKEN)\s*=\s*(.*?)\s*$/m.exec(
+      text,
+    );
   const value = match ? match[1].replace(/^(["'])(.*)\1$/, "$2") : text;
   if (!value || /\s/.test(value) || value.includes("=")) {
     throw new Error("Invalid Cloudflare API token file");
@@ -474,7 +501,7 @@ export function apiToken(contents: string): string {
 }
 
 async function main(): Promise<void> {
-  const args = Deno.args;
+  const args = process.argv.slice(2);
   const value = (name: string): string => {
     const index = args.indexOf(name);
     if (index < 0 || !args[index + 1] || args[index + 1].startsWith("--")) {
@@ -483,35 +510,31 @@ async function main(): Promise<void> {
     return args[index + 1];
   };
   const config: Manifest = JSON.parse(
-    await Deno.readTextFile(value("--config")),
+    await readFile(value("--config"), "utf8"),
   );
   validateManifest(config);
-  const token = apiToken(await Deno.readTextFile(value("--token-file")));
+  const token = apiToken(await readFile(value("--token-file"), "utf8"));
   const statePath = value("--state");
   let state: State | undefined;
   try {
-    state = JSON.parse(await Deno.readTextFile(statePath));
+    state = JSON.parse(await readFile(statePath, "utf8"));
   } catch (error) {
-    if (!(error instanceof Deno.errors.NotFound)) throw error;
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
   const save = async (next: State) => {
     const temporary = `${statePath}.${crypto.randomUUID()}.tmp`;
-    const file = await Deno.open(temporary, {
-      write: true,
-      createNew: true,
-      mode: 0o600,
-    });
+    const file = await open(temporary, "wx", 0o600);
     try {
       const bytes = new TextEncoder().encode(JSON.stringify(next) + "\n");
       let offset = 0;
       while (offset < bytes.length) {
-        offset += await file.write(bytes.subarray(offset));
+        offset += (await file.write(bytes.subarray(offset))).bytesWritten;
       }
       await file.sync();
     } finally {
-      file.close();
+      await file.close();
     }
-    await Deno.rename(temporary, statePath);
+    await rename(temporary, statePath);
   };
   const dryRun = args.includes("--dry-run");
   const actions = await reconcile(
@@ -539,6 +562,6 @@ if (import.meta.main) {
     console.error(
       error instanceof Error ? error.message : "Cloudflare publication failed",
     );
-    Deno.exit(1);
+    process.exit(1);
   }
 }

@@ -1,3 +1,4 @@
+import { test } from "node:test";
 import {
   apiToken,
   canonical,
@@ -66,24 +67,31 @@ function manifest(routes: Route[] = [route()]): Manifest {
 }
 
 class FakeCloudflare {
-  records: RecordEntry[] = [{
-    id: "external",
-    name: "link.leolab.party",
-    type: "CNAME",
-    content: "cname.short.io",
-    proxied: false,
-  }];
+  records: RecordEntry[] = [
+    {
+      id: "external",
+      name: "link.leolab.party",
+      type: "CNAME",
+      content: "cname.short.io",
+      proxied: false,
+    },
+  ];
   config: Record<string, unknown> & { ingress: Route[] } = {
     originRequest: { connectTimeout: 12 },
     "warp-routing": { enabled: true },
-    ingress: [{
-      hostname: "external.leolab.party",
-      service: "http://192.0.2.1:8000",
-    }, { service: "http_status:404" }],
+    ingress: [
+      {
+        hostname: "external.leolab.party",
+        service: "http://192.0.2.1:8000",
+      },
+      { service: "http_status:404" },
+    ],
   };
-  calls: Array<
-    { method: string; path: string; body?: Record<string, unknown> }
-  > = [];
+  calls: Array<{
+    method: string;
+    path: string;
+    body?: Record<string, unknown>;
+  }> = [];
   state?: State;
   saves = 0;
   failPost = false;
@@ -172,15 +180,22 @@ class FakeCloudflare {
   }
 }
 
-Deno.test("publication creates the route before DNS and preserves unrelated records and tunnel settings", async () => {
+test("publication creates the route before DNS and preserves unrelated records and tunnel settings", async () => {
   const fake = new FakeCloudflare();
   await fake.run();
-  equal(fake.mutations().map((call) => call.method), ["PUT", "POST"]);
+  equal(
+    fake.mutations().map((call) => call.method),
+    ["PUT", "POST"],
+  );
   equal(fake.records[0].content, "cname.short.io");
-  equal(fake.config.ingress, [route(), {
-    hostname: "external.leolab.party",
-    service: "http://192.0.2.1:8000",
-  }, { service: "http_status:404" }]);
+  equal(fake.config.ingress, [
+    route(),
+    {
+      hostname: "external.leolab.party",
+      service: "http://192.0.2.1:8000",
+    },
+    { service: "http_status:404" },
+  ]);
   equal(fake.config["warp-routing"], { enabled: true });
   equal(fake.config.originRequest, { connectTimeout: 12 });
   assert(fake.records[1].comment === marker(manifest()));
@@ -188,7 +203,7 @@ Deno.test("publication creates the route before DNS and preserves unrelated reco
   equal(fake.state?.claims["app.leolab.party"], [route()]);
 });
 
-Deno.test("repeated reconciliation performs no Cloudflare writes", async () => {
+test("repeated reconciliation performs no Cloudflare writes", async () => {
   const fake = new FakeCloudflare();
   await fake.run();
   fake.calls = [];
@@ -196,20 +211,26 @@ Deno.test("repeated reconciliation performs no Cloudflare writes", async () => {
   equal(fake.mutations(), []);
 });
 
-Deno.test("unpublishing the last service removes owned DNS before its route and keeps dashboard resources", async () => {
+test("unpublishing the last service removes owned DNS before its route and keeps dashboard resources", async () => {
   const fake = new FakeCloudflare();
   await fake.run();
   fake.calls = [];
   await fake.run(manifest([]));
-  equal(fake.mutations().map((call) => call.method), ["DELETE", "PUT"]);
-  equal(fake.records.map((record) => record.name), ["link.leolab.party"]);
+  equal(
+    fake.mutations().map((call) => call.method),
+    ["DELETE", "PUT"],
+  );
+  equal(
+    fake.records.map((record) => record.name),
+    ["link.leolab.party"],
+  );
   assert(
     !fake.config.ingress.some((entry) => entry.hostname === "app.leolab.party"),
   );
   equal(fake.state?.claims, {});
 });
 
-Deno.test("empty desired state does not need tunnel permissions and does not adopt existing dashboard hosts", async () => {
+test("empty desired state does not need tunnel permissions and does not adopt existing dashboard hosts", async () => {
   const fake = new FakeCloudflare();
   fake.denyTunnel = true;
   equal(await fake.run(manifest([])), []);
@@ -218,17 +239,17 @@ Deno.test("empty desired state does not need tunnel permissions and does not ado
   equal(fake.mutations(), []);
 });
 
-Deno.test("dry-run reads a plan without writes to Cloudflare or local state", async () => {
+test("dry-run reads a plan without writes to Cloudflare or local state", async () => {
   const fake = new FakeCloudflare();
-  equal((await fake.run(manifest(), true)).map((action) => action.operation), [
-    "create-dns",
-    "update-tunnel",
-  ]);
+  equal(
+    (await fake.run(manifest(), true)).map((action) => action.operation),
+    ["create-dns", "update-tunnel"],
+  );
   equal(fake.saves, 0);
   equal(fake.mutations(), []);
 });
 
-Deno.test("unmanaged DNS collisions abort before claiming or changing resources", async () => {
+test("unmanaged DNS collisions abort before claiming or changing resources", async () => {
   for (const type of ["A", "AAAA", "CNAME", "NS"]) {
     const fake = new FakeCloudflare();
     fake.records.push({
@@ -244,7 +265,7 @@ Deno.test("unmanaged DNS collisions abort before claiming or changing resources"
   }
 });
 
-Deno.test("matching existing DNS and tunnel routes require explicit adoption", async () => {
+test("matching existing DNS and tunnel routes require explicit adoption", async () => {
   const fake = new FakeCloudflare();
   const config = manifest();
   fake.records.push({
@@ -268,7 +289,7 @@ Deno.test("matching existing DNS and tunnel routes require explicit adoption", a
   equal(fake.config.ingress[0], route());
 });
 
-Deno.test("an unmanaged tunnel route alone also needs adoption", async () => {
+test("an unmanaged tunnel route alone also needs adoption", async () => {
   const fake = new FakeCloudflare();
   fake.config.ingress.unshift(route());
   await rejects(
@@ -279,7 +300,7 @@ Deno.test("an unmanaged tunnel route alone also needs adoption", async () => {
   equal(fake.mutations(), []);
 });
 
-Deno.test("external changes to an owned route are reported rather than overwritten", async () => {
+test("external changes to an owned route are reported rather than overwritten", async () => {
   const fake = new FakeCloudflare();
   await fake.run();
   fake.config.ingress[0].service = "http://192.0.2.99";
@@ -288,17 +309,20 @@ Deno.test("external changes to an owned route are reported rather than overwritt
   equal(fake.mutations(), []);
 });
 
-Deno.test("a DNS failure after publishing a route is recoverable from saved intent", async () => {
+test("a DNS failure after publishing a route is recoverable from saved intent", async () => {
   const fake = new FakeCloudflare();
   fake.failPost = true;
   await rejects(() => fake.run(), "HTTP 401");
   equal(fake.state?.claims["app.leolab.party"], [route()]);
   fake.calls = [];
   await fake.run();
-  equal(fake.mutations().map((call) => call.method), ["POST"]);
+  equal(
+    fake.mutations().map((call) => call.method),
+    ["POST"],
+  );
 });
 
-Deno.test("a lost DNS creation response does not create duplicates on retry", async () => {
+test("a lost DNS creation response does not create duplicates on retry", async () => {
   const fake = new FakeCloudflare();
   fake.lostPostResponse = true;
   await rejects(() => fake.run(), "HTTP 401");
@@ -311,23 +335,26 @@ Deno.test("a lost DNS creation response does not create duplicates on retry", as
   );
 });
 
-Deno.test("ownership comments recover generated routes after a lost state file, including withdrawal", async () => {
+test("ownership comments recover generated routes after a lost state file, including withdrawal", async () => {
   const fake = new FakeCloudflare();
   await fake.run();
   fake.state = undefined;
   fake.calls = [];
   await fake.run(manifest([]));
-  equal(fake.mutations().map((call) => call.method), ["DELETE", "PUT"]);
+  equal(
+    fake.mutations().map((call) => call.method),
+    ["DELETE", "PUT"],
+  );
 });
 
-Deno.test("concurrent tunnel edits abort the full-configuration update", async () => {
+test("concurrent tunnel edits abort the full-configuration update", async () => {
   const fake = new FakeCloudflare();
   fake.concurrentTunnelEdit = true;
   await rejects(() => fake.run(), "changed during reconciliation");
   equal(fake.mutations(), []);
 });
 
-Deno.test("public root publication retains mail records", async () => {
+test("public root publication retains mail records", async () => {
   const fake = new FakeCloudflare();
   fake.records.push({
     id: "mail",
@@ -346,7 +373,7 @@ Deno.test("public root publication retains mail records", async () => {
   assert(fake.records.some((record) => record.id === "spf"));
 });
 
-Deno.test("webhooks route through the existing Caddy HTTP listener", async () => {
+test("webhooks route through the existing Caddy HTTP listener", async () => {
   const fake = new FakeCloudflare();
   const webhook: Route = {
     hostname: "webhooks.leolab.party",
@@ -357,17 +384,14 @@ Deno.test("webhooks route through the existing Caddy HTTP listener", async () =>
   equal(fake.config.ingress[0], webhook);
 });
 
-Deno.test("owned records on later API pages are still withdrawn", async () => {
+test("owned records on later API pages are still withdrawn", async () => {
   const fake = new FakeCloudflare();
-  fake.records = Array.from(
-    { length: 100 },
-    (_, index) => ({
-      id: `manual-${index}`,
-      name: `manual-${index}.leolab.party`,
-      type: "A",
-      content: "192.0.2.1",
-    }),
-  );
+  fake.records = Array.from({ length: 100 }, (_, index) => ({
+    id: `manual-${index}`,
+    name: `manual-${index}.leolab.party`,
+    type: "A",
+    content: "192.0.2.1",
+  }));
   await fake.run();
   fake.state = undefined;
   fake.calls = [];
@@ -376,7 +400,7 @@ Deno.test("owned records on later API pages are still withdrawn", async () => {
   assert(fake.calls.some((call) => call.path.includes("page=2")));
 });
 
-Deno.test("API failures do not log tokens or change resources", async () => {
+test("API failures do not log tokens or change resources", async () => {
   const fake = new FakeCloudflare();
   fake.denyTunnel = true;
   await rejects(() => fake.run(), "HTTP 401; codes 1000");
@@ -384,10 +408,11 @@ Deno.test("API failures do not log tokens or change resources", async () => {
   equal(fake.saves, 0);
 });
 
-Deno.test("multi-rule and path-specific hostnames cannot be silently adopted", async () => {
-  for (
-    const rules of [[{ ...route(), path: "/private" }], [route(), route()]]
-  ) {
+test("multi-rule and path-specific hostnames cannot be silently adopted", async () => {
+  for (const rules of [
+    [{ ...route(), path: "/private" }],
+    [route(), route()],
+  ]) {
     const fake = new FakeCloudflare();
     fake.config.ingress.unshift(...rules);
     const config = manifest();
@@ -397,7 +422,7 @@ Deno.test("multi-rule and path-specific hostnames cannot be silently adopted", a
   }
 });
 
-Deno.test("foreign state fails before any Cloudflare request", async () => {
+test("foreign state fails before any Cloudflare request", async () => {
   const fake = new FakeCloudflare();
   fake.state = {
     version: 1,
@@ -408,13 +433,15 @@ Deno.test("foreign state fails before any Cloudflare request", async () => {
   equal(fake.calls, []);
 });
 
-Deno.test("manifest validation prevents publishing outside the zone or bypassing Caddy", () => {
-  for (
-    const bad of [route("app.other.example"), {
+test("manifest validation prevents publishing outside the zone or bypassing Caddy", () => {
+  for (const bad of [
+    route("app.other.example"),
+    {
       ...route(),
       service: "http://127.0.0.1:8000",
-    }, { ...route(), originRequest: { noTLSVerify: true } }]
-  ) {
+    },
+    { ...route(), originRequest: { noTLSVerify: true } },
+  ]) {
     let failed = false;
     try {
       validateManifest(manifest([bad]));
@@ -425,7 +452,7 @@ Deno.test("manifest validation prevents publishing outside the zone or bypassing
   }
 });
 
-Deno.test("token files accept raw tokens and existing ACME dotenv credentials", () => {
+test("token files accept raw tokens and existing ACME dotenv credentials", () => {
   equal(apiToken("test-token\n"), "test-token");
   equal(apiToken('CF_DNS_API_TOKEN="test-token"\n'), "test-token");
   equal(apiToken("export CLOUDFLARE_API_TOKEN='test-token'\n"), "test-token");

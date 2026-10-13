@@ -1,17 +1,41 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.homelab.automation.mediaImportNotifications;
 
+  launcher = pkgs.callPackage ../../packages/automation/launcher.nix { } {
+    name = "media-import-notify";
+    script = "modules/automation/media-import-notifications.ts";
+    environmentNames = [
+      "MEDIA_IMPORT_NOTIFICATION_ENDPOINT"
+      "radarr_eventtype"
+      "radarr_isupgrade"
+      "radarr_movie_title"
+      "sonarr_eventtype"
+      "sonarr_isupgrade"
+      "sonarr_series_title"
+      "sonarr_episodefile_seasonnumber"
+      "sonarr_episodefile_episodenumbers"
+      "Radarr_EventType"
+      "Radarr_IsUpgrade"
+      "Radarr_Movie_Title"
+      "Sonarr_EventType"
+      "Sonarr_IsUpgrade"
+      "Sonarr_Series_Title"
+      "Sonarr_EpisodeFile_SeasonNumber"
+      "Sonarr_EpisodeFile_EpisodeNumbers"
+    ];
+  };
   mediaImportNotify = pkgs.writeShellApplication {
     name = "media-import-notify";
-    runtimeInputs = [ pkgs.deno ];
     text = ''
       export MEDIA_IMPORT_NOTIFICATION_ENDPOINT=${lib.escapeShellArg cfg.endpoint}
-      exec deno run --no-prompt \
-        --allow-env=MEDIA_IMPORT_NOTIFICATION_ENDPOINT,radarr_eventtype,radarr_isupgrade,radarr_movie_title,sonarr_eventtype,sonarr_isupgrade,sonarr_series_title,sonarr_episodefile_seasonnumber,sonarr_episodefile_episodenumbers,Radarr_EventType,Radarr_IsUpgrade,Radarr_Movie_Title,Sonarr_EventType,Sonarr_IsUpgrade,Sonarr_Series_Title,Sonarr_EpisodeFile_SeasonNumber,Sonarr_EpisodeFile_EpisodeNumbers \
-        --allow-net=notifications.${config.homelab.baseDomain}:443 \
-        ${./media-import-notifications.ts}
+      exec ${launcher}/bin/media-import-notify "$@"
     '';
   };
 in
@@ -36,7 +60,7 @@ in
 
     environment.systemPackages = [ mediaImportNotify ];
 
-    # Deno's V8 runtime uses memory-protection keys on x86_64 Linux.
+    # Node's V8 runtime uses memory-protection keys on x86_64 Linux.
     systemd.services.radarr.serviceConfig.SystemCallFilter = lib.mkAfter [
       "pkey_alloc"
       "pkey_free"

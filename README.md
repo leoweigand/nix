@@ -12,9 +12,31 @@ NixOS configuration for my homelab.
 
 ## Custom automation
 
-Use TypeScript with Deno for custom automation, including the notification
-gateway. Prefer Deno built-ins; use Nix or shell only for configuration and
-small glue.
+Use TypeScript with Node 26 for custom automation. Native type stripping runs
+our `.ts` sources directly; constructors use explicit fields rather than
+TypeScript parameter properties. Prefer Node and Web built-ins; use Nix or
+shell only for configuration and small glue.
+
+`nix develop` supplies the pinned Node/npm toolchain. Run `npm ci`, `npm test`,
+`npm run check` and `npm run format:check`; `npm run format` formats the sources.
+Type checking is separate from execution. `package-lock.json` pins dependencies,
+including the JSR packages accessed through their npm compatibility registry.
+`packages/automation/default.nix` verifies the source and installs production
+dependencies in the Nix store; services do not install packages at runtime.
+
+Picard's launchers apply a strict Landlock filesystem and TCP-port policy and
+pass only explicitly declared environment variables. Filesystem restrictions
+cover SQLite and child processes, while atomic Cloudflare state writes retain
+`fsync`. The sandbox requires a Landlock ABI 6+ kernel and fails closed if it
+cannot apply the policy. HTTP origin checks also apply to redirects; these are
+application checks, while Landlock limits ports rather than remote hostnames.
+Existing systemd hardening remains in place. The scripts cover notification
+submission, Cloudflare publication, seedbox cleanup, Paperless titles and
+Sonarr/Radarr import notifications.
+
+`nix build .#checks.x86_64-linux.automation` runs all TypeScript checks and tests;
+`nix build .#checks.x86_64-linux.automation-sandbox` verifies filesystem/SQLite
+isolation, atomic writes and TCP denial on Linux.
 
 ## Machines
 - **picard (NixOS VM on laforge)**: Runs the homelab edge (reverse proxy, DNS), plus apps (Immich, Paperless-ngx, etc.). Laforge is the Unraid host with the storage array and SSD cache drives.

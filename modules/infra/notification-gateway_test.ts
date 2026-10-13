@@ -1,3 +1,4 @@
+import { test } from "node:test";
 import {
   createHandler,
   type GatewayConfig,
@@ -17,7 +18,10 @@ function assert(
 function config(overrides: Partial<GatewayConfig> = {}): GatewayConfig {
   return {
     telegramBotToken: "test-token",
-    destinations: new Map([["leo", "-100123"], ["alerts", "42"]]),
+    destinations: new Map([
+      ["leo", "-100123"],
+      ["alerts", "42"],
+    ]),
     defaultDestination: "leo",
     webhookSecret: "test-webhook-secret",
     webhookUrl: "https://webhooks.leolab.party/telegram",
@@ -53,7 +57,7 @@ function handler(gatewayConfig = config(), responses: Response[] = []) {
   };
 }
 
-Deno.test("notification delivery uses the default allowed chat", async () => {
+test("notification delivery uses the default allowed chat", async () => {
   const test = handler();
   const response = await test.handler(
     new Request("http://gateway/v1/notifications", {
@@ -82,16 +86,14 @@ Deno.test("notification delivery uses the default allowed chat", async () => {
   );
 });
 
-Deno.test("notification rejects malformed, oversized, and unknown fields", async () => {
+test("notification rejects malformed, oversized, and unknown fields", async () => {
   const test = handler();
-  for (
-    const body of [
-      "not json",
-      JSON.stringify({ message: "" }),
-      JSON.stringify({ message: "okay", extra: true }),
-      JSON.stringify({ message: "x".repeat(3801) }),
-    ]
-  ) {
+  for (const body of [
+    "not json",
+    JSON.stringify({ message: "" }),
+    JSON.stringify({ message: "okay", extra: true }),
+    JSON.stringify({ message: "x".repeat(3801) }),
+  ]) {
     const response = await test.handler(
       new Request("http://gateway/v1/notifications", {
         method: "POST",
@@ -104,7 +106,7 @@ Deno.test("notification rejects malformed, oversized, and unknown fields", async
   assert(test.calls.length === 0);
 });
 
-Deno.test("notification cannot choose an unconfigured destination", async () => {
+test("notification cannot choose an unconfigured destination", async () => {
   const test = handler();
   const response = await test.handler(
     new Request("http://gateway/v1/notifications", {
@@ -118,7 +120,7 @@ Deno.test("notification cannot choose an unconfigured destination", async () => 
   assert(test.calls.length === 0);
 });
 
-Deno.test("notification can choose a named destination", async () => {
+test("notification can choose a named destination", async () => {
   const test = handler();
   const response = await test.handler(
     new Request("http://gateway/v1/notifications", {
@@ -140,7 +142,7 @@ Deno.test("notification can choose a named destination", async () => {
   );
 });
 
-Deno.test("Telegram delivery failures are returned to the caller", async () => {
+test("Telegram delivery failures are returned to the caller", async () => {
   const test = handler(config(), [
     new Response(JSON.stringify({ ok: false }), { status: 401 }),
   ]);
@@ -155,7 +157,7 @@ Deno.test("Telegram delivery failures are returned to the caller", async () => {
   assert(response.status === 502);
 });
 
-Deno.test("a reaction targets an earlier sent message", async () => {
+test("a reaction targets an earlier sent message", async () => {
   const test = handler(config(), [
     new Response(JSON.stringify({ ok: true, result: true }), { status: 200 }),
   ]);
@@ -179,12 +181,11 @@ Deno.test("a reaction targets an earlier sent message", async () => {
   );
 });
 
-Deno.test("a sent message can be edited", async () => {
+test("a sent message can be edited", async () => {
   const test = handler(config(), [
-    new Response(
-      JSON.stringify({ ok: true, result: { message_id: 123 } }),
-      { status: 200 },
-    ),
+    new Response(JSON.stringify({ ok: true, result: { message_id: 123 } }), {
+      status: 200,
+    }),
   ]);
   const response = await test.handler(
     new Request("http://gateway/v1/messages/edit", {
@@ -210,7 +211,7 @@ Deno.test("a sent message can be edited", async () => {
   );
 });
 
-Deno.test("typing status uses the default destination", async () => {
+test("typing status uses the default destination", async () => {
   const test = handler(config(), [
     new Response(JSON.stringify({ ok: true, result: true }), { status: 200 }),
   ]);
@@ -230,7 +231,7 @@ Deno.test("typing status uses the default destination", async () => {
   );
 });
 
-Deno.test("startup registers the configured Telegram webhook", async () => {
+test("startup registers the configured Telegram webhook", async () => {
   const test = handler();
   await registerTelegramWebhook(config(), {
     fetch: test.fetch,
@@ -253,7 +254,7 @@ Deno.test("startup registers the configured Telegram webhook", async () => {
   );
 });
 
-Deno.test("unknown Telegram chats are logged and never forwarded", async () => {
+test("unknown Telegram chats are logged and never forwarded", async () => {
   const test = handler();
   const response = await test.handler(
     new Request("http://gateway/v1/telegram-webhook", {
@@ -276,7 +277,7 @@ Deno.test("unknown Telegram chats are logged and never forwarded", async () => {
   assert(test.logs.length === 1);
 });
 
-Deno.test("allowed Telegram chats are acknowledged without a persistent inbox", async () => {
+test("allowed Telegram chats are acknowledged without a persistent inbox", async () => {
   const test = handler();
   const response = await test.handler(
     new Request("http://gateway/v1/telegram-webhook", {
@@ -296,7 +297,7 @@ Deno.test("allowed Telegram chats are acknowledged without a persistent inbox", 
   assert(test.logs.length === 0);
 });
 
-Deno.test("webhook secrets are enforced when configured", async () => {
+test("webhook secrets are enforced when configured", async () => {
   const test = handler(config({ webhookSecret: "expected" }));
   const response = await test.handler(
     new Request("http://gateway/v1/telegram-webhook", {
@@ -312,7 +313,7 @@ Deno.test("webhook secrets are enforced when configured", async () => {
   assert(test.calls.length === 0);
 });
 
-Deno.test("configuration permits discovery mode without an allowed chat", () => {
+test("configuration permits discovery mode without an allowed chat", () => {
   const gatewayConfig = loadConfig({
     TELEGRAM_BOT_TOKEN: "test-token",
     TELEGRAM_WEBHOOK_SECRET: "test-webhook-secret",
@@ -322,7 +323,7 @@ Deno.test("configuration permits discovery mode without an allowed chat", () => 
   assert(gatewayConfig.defaultDestination === undefined);
 });
 
-Deno.test("the first destination is the default", () => {
+test("the first destination is the default", () => {
   const gatewayConfig = loadConfig({
     TELEGRAM_BOT_TOKEN: "test-token",
     TELEGRAM_WEBHOOK_SECRET: "test-webhook-secret",
@@ -333,31 +334,29 @@ Deno.test("the first destination is the default", () => {
   assert(gatewayConfig.destinations.get("alerts") === "-100123");
 });
 
-for (
-  const media of [
-    {
-      kind: "image",
-      path: "images",
-      method: "sendPhoto",
-      field: "photo",
-      mime: "image/png",
-      name: "test.png",
-      maximumBytes: 10 * 1024 * 1024,
-    },
-    {
-      kind: "voice",
-      path: "voice",
-      method: "sendVoice",
-      field: "voice",
-      mime: "audio/ogg",
-      name: "test.ogg",
-      maximumBytes: 50 * 1024 * 1024,
-    },
-  ]
-) {
+for (const media of [
+  {
+    kind: "image",
+    path: "images",
+    method: "sendPhoto",
+    field: "photo",
+    mime: "image/png",
+    name: "test.png",
+    maximumBytes: 10 * 1024 * 1024,
+  },
+  {
+    kind: "voice",
+    path: "voice",
+    method: "sendVoice",
+    field: "voice",
+    mime: "audio/ogg",
+    name: "test.ogg",
+    maximumBytes: 50 * 1024 * 1024,
+  },
+]) {
   const url = `http://gateway/v1/${media.path}`;
 
-  Deno.test(`${media.kind} supports HTTPS URLs and Telegram file IDs`, async () => {
+  test(`${media.kind} supports HTTPS URLs and Telegram file IDs`, async () => {
     for (const source of ["https://example.com/media", "AgAC_file-id123"]) {
       const test = handler();
       const response = await test.handler(
@@ -388,7 +387,7 @@ for (
     }
   });
 
-  Deno.test(`${media.kind} uploads preserve file bytes and use the default destination`, async () => {
+  test(`${media.kind} uploads preserve file bytes and use the default destination`, async () => {
     const test = handler();
     const bytes = new Uint8Array([0, 1, 255, 42]);
     const form = new FormData();
@@ -418,27 +417,25 @@ for (
     assert(String(new Uint8Array(await file.arrayBuffer())) === String(bytes));
   });
 
-  Deno.test(`${media.kind} rejects invalid JSON media and metadata without contacting Telegram`, async () => {
+  test(`${media.kind} rejects invalid JSON media and metadata without contacting Telegram`, async () => {
     const test = handler();
-    for (
-      const value of [
-        null,
-        {},
-        { [media.kind]: "" },
-        { [media.kind]: 42 },
-        { [media.kind]: "http://example.com/media" },
-        { [media.kind]: "file:///etc/passwd" },
-        { [media.kind]: "attach://upload" },
-        { [media.kind]: "https://user:password@example.com/media" },
-        { [media.kind]: "x".repeat(2049) },
-        { [media.kind]: "file_id", caption: "x".repeat(1025) },
-        { [media.kind]: "file_id", caption: false },
-        { [media.kind]: "file_id", to: 42 },
-        { [media.kind]: "file_id", to: "bad destination" },
-        { [media.kind]: "file_id", chat_id: "unapproved" },
-        { [media.kind]: "file_id", parse_mode: "HTML" },
-      ]
-    ) {
+    for (const value of [
+      null,
+      {},
+      { [media.kind]: "" },
+      { [media.kind]: 42 },
+      { [media.kind]: "http://example.com/media" },
+      { [media.kind]: "file:///etc/passwd" },
+      { [media.kind]: "attach://upload" },
+      { [media.kind]: "https://user:password@example.com/media" },
+      { [media.kind]: "x".repeat(2049) },
+      { [media.kind]: "file_id", caption: "x".repeat(1025) },
+      { [media.kind]: "file_id", caption: false },
+      { [media.kind]: "file_id", to: 42 },
+      { [media.kind]: "file_id", to: "bad destination" },
+      { [media.kind]: "file_id", chat_id: "unapproved" },
+      { [media.kind]: "file_id", parse_mode: "HTML" },
+    ]) {
       const response = await test.handler(
         new Request(url, {
           method: "POST",
@@ -451,20 +448,18 @@ for (
     assert(test.calls.length === 0);
   });
 
-  Deno.test(`${media.kind} rejects duplicate, empty, unsupported and unexpected multipart fields`, async () => {
+  test(`${media.kind} rejects duplicate, empty, unsupported and unexpected multipart fields`, async () => {
     const test = handler();
-    for (
-      const variant of [
-        "duplicate",
-        "empty",
-        "mime",
-        "unknown",
-        "file-caption",
-        "file-to",
-        "missing",
-        "long-caption",
-      ]
-    ) {
+    for (const variant of [
+      "duplicate",
+      "empty",
+      "mime",
+      "unknown",
+      "file-caption",
+      "file-to",
+      "missing",
+      "long-caption",
+    ]) {
       const form = new FormData();
       const file = new File(
         [variant === "empty" ? "" : "media bytes"],
@@ -485,7 +480,7 @@ for (
     assert(test.calls.length === 0);
   });
 
-  Deno.test(`${media.kind} enforces both file and streamed body size limits`, async () => {
+  test(`${media.kind} enforces both file and streamed body size limits`, async () => {
     const test = handler();
     const form = new FormData();
     form.set(
@@ -508,19 +503,22 @@ for (
       },
     });
     assert(
-      (await test.handler(
-        new Request(url, {
-          method: "POST",
-          headers: { "content-type": "multipart/form-data; boundary=test" },
-          body: stream,
-        }),
-      )).status === 400,
+      (
+        await test.handler(
+          new Request(url, {
+            method: "POST",
+            headers: { "content-type": "multipart/form-data; boundary=test" },
+            body: stream,
+            ...{ duplex: "half" as const },
+          }),
+        )
+      ).status === 400,
     );
     assert(cancelled);
     assert(test.calls.length === 0);
   });
 
-  Deno.test(`${media.kind} rejects unconfigured destinations and reports Telegram failures`, async () => {
+  test(`${media.kind} rejects unconfigured destinations and reports Telegram failures`, async () => {
     const test = handler();
     const form = new FormData();
     form.set(media.kind, new File(["media"], media.name, { type: media.mime }));
@@ -530,65 +528,65 @@ for (
         .status === 503,
     );
     assert(
-      (await test.handler(
-        new Request(url, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ [media.kind]: "file_id", to: "unknown" }),
-        }),
-      )).status === 503,
-    );
-    assert(test.calls.length === 0);
-    for (
-      const upstream of [
-        new Response(JSON.stringify({ ok: false }), { status: 400 }),
-        new Response(JSON.stringify({ ok: false }), { status: 200 }),
-        new Response(JSON.stringify({ ok: true, result: true }), {
-          status: 200,
-        }),
-        new Response("invalid JSON", { status: 200 }),
-      ]
-    ) {
-      const failing = handler(config(), [upstream]);
-      assert(
-        (await failing.handler(
+      (
+        await test.handler(
           new Request(url, {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ [media.kind]: "file_id" }),
+            body: JSON.stringify({ [media.kind]: "file_id", to: "unknown" }),
           }),
-        )).status === 502,
+        )
+      ).status === 503,
+    );
+    assert(test.calls.length === 0);
+    for (const upstream of [
+      new Response(JSON.stringify({ ok: false }), { status: 400 }),
+      new Response(JSON.stringify({ ok: false }), { status: 200 }),
+      new Response(JSON.stringify({ ok: true, result: true }), {
+        status: 200,
+      }),
+      new Response("invalid JSON", { status: 200 }),
+    ]) {
+      const failing = handler(config(), [upstream]);
+      assert(
+        (
+          await failing.handler(
+            new Request(url, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ [media.kind]: "file_id" }),
+            }),
+          )
+        ).status === 502,
       );
     }
   });
 
-  Deno.test(`${media.kind} rejects malformed uploads, wrong methods and content types`, async () => {
+  test(`${media.kind} rejects malformed uploads, wrong methods and content types`, async () => {
     const test = handler();
-    for (
-      const request of [
-        new Request(url),
-        new Request(url, { method: "PUT", body: "media" }),
-        new Request(url, { method: "POST", body: "media" }),
-        new Request(url, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: "bad JSON",
-        }),
-        new Request(url, {
-          method: "POST",
-          headers: { "content-type": "multipart/form-data" },
-          body: "bad multipart",
-        }),
-        new Request(url, {
-          method: "POST",
-          headers: {
-            "content-type": "multipart/form-data; boundary=test",
-            "content-length": String(media.maximumBytes + 64 * 1024 + 1),
-          },
-          body: "too large",
-        }),
-      ]
-    ) {
+    for (const request of [
+      new Request(url),
+      new Request(url, { method: "PUT", body: "media" }),
+      new Request(url, { method: "POST", body: "media" }),
+      new Request(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "bad JSON",
+      }),
+      new Request(url, {
+        method: "POST",
+        headers: { "content-type": "multipart/form-data" },
+        body: "bad multipart",
+      }),
+      new Request(url, {
+        method: "POST",
+        headers: {
+          "content-type": "multipart/form-data; boundary=test",
+          "content-length": String(media.maximumBytes + 64 * 1024 + 1),
+        },
+        body: "too large",
+      }),
+    ]) {
       assert((await test.handler(request)).status === 400);
     }
     assert(test.calls.length === 0);

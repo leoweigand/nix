@@ -12,6 +12,12 @@ let
   domain = config.homelab.baseDomain;
   serviceName = "cloudflare-publication";
   stateDirectory = "/var/lib/${serviceName}";
+  launcher = pkgs.callPackage ../../packages/automation/launcher.nix { } {
+    name = serviceName;
+    script = "modules/infra/cloudflare-publication.ts";
+    writePaths = [ stateDirectory ];
+    credentialNames = [ "cloudflare-api" ];
+  };
   publicProxies = lib.filterAttrs (_: proxy: proxy.public) edge.proxies;
   mkRoute = hostname: service: {
     inherit hostname service;
@@ -134,11 +140,10 @@ in
         restartTriggers = [ manifest ];
         serviceConfig = {
           Type = "oneshot";
-          ExecStart = "${pkgs.deno}/bin/deno run --no-prompt --no-config --no-lock --allow-net=api.cloudflare.com:443 --allow-read=${manifest},%d/cloudflare-api,${stateDirectory} --allow-write=${stateDirectory} ${./cloudflare-publication.ts} --config ${manifest} --token-file %d/cloudflare-api --state ${stateDirectory}/state.json";
+          ExecStart = "${launcher}/bin/${serviceName} --config ${manifest} --token-file %d/cloudflare-api --state ${stateDirectory}/state.json";
           LoadCredential = [
             "cloudflare-api:${config.services.onepassword-secrets.secretPaths.cloudflarePublicationToken}"
           ];
-          Environment = "DENO_DIR=${stateDirectory}/deno";
           StateDirectory = serviceName;
           StateDirectoryMode = "0700";
           DynamicUser = true;

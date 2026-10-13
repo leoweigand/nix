@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   name = "paperless";
@@ -6,24 +11,33 @@ let
   serviceHost = "${cfg.subdomain}.${config.homelab.baseDomain}";
   oidcReference = pkgs.writeText "paperless-oidc-reference" cfg.oidcEnvReference;
 
-  llmTitleScript = pkgs.writeShellApplication {
+  llmTitleScript = pkgs.callPackage ../../../packages/automation/launcher.nix { } {
     name = "paperless-llm-title";
-    runtimeInputs = [ pkgs.deno ];
-    text = ''
-      exec deno run --no-prompt --no-check --frozen \
-        --config=${../../../deno.json} --lock=${../../../deno.lock} \
-        --allow-env=PAPERLESS_LLM_PAPERLESS_URL,PAPERLESS_LLM_API_USERNAME,PAPERLESS_LLM_API_PASSWORD_FILE,PAPERLESS_LLM_OPENAI_KEY_FILE,PAPERLESS_LLM_MODEL,DOCUMENT_ID \
-        --allow-read=${config.services.onepassword-secrets.secretPaths.paperlessAdminPassword},${config.services.onepassword-secrets.secretPaths.paperlessOpenaiKey} \
-        --allow-net=127.0.0.1:28981,api.openai.com:443 \
-        ${./paperless-llm-title.ts}
-    '';
+    script = "modules/apps/paperless/paperless-llm-title.ts";
+    connectPorts = [
+      443
+      28981
+    ];
+    readPaths = [
+      config.services.onepassword-secrets.secretPaths.paperlessAdminPassword
+      config.services.onepassword-secrets.secretPaths.paperlessOpenaiKey
+    ];
+    environmentNames = [
+      "PAPERLESS_LLM_PAPERLESS_URL"
+      "PAPERLESS_LLM_API_USERNAME"
+      "PAPERLESS_LLM_API_PASSWORD_FILE"
+      "PAPERLESS_LLM_OPENAI_KEY_FILE"
+      "PAPERLESS_LLM_MODEL"
+      "DOCUMENT_ID"
+    ];
   };
 
   llmEnabled = cfg.llmTitleExtraction.enable;
 
   llmEnv = {
     PAPERLESS_LLM_API_USERNAME = "admin";
-    PAPERLESS_LLM_API_PASSWORD_FILE = config.services.onepassword-secrets.secretPaths.paperlessAdminPassword;
+    PAPERLESS_LLM_API_PASSWORD_FILE =
+      config.services.onepassword-secrets.secretPaths.paperlessAdminPassword;
     PAPERLESS_LLM_OPENAI_KEY_FILE = config.services.onepassword-secrets.secretPaths.paperlessOpenaiKey;
     PAPERLESS_LLM_MODEL = cfg.llmTitleExtraction.model;
   };
@@ -99,14 +113,16 @@ in
         group = "paperless";
         mode = "0400";
       };
-    } // lib.optionalAttrs (cfg.oidcEnvReference != null) {
+    }
+    // lib.optionalAttrs (cfg.oidcEnvReference != null) {
       paperlessOidcEnv = {
         reference = cfg.oidcEnvReference;
         owner = "paperless";
         group = "paperless";
         mode = "0400";
       };
-    } // lib.optionalAttrs llmEnabled {
+    }
+    // lib.optionalAttrs llmEnabled {
       paperlessOpenaiKey = {
         reference = cfg.llmTitleExtraction.openaiKeyReference;
         owner = "paperless";
@@ -119,10 +135,12 @@ in
     services.postgresql = {
       enable = true;
       ensureDatabases = [ "paperless" ];
-      ensureUsers = [{
-        name = "paperless";
-        ensureDBOwnership = true;
-      }];
+      ensureUsers = [
+        {
+          name = "paperless";
+          ensureDBOwnership = true;
+        }
+      ];
     };
 
     services.paperless = {
@@ -135,7 +153,7 @@ in
 
       address = "127.0.0.1";
       port = 28981;
-      consumptionDirIsPublic = true;  # Allow all users to add documents
+      consumptionDirIsPublic = true; # Allow all users to add documents
 
       settings = {
         PAPERLESS_URL = "https://${serviceHost}";
@@ -156,7 +174,8 @@ in
         ];
         PAPERLESS_TASK_WORKERS = 2;
         PAPERLESS_THREADS_PER_WORKER = 2;
-      } // lib.optionalAttrs llmEnabled {
+      }
+      // lib.optionalAttrs llmEnabled {
         PAPERLESS_POST_CONSUME_SCRIPT = "${llmTitleScript}/bin/paperless-llm-title";
       };
     };
@@ -186,7 +205,8 @@ in
     systemd.services.paperless-scheduler = {
       after = [ "opnix-secrets.service" ];
       requires = [ "opnix-secrets.service" ];
-    } // lib.optionalAttrs (cfg.oidcEnvReference != null) {
+    }
+    // lib.optionalAttrs (cfg.oidcEnvReference != null) {
       serviceConfig.EnvironmentFile = config.services.onepassword-secrets.secretPaths.paperlessOidcEnv;
       restartTriggers = [ oidcReference ];
     };
@@ -209,7 +229,15 @@ in
         serviceConfig.EnvironmentFile = config.services.onepassword-secrets.secretPaths.paperlessOidcEnv;
         restartTriggers = [ oidcReference ];
       })
-      (lib.mkIf llmEnabled { environment = llmEnv; })
+      (lib.mkIf llmEnabled {
+        environment = llmEnv;
+        # The post-consume Node process uses V8's memory-protection keys.
+        serviceConfig.SystemCallFilter = lib.mkAfter [
+          "pkey_alloc"
+          "pkey_free"
+          "pkey_mprotect"
+        ];
+      })
     ];
 
     systemd.services.paperless-task-queue = lib.mkMerge [
@@ -219,7 +247,15 @@ in
         serviceConfig.EnvironmentFile = config.services.onepassword-secrets.secretPaths.paperlessOidcEnv;
         restartTriggers = [ oidcReference ];
       })
-      (lib.mkIf llmEnabled { environment = llmEnv; })
+      (lib.mkIf llmEnabled {
+        environment = llmEnv;
+        # The post-consume Node process uses V8's memory-protection keys.
+        serviceConfig.SystemCallFilter = lib.mkAfter [
+          "pkey_alloc"
+          "pkey_free"
+          "pkey_mprotect"
+        ];
+      })
     ];
   };
 }

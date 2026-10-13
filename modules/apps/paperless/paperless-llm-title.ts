@@ -1,3 +1,11 @@
+import { restrictedFetch } from "../../runtime/network.ts";
+import { readFile } from "node:fs/promises";
+
+const automationFetch = restrictedFetch([
+  "http://127.0.0.1:28981",
+  "https://api.openai.com",
+]);
+
 /** Post-consume hook for Paperless: extracts a better title via OpenAI.
  *
  * Runs once per consumed document. Skips if the current title looks
@@ -30,16 +38,13 @@ const prompt = [
 
 function environment(): Environment {
   return {
-    PAPERLESS_LLM_PAPERLESS_URL: Deno.env.get("PAPERLESS_LLM_PAPERLESS_URL"),
-    PAPERLESS_LLM_API_USERNAME: Deno.env.get("PAPERLESS_LLM_API_USERNAME"),
-    PAPERLESS_LLM_API_PASSWORD_FILE: Deno.env.get(
-      "PAPERLESS_LLM_API_PASSWORD_FILE",
-    ),
-    PAPERLESS_LLM_OPENAI_KEY_FILE: Deno.env.get(
-      "PAPERLESS_LLM_OPENAI_KEY_FILE",
-    ),
-    PAPERLESS_LLM_MODEL: Deno.env.get("PAPERLESS_LLM_MODEL"),
-    DOCUMENT_ID: Deno.env.get("DOCUMENT_ID"),
+    PAPERLESS_LLM_PAPERLESS_URL: process.env["PAPERLESS_LLM_PAPERLESS_URL"],
+    PAPERLESS_LLM_API_USERNAME: process.env["PAPERLESS_LLM_API_USERNAME"],
+    PAPERLESS_LLM_API_PASSWORD_FILE:
+      process.env["PAPERLESS_LLM_API_PASSWORD_FILE"],
+    PAPERLESS_LLM_OPENAI_KEY_FILE: process.env["PAPERLESS_LLM_OPENAI_KEY_FILE"],
+    PAPERLESS_LLM_MODEL: process.env["PAPERLESS_LLM_MODEL"],
+    DOCUMENT_ID: process.env["DOCUMENT_ID"],
   };
 }
 
@@ -48,7 +53,7 @@ async function readSecret(
 ): Promise<string | undefined> {
   if (!path) return undefined;
   try {
-    return (await Deno.readTextFile(path)).trim() || undefined;
+    return (await readFile(path, "utf8")).trim() || undefined;
   } catch {
     return undefined;
   }
@@ -59,7 +64,7 @@ function log(documentId: string | undefined, message: string): void {
 }
 
 async function httpJson(request: Request): Promise<Record<string, unknown>> {
-  const response = await fetch(request);
+  const response = await automationFetch(request);
   if (!response.ok) {
     const body = (await response.text()).slice(0, 500);
     throw new Error(`HTTP ${response.status} from ${request.url}: ${body}`);
@@ -86,7 +91,11 @@ export function isAutoTitle(
 }
 
 export function cleanTitle(raw: string): string {
-  return raw.trim().replace(/^['"]|['"]$/g, "").replace(/\.+$/, "").trim();
+  return raw
+    .trim()
+    .replace(/^['"]|['"]$/g, "")
+    .replace(/\.+$/, "")
+    .trim();
 }
 
 async function getPaperlessToken(
@@ -160,7 +169,8 @@ async function callOpenAi(
     ? response.choices[0]
     : undefined;
   if (
-    !isRecord(choice) || !isRecord(choice.message) ||
+    !isRecord(choice) ||
+    !isRecord(choice.message) ||
     typeof choice.message.content !== "string"
   ) {
     throw new Error("OpenAI returned no title");
@@ -179,8 +189,8 @@ export async function main(env = environment()): Promise<number> {
     return 0;
   }
 
-  const paperlessUrl = env.PAPERLESS_LLM_PAPERLESS_URL ??
-    "http://127.0.0.1:28981";
+  const paperlessUrl =
+    env.PAPERLESS_LLM_PAPERLESS_URL ?? "http://127.0.0.1:28981";
   const username = env.PAPERLESS_LLM_API_USERNAME ?? "admin";
   const model = env.PAPERLESS_LLM_MODEL ?? "gpt-5.4-nano";
   let token: string;
@@ -210,14 +220,14 @@ export async function main(env = environment()): Promise<number> {
   }
 
   const title = typeof document.title === "string" ? document.title : "";
-  const original = typeof document.original_file_name === "string"
-    ? document.original_file_name
-    : typeof document.original_filename === "string"
-    ? document.original_filename
-    : undefined;
-  const content = typeof document.content === "string"
-    ? document.content.slice(0, 4000)
-    : "";
+  const original =
+    typeof document.original_file_name === "string"
+      ? document.original_file_name
+      : typeof document.original_filename === "string"
+        ? document.original_filename
+        : undefined;
+  const content =
+    typeof document.content === "string" ? document.content.slice(0, 4000) : "";
   if (!isAutoTitle(title, original)) {
     log(documentId, `keeping user-provided title: ${JSON.stringify(title)}`);
     return 0;
@@ -259,4 +269,4 @@ export async function main(env = environment()): Promise<number> {
   return 0;
 }
 
-if (import.meta.main) Deno.exit(await main());
+if (import.meta.main) process.exit(await main());

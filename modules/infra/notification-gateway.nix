@@ -1,8 +1,25 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.homelab.infra.notificationGateway;
   serviceName = "notification-gateway";
+  launcher = pkgs.callPackage ../../packages/automation/launcher.nix { } {
+    name = serviceName;
+    script = "modules/infra/notification-gateway.ts";
+    bindPorts = [ cfg.port ];
+    environmentNames = [
+      "TELEGRAM_BOT_TOKEN"
+      "TELEGRAM_DESTINATIONS"
+      "TELEGRAM_WEBHOOK_SECRET"
+      "TELEGRAM_WEBHOOK_URL"
+      "NOTIFICATION_GATEWAY_PORT"
+    ];
+  };
 in
 {
   options.homelab.infra.notificationGateway = {
@@ -71,14 +88,19 @@ in
     systemd.services.${serviceName} = {
       description = "Telegram notification gateway";
       wantedBy = [ "multi-user.target" ];
-      after = [ "network-online.target" "opnix-secrets.service" ];
+      after = [
+        "network-online.target"
+        "opnix-secrets.service"
+      ];
       wants = [ "network-online.target" ];
       requires = [ "opnix-secrets.service" ];
       serviceConfig = {
-        ExecStart = "${pkgs.deno}/bin/deno run --no-prompt --no-check --allow-env=TELEGRAM_BOT_TOKEN,TELEGRAM_DESTINATIONS,TELEGRAM_WEBHOOK_SECRET,TELEGRAM_WEBHOOK_URL,NOTIFICATION_GATEWAY_PORT --allow-net=127.0.0.1:${toString cfg.port},api.telegram.org:443 ${./notification-gateway.ts}";
+        ExecStart = "${launcher}/bin/${serviceName}";
         EnvironmentFile = config.services.onepassword-secrets.secretPaths.notificationGatewayEnv;
-        Environment = [ "NOTIFICATION_GATEWAY_PORT=${toString cfg.port}" "TELEGRAM_WEBHOOK_URL=https://webhooks.${config.homelab.baseDomain}${cfg.webhookPath}" "DENO_DIR=/run/notification-gateway/deno" ];
-        RuntimeDirectory = serviceName;
+        Environment = [
+          "NOTIFICATION_GATEWAY_PORT=${toString cfg.port}"
+          "TELEGRAM_WEBHOOK_URL=https://webhooks.${config.homelab.baseDomain}${cfg.webhookPath}"
+        ];
         DynamicUser = true;
         Restart = "on-failure";
         RestartSec = "5s";
@@ -93,7 +115,11 @@ in
         ProtectKernelModules = true;
         ProtectKernelTunables = true;
         ProtectSystem = "strict";
-        RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_UNIX" ];
+        RestrictAddressFamilies = [
+          "AF_INET"
+          "AF_INET6"
+          "AF_UNIX"
+        ];
         RestrictNamespaces = true;
         RestrictRealtime = true;
         SystemCallArchitectures = "native";

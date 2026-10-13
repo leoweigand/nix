@@ -1,3 +1,8 @@
+import { restrictedFetch } from "../runtime/network.ts";
+import { createWebServer } from "../runtime/http.ts";
+
+const automationFetch = restrictedFetch(["https://api.telegram.org"]);
+
 const MAX_MESSAGE_LENGTH = 3800;
 const MAX_NOTIFICATION_BODY_BYTES = 8 * 1024;
 const MAX_WEBHOOK_BODY_BYTES = 1024 * 1024;
@@ -33,7 +38,7 @@ interface GatewayDependencies {
 }
 
 const defaultDependencies: GatewayDependencies = {
-  fetch,
+  fetch: automationFetch,
   log: console,
 };
 
@@ -50,10 +55,10 @@ function requiredEnvironment(
 
 function runtimeEnvironment(): Record<string, string | undefined> {
   return {
-    TELEGRAM_BOT_TOKEN: Deno.env.get("TELEGRAM_BOT_TOKEN"),
-    TELEGRAM_DESTINATIONS: Deno.env.get("TELEGRAM_DESTINATIONS"),
-    TELEGRAM_WEBHOOK_SECRET: Deno.env.get("TELEGRAM_WEBHOOK_SECRET"),
-    TELEGRAM_WEBHOOK_URL: Deno.env.get("TELEGRAM_WEBHOOK_URL"),
+    TELEGRAM_BOT_TOKEN: process.env["TELEGRAM_BOT_TOKEN"],
+    TELEGRAM_DESTINATIONS: process.env["TELEGRAM_DESTINATIONS"],
+    TELEGRAM_WEBHOOK_SECRET: process.env["TELEGRAM_WEBHOOK_SECRET"],
+    TELEGRAM_WEBHOOK_URL: process.env["TELEGRAM_WEBHOOK_URL"],
   };
 }
 
@@ -153,9 +158,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function notificationFrom(
-  value: unknown,
-): { message: string; destination?: string } {
+function notificationFrom(value: unknown): {
+  message: string;
+  destination?: string;
+} {
   if (!isRecord(value)) {
     throw new TypeError("request body must be a JSON object");
   }
@@ -182,13 +188,15 @@ function notificationFrom(
   return { message: value.message, destination: value.to };
 }
 
-function messageEditFrom(
-  value: unknown,
-): { message: string; messageId: number; destination?: string } {
+function messageEditFrom(value: unknown): {
+  message: string;
+  messageId: number;
+  destination?: string;
+} {
   if (
     !isRecord(value) ||
-    Object.keys(value).some((key) =>
-      !["message", "message_id", "to"].includes(key)
+    Object.keys(value).some(
+      (key) => !["message", "message_id", "to"].includes(key),
     )
   ) {
     throw new TypeError("request body has unknown fields");
@@ -199,7 +207,8 @@ function messageEditFrom(
   });
   if (
     typeof value.message_id !== "number" ||
-    !Number.isSafeInteger(value.message_id) || value.message_id < 1
+    !Number.isSafeInteger(value.message_id) ||
+    value.message_id < 1
   ) {
     throw new TypeError("message_id must be a positive integer");
   }
@@ -233,9 +242,10 @@ async function callTelegram(
       `https://api.telegram.org/bot${config.telegramBotToken}/${method}`,
       {
         method: "POST",
-        headers: body instanceof FormData
-          ? undefined
-          : { "content-type": "application/json" },
+        headers:
+          body instanceof FormData
+            ? undefined
+            : { "content-type": "application/json" },
         body: body instanceof FormData ? body : JSON.stringify(body),
       },
     );
@@ -314,14 +324,12 @@ function telegramChat(update: unknown): Record<string, unknown> | undefined {
   if (!isRecord(update)) {
     return undefined;
   }
-  for (
-    const key of [
-      "message",
-      "edited_message",
-      "channel_post",
-      "edited_channel_post",
-    ]
-  ) {
+  for (const key of [
+    "message",
+    "edited_message",
+    "channel_post",
+    "edited_channel_post",
+  ]) {
     const message = update[key];
     if (isRecord(message) && isRecord(message.chat)) {
       return message;
@@ -337,9 +345,10 @@ async function handleNotification(
 ): Promise<Response> {
   if (
     request.method !== "POST" ||
-    !request.headers.get("content-type")?.toLowerCase().startsWith(
-      "application/json",
-    )
+    !request.headers
+      .get("content-type")
+      ?.toLowerCase()
+      .startsWith("application/json")
   ) {
     return new Response(null, { status: 400 });
   }
@@ -510,9 +519,10 @@ async function handleReaction(
 ): Promise<Response> {
   if (
     request.method !== "POST" ||
-    !request.headers.get("content-type")?.toLowerCase().startsWith(
-      "application/json",
-    )
+    !request.headers
+      .get("content-type")
+      ?.toLowerCase()
+      .startsWith("application/json")
   ) {
     return new Response(null, { status: 400 });
   }
@@ -523,23 +533,26 @@ async function handleReaction(
     );
     if (
       !isRecord(value) ||
-      Object.keys(value).some((key) =>
-        !["to", "message_id", "emoji"].includes(key)
+      Object.keys(value).some(
+        (key) => !["to", "message_id", "emoji"].includes(key),
       )
     ) {
       return new Response(null, { status: 400 });
     }
-    const destination = value.to === undefined
-      ? undefined
-      : typeof value.to === "string" && /^[a-z][a-z0-9_-]*$/.test(value.to)
-      ? value.to
-      : undefined;
+    const destination =
+      value.to === undefined
+        ? undefined
+        : typeof value.to === "string" && /^[a-z][a-z0-9_-]*$/.test(value.to)
+          ? value.to
+          : undefined;
     const messageId = value.message_id;
     if (
       (value.to !== undefined && !destination) ||
-      typeof messageId !== "number" || !Number.isSafeInteger(messageId) ||
+      typeof messageId !== "number" ||
+      !Number.isSafeInteger(messageId) ||
       messageId < 1 ||
-      typeof value.emoji !== "string" || !value.emoji.trim() ||
+      typeof value.emoji !== "string" ||
+      !value.emoji.trim() ||
       Array.from(value.emoji).length > 32
     ) {
       return new Response(null, { status: 400 });
@@ -571,9 +584,10 @@ async function handleMessageEdit(
 ): Promise<Response> {
   if (
     request.method !== "POST" ||
-    !request.headers.get("content-type")?.toLowerCase().startsWith(
-      "application/json",
-    )
+    !request.headers
+      .get("content-type")
+      ?.toLowerCase()
+      .startsWith("application/json")
   ) {
     return new Response(null, { status: 400 });
   }
@@ -604,9 +618,10 @@ async function handleTyping(
 ): Promise<Response> {
   if (
     request.method !== "POST" ||
-    !request.headers.get("content-type")?.toLowerCase().startsWith(
-      "application/json",
-    )
+    !request.headers
+      .get("content-type")
+      ?.toLowerCase()
+      .startsWith("application/json")
   ) {
     return new Response(null, { status: 400 });
   }
@@ -618,11 +633,12 @@ async function handleTyping(
     if (!isRecord(value) || Object.keys(value).some((key) => key !== "to")) {
       return new Response(null, { status: 400 });
     }
-    const destination = value.to === undefined
-      ? undefined
-      : typeof value.to === "string" && /^[a-z][a-z0-9_-]*$/.test(value.to)
-      ? value.to
-      : undefined;
+    const destination =
+      value.to === undefined
+        ? undefined
+        : typeof value.to === "string" && /^[a-z][a-z0-9_-]*$/.test(value.to)
+          ? value.to
+          : undefined;
     if (value.to !== undefined && !destination) {
       return new Response(null, { status: 400 });
     }
@@ -647,15 +663,16 @@ async function handleTelegramWebhook(
 ): Promise<Response> {
   if (
     request.method !== "POST" ||
-    !request.headers.get("content-type")?.toLowerCase().startsWith(
-      "application/json",
-    )
+    !request.headers
+      .get("content-type")
+      ?.toLowerCase()
+      .startsWith("application/json")
   ) {
     return new Response(null, { status: 400 });
   }
   if (
     request.headers.get("x-telegram-bot-api-secret-token") !==
-      config.webhookSecret
+    config.webhookSecret
   ) {
     return new Response(null, { status: 401 });
   }
@@ -675,9 +692,10 @@ async function handleTelegramWebhook(
   }
 
   const chat = message.chat as Record<string, unknown>;
-  const chatId = typeof chat.id === "number" || typeof chat.id === "string"
-    ? String(chat.id)
-    : undefined;
+  const chatId =
+    typeof chat.id === "number" || typeof chat.id === "string"
+      ? String(chat.id)
+      : undefined;
   if (!chatId) {
     return new Response(null, { status: 204 });
   }
@@ -731,10 +749,10 @@ export function createHandler(
 
 if (import.meta.main) {
   const config = loadConfig();
-  const port = Number(Deno.env.get("NOTIFICATION_GATEWAY_PORT") ?? "9087");
+  const port = Number(process.env["NOTIFICATION_GATEWAY_PORT"] ?? "9087");
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error("NOTIFICATION_GATEWAY_PORT must be a valid TCP port");
   }
   await registerTelegramWebhook(config);
-  Deno.serve({ hostname: "127.0.0.1", port }, createHandler(config));
+  createWebServer(createHandler(config)).listen(port, "127.0.0.1");
 }

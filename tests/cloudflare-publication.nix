@@ -15,6 +15,7 @@ let
   acme = original.security.acme.certs."leolab.party";
   acmeTokenPath = original.services.onepassword-secrets.secretPaths.cloudflareAcmeToken;
   cfg = testConfig.systemd.services.cloudflare-publication;
+  automation = pkgs.callPackage ../packages/automation/default.nix { };
 in
 assert cfg.serviceConfig.Type == "oneshot";
 assert acme.environmentFile == null;
@@ -31,20 +32,18 @@ assert
   testConfig.environment.etc."edge-dns/tailnet.zone".text
   == original.environment.etc."edge-dns/tailnet.zone".text;
 assert original.systemd.timers.cloudflare-publication.timerConfig.OnUnitInactiveSec == "5min";
-pkgs.runCommand "cloudflare-publication-check" { nativeBuildInputs = [ pkgs.deno ]; } ''
-  cp ${../modules/infra/cloudflare-publication.ts} cloudflare-publication.ts
-  cp ${../modules/infra/cloudflare-publication_test.ts} cloudflare-publication_test.ts
+pkgs.runCommand "cloudflare-publication-check" { nativeBuildInputs = [ automation.nodejs ]; } ''
   cp ${builtins.head cfg.restartTriggers} manifest.json
-  deno check --no-config --no-lock cloudflare-publication.ts cloudflare-publication_test.ts
-  deno eval --no-config --no-lock '
-    import { validateManifest } from "./cloudflare-publication.ts";
-    const manifest = JSON.parse(Deno.readTextFileSync("manifest.json"));
+  node --input-type=module -e '
+    import { validateManifest } from "${automation}/lib/homelab-automation/modules/infra/cloudflare-publication.ts";
+    import { readFileSync } from "node:fs";
+    const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
     validateManifest(manifest);
     const hosts = manifest.routes.map(route => route.hostname).sort();
     if (JSON.stringify(hosts) !== JSON.stringify(["auth.leolab.party", "leolab.party", "login.leolab.party", "photos.leolab.party", "share.leolab.party", "webhooks.leolab.party"])) {
       throw new Error("Nix did not generate exactly the opted-in hostnames");
     }
   '
-  deno test --no-config --no-lock cloudflare-publication_test.ts
+  node --test ${automation}/lib/homelab-automation/modules/infra/cloudflare-publication_test.ts
   touch "$out"
 ''

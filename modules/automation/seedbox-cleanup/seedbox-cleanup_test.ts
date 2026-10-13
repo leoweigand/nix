@@ -1,3 +1,6 @@
+import { mkdtemp, mkdir, writeFile, rm, symlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import {
@@ -24,10 +27,13 @@ function torrent() {
     save_path: `${completedPath}/sonarr`,
     seeding_time: 7 * day,
     ratio: 0.4,
-    files: [{ path: "Season/one.mkv", size: 4 }, {
-      path: "Season/two.mkv",
-      size: 4,
-    }],
+    files: [
+      { path: "Season/one.mkv", size: 4 },
+      {
+        path: "Season/two.mkv",
+        size: 4,
+      },
+    ],
     file_progress: [1, 1],
     file_priorities: [1, 1],
     trackers: [{ url: "https://tracker.torrentleech.org/example/announce" }],
@@ -68,12 +74,14 @@ function table(
     hnr,
     "Deluge",
   ];
-  return `<table id="profile-snatchListTable"><tr>${
-    headers.map((header) => `<th>${header}</th>`).join("")
-  }</tr><tr>${cells.map((cell) => `<td>${cell}</td>`).join("")}</tr></table>`;
+  return `<table id="profile-snatchListTable"><tr>${headers
+    .map((header) => `<th>${header}</th>`)
+    .join(
+      "",
+    )}</tr><tr>${cells.map((cell) => `<td>${cell}</td>`).join("")}</tr></table>`;
 }
 
-Deno.test("time and ratio are independent cleanup triggers", () => {
+test("time and ratio are independent cleanup triggers", () => {
   assert.equal(torrentGate(torrent(), 6, completedPath), "seeding-time");
   assert.equal(
     torrentGate({ ...torrent(), seeding_time: 0, ratio: 1 }, 6, completedPath),
@@ -115,13 +123,16 @@ Deno.test("time and ratio are independent cleanup triggers", () => {
   }
 });
 
-Deno.test("TorrentLeech's alternate announce host is accepted without permitting mixed trackers", () => {
+test("TorrentLeech's alternate announce host is accepted without permitting mixed trackers", () => {
   torrentGate(
     {
       ...torrent(),
-      trackers: [...torrent().trackers, {
-        url: "https://tracker.tleechreload.org/example/announce",
-      }],
+      trackers: [
+        ...torrent().trackers,
+        {
+          url: "https://tracker.tleechreload.org/example/announce",
+        },
+      ],
     },
     6,
     completedPath,
@@ -132,9 +143,12 @@ Deno.test("TorrentLeech's alternate announce host is accepted without permitting
         {
           ...torrent(),
           ratio: 100,
-          trackers: [...torrent().trackers, {
-            url: "https://evil.example/announce",
-          }],
+          trackers: [
+            ...torrent().trackers,
+            {
+              url: "https://evil.example/announce",
+            },
+          ],
         },
         6,
         completedPath,
@@ -143,7 +157,7 @@ Deno.test("TorrentLeech's alternate announce host is accepted without permitting
   );
 });
 
-Deno.test("quarter-hour checks accumulate an hour of unchanged evidence", () => {
+test("quarter-hour checks accumulate an hour of unchanged evidence", () => {
   let proof = eligibility(undefined, "manifest", 10000);
   for (const now of [10900, 11800, 12700, 13600]) {
     proof = eligibility(proof, "manifest", now);
@@ -155,18 +169,16 @@ Deno.test("quarter-hour checks accumulate an hour of unchanged evidence", () => 
   assert.equal(eligibility(proof, "manifest", 10000).since, 10000);
 });
 
-Deno.test("partial, paused, unknown tracker, and wrong-path torrents are retained", () => {
-  for (
-    const delta of [
-      { file_priorities: [1, 0] },
-      { file_progress: [1, 0.9] },
-      { state: "Paused" },
-      { private: false },
-      { label: "manual" },
-      { save_path: "/other" },
-      { trackers: [{ url: "https://evil.example/announce" }] },
-    ]
-  ) {
+test("partial, paused, unknown tracker, and wrong-path torrents are retained", () => {
+  for (const delta of [
+    { file_priorities: [1, 0] },
+    { file_progress: [1, 0.9] },
+    { state: "Paused" },
+    { private: false },
+    { label: "manual" },
+    { save_path: "/other" },
+    { trackers: [{ url: "https://evil.example/announce" }] },
+  ]) {
     assert.throws(
       () =>
         torrentGate({ ...torrent(), ratio: 100, ...delta }, 6, completedPath),
@@ -175,7 +187,7 @@ Deno.test("partial, paused, unknown tracker, and wrong-path torrents are retaine
   }
 });
 
-Deno.test("tracker clearance requires known time or ratio evidence", () => {
+test("tracker clearance requires known time or ratio evidence", () => {
   trackerClearance(table(), "123", 6);
   trackerClearance(table("1.1", "0 days"), "123", 6);
   trackerClearance(table("1", "0 days"), "123", 6, "ratio");
@@ -195,36 +207,32 @@ Deno.test("tracker clearance requires known time or ratio evidence", () => {
     () => trackerClearance(table("1", "5 days"), "123", 6, "seeding-time"),
     Hold,
   );
-  for (
-    const page of [
-      table("0.4", "5 days"),
-      table("0.4", "999999"),
-      table("0.4", "6 days", "Yes"),
-      table("0.4", "6 days", ""),
-      table("0.4", "6 days", "No", "456"),
-      table().replace("Rto", "Changed"),
-    ]
-  ) {
+  for (const page of [
+    table("0.4", "5 days"),
+    table("0.4", "999999"),
+    table("0.4", "6 days", "Yes"),
+    table("0.4", "6 days", ""),
+    table("0.4", "6 days", "No", "456"),
+    table().replace("Rto", "Changed"),
+  ]) {
     assert.throws(() => trackerClearance(page, "123", 6), Hold);
   }
 });
 
-Deno.test("tracker login and account class are required", () => {
+test("tracker login and account class are required", () => {
   const page =
     '<a href="/user/account/logout">Logout</a><td>Class</td><td>Extreme User</td><span class="profile-ratio-details">52.873</span>';
   assert.deepEqual(trackerAccount(page), ["Extreme User", 52.873]);
-  for (
-    const bad of [
-      page.replace("Extreme User", "Unknown"),
-      page.replace("52.873", "NaN"),
-      "login",
-    ]
-  ) {
+  for (const bad of [
+    page.replace("Extreme User", "Unknown"),
+    page.replace("52.873", "NaN"),
+    "login",
+  ]) {
     assert.throws(() => trackerAccount(bad));
   }
 });
 
-Deno.test("grab receipt requires the exact tracker and one torrent ID", () => {
+test("grab receipt requires the exact tracker and one torrent ID", () => {
   const event = {
     eventType: "grabbed",
     data: { nzbInfoUrl: "https://www.torrentleech.org/torrent/123" },
@@ -233,27 +241,31 @@ Deno.test("grab receipt requires the exact tracker and one torrent ID", () => {
   assert.throws(() => trackerId([]), Hold);
   assert.throws(
     () =>
-      trackerId([event, {
-        ...event,
-        data: { nzbInfoUrl: "https://www.torrentleech.org/torrent/456" },
-      }]),
+      trackerId([
+        event,
+        {
+          ...event,
+          data: { nzbInfoUrl: "https://www.torrentleech.org/torrent/456" },
+        },
+      ]),
     Hold,
   );
 });
 
-Deno.test("every media file must be imported with matching bytes", async () => {
-  const root = await Deno.makeTempDir();
+test("every media file must be imported with matching bytes", async () => {
+  const root = await mkdtemp(join(tmpdir(), "seedbox-cleanup-"));
   try {
     const inbox = join(root, "sources/seedbox/deluge/sonarr/Season");
     const library = join(root, "library/tv/Series");
-    await Deno.mkdir(inbox, { recursive: true });
-    await Deno.mkdir(library, { recursive: true });
-    const history: Array<
-      { eventType: string; data: { droppedPath: string; importedPath: string } }
-    > = [];
+    await mkdir(inbox, { recursive: true });
+    await mkdir(library, { recursive: true });
+    const history: Array<{
+      eventType: string;
+      data: { droppedPath: string; importedPath: string };
+    }> = [];
     for (const name of ["one.mkv", "two.mkv"]) {
-      await Deno.writeTextFile(join(inbox, name), "data");
-      await Deno.writeTextFile(join(library, name), "data");
+      await writeFile(join(inbox, name), "data");
+      await writeFile(join(library, name), "data");
       history.push({
         eventType: "downloadFolderImported",
         data: {
@@ -262,7 +274,7 @@ Deno.test("every media file must be imported with matching bytes", async () => {
         },
       });
     }
-    await Deno.writeTextFile(join(inbox, "release.srr"), "meta");
+    await writeFile(join(inbox, "release.srr"), "meta");
     const withMetadata = {
       ...torrent(),
       files: [...torrent().files, { path: "Season/release.srr", size: 4 }],
@@ -282,7 +294,7 @@ Deno.test("every media file must be imported with matching bytes", async () => {
       Hold,
     );
     await new Promise((resolve) => setTimeout(resolve, 10));
-    await Deno.writeTextFile(join(library, "two.mkv"), "evil");
+    await writeFile(join(library, "two.mkv"), "evil");
     await assert.rejects(
       () => importProof(withMetadata, history, "sonarr", root, verifiedCopies),
       Hold,
@@ -291,22 +303,22 @@ Deno.test("every media file must be imported with matching bytes", async () => {
       () => importProof(withMetadata, history, "sonarr", root),
       Hold,
     );
-    await Deno.remove(join(library, "two.mkv"));
+    await rm(join(library, "two.mkv"));
     await assert.rejects(
       () => importProof(withMetadata, history, "sonarr", root),
       Hold,
     );
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await rm(root, { recursive: true });
   }
 });
 
-Deno.test("archives, traversal, absolute paths, and symlinks are retained", async () => {
-  const root = await Deno.makeTempDir();
+test("archives, traversal, absolute paths, and symlinks are retained", async () => {
+  const root = await mkdtemp(join(tmpdir(), "seedbox-cleanup-"));
   try {
     const inbox = join(root, "sources/seedbox/deluge/sonarr");
-    await Deno.mkdir(inbox, { recursive: true });
-    await Deno.writeTextFile(join(inbox, "movie.rar"), "data");
+    await mkdir(inbox, { recursive: true });
+    await writeFile(join(inbox, "movie.rar"), "data");
     await assert.rejects(
       () =>
         importProof(
@@ -319,9 +331,9 @@ Deno.test("archives, traversal, absolute paths, and symlinks are retained", asyn
     );
     await assert.rejects(() => safePath(inbox, "../escape.mkv"), Hold);
     await assert.rejects(() => safePath(inbox, "/absolute.mkv"), Hold);
-    await Deno.symlink(root, join(inbox, "linked"));
+    await symlink(root, join(inbox, "linked"));
     await assert.rejects(() => safePath(inbox, "linked/file.mkv"), Hold);
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await rm(root, { recursive: true });
   }
 });

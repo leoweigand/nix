@@ -1,0 +1,24 @@
+{
+  "name": "homelab-automation",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26.11.1 <27"
+  },
+  "scripts": {
+    "test": "node --test modules/infra/*_test.ts modules/automation/*_test.ts modules/automation/seedbox-cleanup/*_test.ts modules/apps/paperless/*_test.ts modules/runtime/*_test.ts",
+    "check": "tsc --noEmit",
+    "format": "prettier --write \"modules/**/*.ts\" package.json tsconfig.json",
+    "format:check": "prettier --check \"modules/**/*.ts\" package.json tsconfig.json"
+  },
+  "dependencies": {
+    "@jd1378/another-cookiejar": "npm:@jsr/jd1378__another-cookiejar@5.0.7",
+    "@std/xml": "npm:@jsr/std__xml@0.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "typescript": "^6.0.0",
+    "prettier": "^3.6.0"
+  }
+}

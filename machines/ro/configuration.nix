@@ -1,4 +1,4 @@
-{ ... }:
+{ pkgs, ... }:
 
 {
   imports = [ ../../modules/darwin/common.nix ];
@@ -16,7 +16,6 @@
     brews = [
       # keeping in brew, not migrating to nix
       "cocoapods"
-      "deno"
     ];
     casks = [
       "blender"
@@ -30,6 +29,8 @@
       "zed"
     ];
   };
+
+  environment.systemPackages = [ pkgs.nodejs_26 ];
 
   system.stateVersion = 5;
 }
