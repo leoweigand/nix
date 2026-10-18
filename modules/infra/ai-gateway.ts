@@ -230,8 +230,11 @@ export function createHandler(
         },
         async cancel() {
           controller.abort();
-          await reader.cancel();
-          release();
+          try {
+            await reader.cancel();
+          } finally {
+            release();
+          }
         },
       });
       return new Response(stream, { status, headers });

@@ -81,6 +81,10 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
+        assertion = cfg.apiKeyReference != "";
+        message = "AI gateway apiKeyReference must be set when enabled";
+      }
+      {
         assertion = config.services.onepassword-secrets.enable && config.homelab.infra.edge.enable;
         message = "AI gateway requires opnix and the edge proxy";
       }

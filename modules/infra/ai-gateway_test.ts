@@ -286,3 +286,20 @@ test("chunked body limit and slow request timeout release the reader and capacit
   assert.equal((await handler(slow)).status, 504);
   assert.equal((await handler(request({ model: "invalid" }))).status, 400);
 });
+
+test("a failing upstream stream cancellation still releases capacity", async () => {
+  const handler = createHandler(config, {
+    log: quiet,
+    fetch: async () =>
+      new Response(
+        new ReadableStream({
+          cancel() {
+            throw new Error("transport cancellation failed");
+          },
+        }),
+      ),
+  });
+  const response = await handler(request());
+  await assert.rejects(response.body!.cancel());
+  assert.equal((await handler(request({ model: "invalid" }))).status, 400);
+});
