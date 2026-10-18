@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { createHandler, type GatewayConfig } from "./ai-gateway.ts";
-import { createWebServer } from "../runtime/http.ts";
+import { createWebServer } from "../../runtime/http.ts";
 
 const config: GatewayConfig = {
   apiKey: "upstream-test-key",

@@ -6,7 +6,7 @@ import { createWebServer } from "./http.ts";
 import {
   createHandler,
   type GatewayConfig,
-} from "../infra/notification-gateway.ts";
+} from "../infra/notification-gateway/notification-gateway.ts";
 
 const config: GatewayConfig = {
   telegramBotToken: "fake",

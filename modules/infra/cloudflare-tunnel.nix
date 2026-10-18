@@ -5,7 +5,7 @@ let
 in
 
 {
-  imports = [ ./cloudflare-publication.nix ];
+  imports = [ ./cloudflare-publication ];
 
   options.homelab.infra.cloudflareTunnel = {
     enable = lib.mkEnableOption "Cloudflare Tunnel outbound connector";

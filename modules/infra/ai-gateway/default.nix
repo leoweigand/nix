@@ -21,9 +21,9 @@ let
         ;
     }
   );
-  launcher = pkgs.callPackage ../../packages/automation/launcher.nix { } {
+  launcher = pkgs.callPackage ../../../packages/automation/launcher.nix { } {
     name = serviceName;
-    script = "modules/infra/ai-gateway.ts";
+    script = "modules/infra/ai-gateway/ai-gateway.ts";
     credentialNames = [ "api-key" ];
     environmentNames = [
       "CREDENTIALS_DIRECTORY"

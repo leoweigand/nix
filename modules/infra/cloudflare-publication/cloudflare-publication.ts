@@ -1,4 +1,4 @@
-import { restrictedFetch } from "../runtime/network.ts";
+import { restrictedFetch } from "../../runtime/network.ts";
 import { open, readFile, rename } from "node:fs/promises";
 
 const automationFetch = restrictedFetch(["https://api.cloudflare.com"]);

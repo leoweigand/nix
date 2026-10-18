@@ -8,9 +8,9 @@
 let
   cfg = config.homelab.infra.notificationGateway;
   serviceName = "notification-gateway";
-  launcher = pkgs.callPackage ../../packages/automation/launcher.nix { } {
+  launcher = pkgs.callPackage ../../../packages/automation/launcher.nix { } {
     name = serviceName;
-    script = "modules/infra/notification-gateway.ts";
+    script = "modules/infra/notification-gateway/notification-gateway.ts";
     bindPorts = [ cfg.port ];
     environmentNames = [
       "TELEGRAM_BOT_TOKEN"

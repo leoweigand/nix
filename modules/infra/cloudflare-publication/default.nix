@@ -12,9 +12,9 @@ let
   domain = config.homelab.baseDomain;
   serviceName = "cloudflare-publication";
   stateDirectory = "/var/lib/${serviceName}";
-  launcher = pkgs.callPackage ../../packages/automation/launcher.nix { } {
+  launcher = pkgs.callPackage ../../../packages/automation/launcher.nix { } {
     name = serviceName;
-    script = "modules/infra/cloudflare-publication.ts";
+    script = "modules/infra/cloudflare-publication/cloudflare-publication.ts";
     writePaths = [ stateDirectory ];
     credentialNames = [ "cloudflare-api" ];
   };

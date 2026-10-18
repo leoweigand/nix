@@ -35,7 +35,7 @@ assert original.systemd.timers.cloudflare-publication.timerConfig.OnUnitInactive
 pkgs.runCommand "cloudflare-publication-check" { nativeBuildInputs = [ automation.nodejs ]; } ''
   cp ${builtins.head cfg.restartTriggers} manifest.json
   node --input-type=module -e '
-    import { validateManifest } from "${automation}/lib/homelab-automation/modules/infra/cloudflare-publication.ts";
+    import { validateManifest } from "${automation}/lib/homelab-automation/modules/infra/cloudflare-publication/cloudflare-publication.ts";
     import { readFileSync } from "node:fs";
     const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
     validateManifest(manifest);
@@ -44,6 +44,6 @@ pkgs.runCommand "cloudflare-publication-check" { nativeBuildInputs = [ automatio
       throw new Error("Nix did not generate exactly the opted-in hostnames");
     }
   '
-  node --test ${automation}/lib/homelab-automation/modules/infra/cloudflare-publication_test.ts
+  node --test ${automation}/lib/homelab-automation/modules/infra/cloudflare-publication/cloudflare-publication_test.ts
   touch "$out"
 ''

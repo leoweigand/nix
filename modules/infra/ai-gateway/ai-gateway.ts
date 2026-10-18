@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
-import { createWebServer } from "../runtime/http.ts";
-import { restrictedFetch } from "../runtime/network.ts";
+import { createWebServer } from "../../runtime/http.ts";
+import { restrictedFetch } from "../../runtime/network.ts";
 
 export interface ModelPolicy {
   chatModels: string[];
