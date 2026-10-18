@@ -21,6 +21,7 @@ let
     ];
     immich = [
       "${mounts.fast}/photos"
+      "${mounts.fast}/photography"
     ];
     notes = [
       "${mounts.fast}/notes"
@@ -34,6 +35,11 @@ let
   };
 in
 {
+  # Camera archive shared by LaForge over SMB; Immich reads Finished only.
+  systemd.tmpfiles.rules = map
+    (path: "d ${mounts.fast}/photography${path} 2750 leo homelab - -")
+    [ "" "/Finished" "/Originals" "/Catalogs" "/Staging" ];
+
   homelab = {
     baseDomain = "leolab.party";
     mounts = mounts;
@@ -188,6 +194,7 @@ in
             schedule = "*-*-* 04:30:00"; # Daily at 4:30 AM (large library, last to run)
             paths = backupPaths.immich;
             exclude = [
+              "${mounts.fast}/photography/Staging"
               "**/thumbs"
               "**/thumbnails"
               "**/.tmp"
