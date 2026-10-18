@@ -69,7 +69,7 @@ export function createWebServer(
         await pipeline(Readable.from(response.body), outgoing);
       }
     } catch {
-      log.error("Notification HTTP request failed");
+      log.error("HTTP request failed");
       if (!outgoing.headersSent) {
         outgoing.writeHead(500, { "content-type": "application/json" });
         outgoing.end(JSON.stringify({ error: "internal server error" }));

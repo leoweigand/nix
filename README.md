@@ -64,6 +64,32 @@ unexpected local compilation.
 - `homelab.apps.*` is reserved for subdomain-routed app modules; supporting platform services belong under `homelab.infra.*`.
 - ACME and public-host reconciliation read the raw API token from `op://Homelab/Cloudflare/CLOUFLARE_ACCESS_TOKEN` through opnix. ACME supplies it to Lego using `CF_DNS_API_TOKEN_FILE` and systemd credentials; the secret stays outside the Nix store.
 
+### Internal service APIs
+
+`homelab.infra.edge.internalProxies.<name>.upstream` routes
+`<name>.internal.leolab.party` within one wildcard Caddy site. A single
+`internalAllowedClientRanges` policy permits loopback, the Podman bridge and
+Tailscale by default. Caddy uses its trusted-proxy-aware client IP, preserving
+the network boundary for Cloudflare tunnel requests. The namespace is reserved
+against competing regular/private virtual hosts; unknown internal hosts return
+404 to approved clients and 403 to others. These entries generate private DNS
+records and add `*.internal.leolab.party` to the ACME certificate.
+
+`homelab.infra.aiGateway` provides a stateless OpenCode Zen gateway at
+`ai.internal.leolab.party`. Callers need no API key. `/v1/models` lists the
+configured allowlist, `/v1/chat/completions` selects `defaultChatModel` when
+`model` is omitted or `default`, and `/v1/systemone` selects
+`defaultSystemoneModel`. `/healthz` returns 204 without upstream traffic.
+Protocol-specific allowlists reject unsupported models before inference.
+
+The service reads `apiKeyReference` through opnix and a systemd credential;
+the API key stays outside the Nix store. It preserves JSON payload fields,
+streaming chunks, tool calls and upstream errors, with fixed upstream routes,
+no inference retries and no caller authentication headers forwarded upstream.
+Defaults are 16 MiB request bodies, eight simultaneous requests and ten minutes
+per request including response streaming. Disconnects cancel upstream work.
+Logs contain endpoint, model, status, duration and cancellation metadata only.
+
 ### Publishing a homelab service
 
 Set the flag on the service's existing edge hostname in `machines/picard/homelab.nix`:

@@ -75,25 +75,24 @@ let
             inherit (proxyCfg.auth) passUser bypassPaths;
           };
       needsAuth = authCfg.enable;
-      authGate =
-        ''
-          # Expanded forward_auth lets renewal cookies reach the browser.
-          reverse_proxy http://127.0.0.1:${toString oauth2Proxy.port} {
-            method GET
-            # Drop the app query so its rd parameter cannot override our return URL.
-            rewrite /?
-            header_up X-Forwarded-Method {method}
-            header_up X-Forwarded-Uri {uri}
-            header_up X-Auth-Request-Redirect https://{host}{uri}
-            @authenticated status 2xx
-            handle_response @authenticated {
-              copy_response_headers {
-                include Set-Cookie
-              }
-              ${lib.optionalString authCfg.passUser "request_header Remote-User {rp.header.X-Auth-Request-Preferred-Username}"}
+      authGate = ''
+        # Expanded forward_auth lets renewal cookies reach the browser.
+        reverse_proxy http://127.0.0.1:${toString oauth2Proxy.port} {
+          method GET
+          # Drop the app query so its rd parameter cannot override our return URL.
+          rewrite /?
+          header_up X-Forwarded-Method {method}
+          header_up X-Forwarded-Uri {uri}
+          header_up X-Auth-Request-Redirect https://{host}{uri}
+          @authenticated status 2xx
+          handle_response @authenticated {
+            copy_response_headers {
+              include Set-Cookie
             }
+            ${lib.optionalString authCfg.passUser "request_header Remote-User {rp.header.X-Auth-Request-Preferred-Username}"}
           }
-        '';
+        }
+      '';
       reverseProxy = ''
         reverse_proxy ${proxyCfg.upstream} {
           ${lib.concatMapAttrsStringSep "\n" (name: value: "header_up ${name} ${value}") proxyCfg.headerUp}
@@ -157,6 +156,26 @@ in
       type = lib.types.attrsOf privateProxyType;
     };
 
+    internalProxies = lib.mkOption {
+      description = "Backends under internal.{domain}, sharing one namespace access policy";
+      default = { };
+      type = lib.types.attrsOf (
+        lib.types.submodule {
+          options.upstream = lib.mkOption { type = lib.types.str; };
+        }
+      );
+    };
+
+    internalAllowedClientRanges = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [
+        "127.0.0.0/8"
+        "10.88.0.0/16"
+        "100.64.0.0/10"
+      ];
+      description = "Trusted client ranges for all internal service APIs";
+    };
+
     rootProxy = lib.mkOption {
       type = lib.types.nullOr proxyType;
       default = null;
@@ -204,6 +223,22 @@ in
           lib.intersectLists (builtins.attrNames cfg.proxies) (builtins.attrNames cfg.privateProxies) == [ ];
         message = "homelab.infra.edge.proxies and privateProxies must not use the same subdomain";
       }
+      {
+        assertion =
+          lib.all (
+            name: builtins.stringLength name <= 63 && builtins.match "[a-z]([a-z0-9-]*[a-z0-9])?" name != null
+          ) (builtins.attrNames cfg.internalProxies)
+          && cfg.internalAllowedClientRanges != [ ];
+        message = "Internal proxy names must be DNS labels, with a nonempty network allowlist";
+      }
+      {
+        assertion =
+          cfg.internalProxies == { }
+          || lib.all (name: name != "internal" && !(lib.hasSuffix ".internal" name)) (
+            builtins.attrNames cfg.proxies ++ builtins.attrNames cfg.privateProxies
+          );
+        message = "The internal namespace is reserved for edge.internalProxies";
+      }
     ]
     ++ lib.mapAttrsToList (name: proxyCfg: {
       assertion = !requiresAuth proxyCfg || oauth2Proxy.enable;
@@ -223,7 +258,10 @@ in
 
       certs.${domain} = {
         domain = domain;
-        extraDomainNames = [ "*.${domain}" ];
+        extraDomainNames = [
+          "*.${domain}"
+        ]
+        ++ lib.optional (cfg.internalProxies != { }) "*.internal.${domain}";
         dnsProvider = "cloudflare";
         dnsPropagationCheck = true;
         dnsResolver = "1.1.1.1:53";
@@ -266,6 +304,26 @@ in
         "https://*.${domain}" = {
           useACMEHost = domain;
           extraConfig = "abort";
+        };
+      }
+      // lib.optionalAttrs (cfg.internalProxies != { }) {
+        "https://*.internal.${domain}" = {
+          useACMEHost = domain;
+          extraConfig = ''
+            route {
+              @denied not client_ip ${lib.concatStringsSep " " cfg.internalAllowedClientRanges}
+              respond @denied 403
+              ${lib.concatMapAttrsStringSep "\n" (name: proxy: ''
+                @${name} host ${name}.internal.${domain}
+                handle @${name} {
+                  reverse_proxy ${proxy.upstream} {
+                    flush_interval -1
+                  }
+                }
+              '') cfg.internalProxies}
+              respond 404
+            }
+          '';
         };
       }
       // lib.optionalAttrs (cfg.rootProxy != null) {
