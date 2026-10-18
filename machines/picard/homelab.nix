@@ -36,9 +36,13 @@ let
 in
 {
   # Camera archive shared by LaForge over SMB; Immich reads Finished only.
-  systemd.tmpfiles.rules = map
-    (path: "d ${mounts.fast}/photography${path} 2750 leo homelab - -")
-    [ "" "/Finished" "/Originals" "/Catalogs" "/Staging" ];
+  systemd.tmpfiles.rules = map (path: "d ${mounts.fast}/photography${path} 2750 leo homelab - -") [
+    ""
+    "/Finished"
+    "/Originals"
+    "/Catalogs"
+    "/Staging"
+  ];
 
   homelab = {
     baseDomain = "leolab.party";
@@ -105,9 +109,14 @@ in
         environmentReference = "op://Homelab/Notification Gateway/env";
       };
 
+      aiGateway = {
+        enable = true;
+        apiKeyReference = "op://Homelab/OpenCode Zen/credential";
+      };
+
       edgeDns = {
         enable = true;
-        serial = 2026101301; # Bump whenever DNS names or values change
+        serial = 2026101801; # Bump whenever DNS names or values change
         lanListenAddress = "192.168.2.4";
         lanAnswerAddress = "192.168.2.4";
         tailnetListenAddress = "100.104.119.103";

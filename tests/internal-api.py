@@ -12,6 +12,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 fixture = json.loads(pathlib.Path(sys.argv[1]).read_text())
+assert fixture["namespaceReserved"], "Competing internal virtual host bypasses policy"
 assert fixture["legacyUnchanged"], "Existing notification route changed"
 assert "*.internal.leolab.party" in fixture["tls"]
 assert "ai.internal 60 IN A 192.168.2.4" in fixture["lan"]

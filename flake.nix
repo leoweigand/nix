@@ -69,6 +69,11 @@
         picard = self.nixosConfigurations.picard;
       };
 
+      checks.x86_64-linux.internal-api = import ./tests/internal-api.nix {
+        pkgs = nixpkgs.legacyPackages.x86_64-linux;
+        picard = self.nixosConfigurations.picard;
+      };
+
       nixosConfigurations = {
         # Picard - Main homelab server (NixOS VM on Unraid)
         picard = nixpkgs.lib.nixosSystem {
