@@ -29,18 +29,10 @@ The separate publication module, `modules/infra/cloudflare-publication.nix`, der
 - **Module ownership**: `modules/infra/reverse-proxy.nix` owns ACME + Caddy defaults, while each app module contributes its own virtual host.
 - **LAN reachability**: Firewall policy keeps DNS (`53/tcp`, `53/udp`) and edge HTTP(S) (`80/tcp`, `443/tcp`) open so local clients can resolve and reach services through the proxy.
 
-Internal APIs share the `*.internal.leolab.party` virtual host, with a single
-trusted-proxy-aware network gate before host routing. Only loopback, Podman
-bridge and Tailscale callers are allowed by default; DNS visibility on the LAN
-does not grant access. Internal service declarations generate exact private DNS
-records, and competing edge declarations under that namespace are rejected.
-The existing notification gateway retains its separate private hostname.
-
-The AI gateway uses this namespace and a loopback-only Node TypeScript service.
-It enforces protocol-specific model allowlists and defaults, injects its opnix
-upstream credential, and streams the OpenCode Zen response back without storing
-prompts or responses. Landlock and systemd restrict its runtime filesystem and
-TCP access; request sizes, concurrency and total duration are bounded.
+Internal APIs share one network gate at `*.internal.leolab.party`, allowing
+loopback, Podman bridge and Tailscale callers. LAN DNS visibility does not grant
+access. The AI gateway uses this namespace to expose allowlisted OpenCode Zen
+models with centrally held credentials. See [internal service APIs](README.md#internal-service-apis).
 
 ### Access Flow
 1. Local client resolves `service.leolab.party` via the home DNS server and connects to picard's LAN IP over HTTPS.

@@ -66,29 +66,18 @@ unexpected local compilation.
 
 ### Internal service APIs
 
-`homelab.infra.edge.internalProxies.<name>.upstream` routes
-`<name>.internal.leolab.party` within one wildcard Caddy site. A single
-`internalAllowedClientRanges` policy permits loopback, the Podman bridge and
-Tailscale by default. Caddy uses its trusted-proxy-aware client IP, preserving
-the network boundary for Cloudflare tunnel requests. The namespace is reserved
-against competing regular/private virtual hosts; unknown internal hosts return
-404 to approved clients and 403 to others. These entries generate private DNS
-records and add `*.internal.leolab.party` to the ACME certificate.
+Declare `homelab.infra.edge.internalProxies.<name>.upstream` to serve
+`<name>.internal.leolab.party`. Entries share one Caddy access policy
+(`internalAllowedClientRanges`): loopback, Podman bridge and Tailscale by default.
+They generate private DNS records and add the internal wildcard certificate.
+Trusted-proxy handling preserves the boundary for Cloudflare tunnel requests;
+competing ordinary proxy declarations in this namespace are rejected.
 
-`homelab.infra.aiGateway` provides a stateless OpenCode Zen gateway at
-`ai.internal.leolab.party`. Callers need no API key. `/v1/models` lists the
-configured allowlist, `/v1/chat/completions` selects `defaultChatModel` when
-`model` is omitted or `default`, and `/v1/systemone` selects
-`defaultSystemoneModel`. `/healthz` returns 204 without upstream traffic.
-Protocol-specific allowlists reject unsupported models before inference.
-
-The service reads `apiKeyReference` through opnix and a systemd credential;
-the API key stays outside the Nix store. It preserves JSON payload fields,
-streaming chunks, tool calls and upstream errors, with fixed upstream routes,
-no inference retries and no caller authentication headers forwarded upstream.
-Defaults are 16 MiB request bodies, eight simultaneous requests and ten minutes
-per request including response streaming. Disconnects cancel upstream work.
-Logs contain endpoint, model, status, duration and cancellation metadata only.
+`homelab.infra.aiGateway` provides OpenCode Zen inference through Chat Completions
+and Jev System One, with separate model allowlists and defaults. Opnix supplies
+`apiKeyReference`; callers need no key. Streaming and tool-call payloads pass
+through. Defaults are 16 MiB bodies, eight active requests and ten minutes total;
+disconnects cancel inference, with no automatic retries or content logging.
 
 ### Publishing a homelab service
 
