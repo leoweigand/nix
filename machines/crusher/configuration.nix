@@ -9,6 +9,7 @@
   home-manager.users.leo.home.packages = [
     pkgs.cloudflared
     pkgs.jdk21
+    pkgs.stripe-cli
   ];
 
   # Flutter is an fvm-managed SDK, unmanaged by nix, and only the SDK's bin dir
