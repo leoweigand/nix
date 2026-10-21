@@ -3,7 +3,10 @@
 {
   imports = [ ../../modules/darwin/common.nix ];
 
-  home-manager.users.leo.imports = [ ../../modules/home/darwin/claude-code.nix ];
+  home-manager.users.leo.imports = [
+    ../../modules/home/darwin/claude-code.nix
+    ../../modules/home/darwin/tsql.nix
+  ];
 
   # Headless JDK for the openapi-generator CLI jar; nothing else needs Java.
   home-manager.users.leo.home.packages = [
