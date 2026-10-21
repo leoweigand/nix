@@ -42,7 +42,7 @@ isolation, atomic writes and TCP denial on Linux.
 - **picard (NixOS VM on laforge)**: Runs the homelab edge (reverse proxy, DNS), plus apps (Immich, Paperless-ngx, etc.). Laforge is the Unraid host with the storage array and SSD cache drives.
 - **crusher (macOS)**: Includes `tsql` and `tsql-prod`. The latter connects to the
   production read-only PostgreSQL role, fetching its connection string from
-  1Password at launch and passing it through `DATABASE_URL`.
+  the Elephant 1Password account at launch and passing it through `DATABASE_URL`.
 
 ## Darwin Package Policy
 

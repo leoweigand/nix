@@ -35,7 +35,7 @@ let
     runtimeInputs = [ pkgs._1password-cli tsql ];
     text = ''
       # Resolve at launch so the credential stays out of the Nix store and argv.
-      DATABASE_URL="$(op read 'op://Engineering/Production Postgres Read-Only Role/Connection string')"
+      DATABASE_URL="$(op read --account elephantcompany.1password.com 'op://Engineering/Production Postgres Read-Only Role/Connection string')"
       export DATABASE_URL
       exec tsql "$@"
     '';
