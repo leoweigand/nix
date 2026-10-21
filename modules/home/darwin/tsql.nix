@@ -29,7 +29,18 @@ let
       platforms = [ "aarch64-darwin" ];
     };
   };
+
+  tsql-prod = pkgs.writeShellApplication {
+    name = "tsql-prod";
+    runtimeInputs = [ pkgs._1password-cli tsql ];
+    text = ''
+      # Resolve at launch so the credential stays out of the Nix store and argv.
+      DATABASE_URL="$(op read 'op://Engineering/Production Postgres Read-Only Role/Connection string')"
+      export DATABASE_URL
+      exec tsql "$@"
+    '';
+  };
 in
 {
-  home.packages = [ tsql ];
+  home.packages = [ tsql tsql-prod ];
 }
