@@ -38,6 +38,19 @@ Sonarr/Radarr import notifications.
 `nix build .#checks.x86_64-linux.automation-sandbox` verifies filesystem/SQLite
 isolation, atomic writes and TCP denial on Linux.
 
+Picard also runs a Swamp diagnostic trial every fifteen minutes through
+`homelab.infra.swamp`. Its typed behavior checks failed services, virtiofs
+mounts, split DNS and three application health endpoints. Definitions and the
+workflow live in `modules/infra/swamp`; runtime state lives in `/var/lib/swamp`
+under a dedicated unprivileged user. The timer records evidence without
+remediation or notifications. Run data is collected for seven days.
+
+`packages/swamp` pins the upstream Linux binary, patches its ELF loader for
+NixOS and supplies Nix's Deno runtime for extensions. Zod is fetched with a
+fixed hash, so these checks need no runtime package downloads. Opnix supplies
+the collective key and matching signin token from `op://Homelab/Swamp/env`.
+Swamp is not included in the Mac configurations.
+
 ## Machines
 - **picard (NixOS VM on laforge)**: Runs the homelab edge (reverse proxy, DNS), plus apps (Immich, Paperless-ngx, etc.). Laforge is the Unraid host with the storage array and SSD cache drives.
 - **crusher (macOS)**: Includes `tsql` and `tsql-prod`. The latter connects to the
@@ -58,10 +71,6 @@ exceptions. Before adding an external flake package, verify that its complete
 `aarch64-darwin` closure is available from a trusted binary cache. Run
 `scripts/check-darwin-build-plan.sh <machine>` before a rebuild to surface
 unexpected local compilation.
-
-Swamp is available to both Macs through `modules/home/darwin/swamp.nix`, which
-pins an upstream prebuilt CLI and its checksum. Update that module to upgrade
-the CLI; repository initialization and Swamp Club login remain user state.
 
 ## Edge Routing Model
 
