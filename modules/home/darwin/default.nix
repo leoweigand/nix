@@ -10,7 +10,6 @@
     ./omp.nix
     ./opencode.nix
     ./slimg.nix
-    ./swamp.nix
     ./zsh.nix
   ];
 
