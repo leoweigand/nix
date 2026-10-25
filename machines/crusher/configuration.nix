@@ -67,6 +67,7 @@
       upgrade = true;
       cleanup = "zap";
     };
+    taps = [ "steipete/tap" ];
     brews = [
       "awscli"
       "cocoapods"
@@ -74,6 +75,7 @@
     ];
     casks = [
       "codex"
+      "steipete/tap/codexbar"
       "ghostty"
       "google-drive"
       "macwhisper"
