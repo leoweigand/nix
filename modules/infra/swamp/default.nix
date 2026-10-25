@@ -125,19 +125,19 @@ in
         if [ ! -f ${repoDir}/.swamp.yaml ]; then
           ${launcher}/bin/swamp-picard repo init --tool none --no-vault
         fi
+        # Extract the bundled runtime before loading any custom extension,
+        # then use Nix's Deno so the first run works on a fresh NixOS host.
+        if [ ! -f "$SWAMP_HOME/deno/.version" ]; then
+          ${launcher}/bin/swamp-picard doctor extensions --json
+        fi
+        ln -sfn ${pkgs.deno}/bin/deno "$SWAMP_HOME/deno/deno"
         ln -sfn ${zod} ${repoDir}/extensions/vendor/zod
         install -m 0644 ${../../../packages/swamp/extensions/picard-health.ts} ${repoDir}/extensions/behaviors/picard-health.ts
         mkdir -p ${repoDir}/models/@leo/picard-health ${repoDir}/workflows
         install -m 0644 ${definition} ${repoDir}/models/@leo/picard-health/picard-health.yaml
         install -m 0644 ${./workflow-picard-health.yaml} ${repoDir}/workflows/workflow-picard-health.yaml
-        # Swamp falls back to Nix's Deno on NixOS. Keep that working runtime
-        # in its cache after extraction to avoid retrying the generic binary.
-        if [ -f "$SWAMP_HOME/deno/.version" ]; then
-          ln -sfn ${pkgs.deno}/bin/deno "$SWAMP_HOME/deno/deno"
-        fi
         ${launcher}/bin/swamp-picard behavior validate picard-health --json
         ${launcher}/bin/swamp-picard workflow validate picard-health --json
-        ln -sfn ${pkgs.deno}/bin/deno "$SWAMP_HOME/deno/deno"
       '';
       script = ''
         ${launcher}/bin/swamp-picard workflow run picard-health
