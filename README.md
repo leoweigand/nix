@@ -41,7 +41,8 @@ isolation, atomic writes and TCP denial on Linux.
 Picard also runs a Swamp diagnostic trial every fifteen minutes through
 `homelab.infra.swamp`. Its typed behavior checks failed services, virtiofs
 mounts, split DNS and three application health endpoints. Definitions and the
-workflow live in `modules/infra/swamp`; runtime state lives in `/var/lib/swamp`
+workflow live in `modules/infra/swamp`, with Deno extension sources under
+`packages/swamp/extensions`; runtime state lives in `/var/lib/swamp`
 under a dedicated unprivileged user. The timer records evidence without
 remediation or notifications. Run data is collected for seven days.
 

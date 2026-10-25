@@ -126,7 +126,7 @@ in
           ${launcher}/bin/swamp-picard repo init --tool none --no-vault
         fi
         ln -sfn ${zod} ${repoDir}/extensions/vendor/zod
-        install -m 0644 ${./picard-health.ts} ${repoDir}/extensions/behaviors/picard-health.ts
+        install -m 0644 ${../../../packages/swamp/extensions/picard-health.ts} ${repoDir}/extensions/behaviors/picard-health.ts
         mkdir -p ${repoDir}/models/@leo/picard-health ${repoDir}/workflows
         install -m 0644 ${definition} ${repoDir}/models/@leo/picard-health/picard-health.yaml
         install -m 0644 ${./workflow-picard-health.yaml} ${repoDir}/workflows/workflow-picard-health.yaml
