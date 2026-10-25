@@ -59,6 +59,10 @@ exceptions. Before adding an external flake package, verify that its complete
 `scripts/check-darwin-build-plan.sh <machine>` before a rebuild to surface
 unexpected local compilation.
 
+Swamp is available to both Macs through `modules/home/darwin/swamp.nix`, which
+pins an upstream prebuilt CLI and its checksum. Update that module to upgrade
+the CLI; repository initialization and Swamp Club login remain user state.
+
 ## Edge Routing Model
 
 - Shared edge settings live in `modules/infra/reverse-proxy.nix`.
