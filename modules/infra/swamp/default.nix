@@ -141,6 +141,7 @@ in
       '';
       script = ''
         ${launcher}/bin/swamp-picard workflow run picard-health
+        ${launcher}/bin/swamp-picard data gc --yes --json
         ${launcher}/bin/swamp-picard run gc --older-than 7d --yes
       '';
       serviceConfig = {
