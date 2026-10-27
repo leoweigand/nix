@@ -1,7 +1,10 @@
 { lib, pkgs, ... }:
 
 {
-  imports = [ ../../modules/darwin/common.nix ];
+  imports = [
+    ../../modules/darwin/common.nix
+    ./usage4claude.nix
+  ];
 
   home-manager.users.leo.imports = [
     ../../modules/home/darwin/claude-code.nix
@@ -67,7 +70,6 @@
       upgrade = true;
       cleanup = "zap";
     };
-    taps = [ "steipete/tap" ];
     brews = [
       "awscli"
       "cocoapods"
@@ -75,7 +77,6 @@
     ];
     casks = [
       "codex"
-      "steipete/tap/codexbar"
       "ghostty"
       "google-drive"
       "macwhisper"
