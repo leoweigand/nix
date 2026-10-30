@@ -58,6 +58,14 @@ Swamp is not included in the Mac configurations.
   to the production read-only PostgreSQL role, fetching its connection string from
   the Elephant 1Password account at launch and passing it through `DATABASE_URL`.
 
+Picard also runs the upstream Rex login server, pinned through the `rex` snapshot
+flake input. `machines/picard/rex.nix` allows only Leo's Tailscale login to use
+the existing `leo` account at `http://picard.stargazer-octatonic.ts.net:7297`.
+It uses the host's Tailscale addresses and PAM, leaving Caddy's HTTPS listener
+available. Update with `nix flake update rex`; this release requires no download
+token. Connection and operational details live in the
+[Homelab Rex notes](../homelab/docs/rex.md).
+
 ## Darwin Package Policy
 
 Darwin rebuilds should install third-party dependencies and applications from
