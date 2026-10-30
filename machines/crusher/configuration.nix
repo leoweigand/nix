@@ -8,7 +8,7 @@
 
   home-manager.users.leo.imports = [
     ../../modules/home/darwin/claude-code.nix
-    ../../modules/home/darwin/tsql.nix
+    ../../modules/home/darwin/rainfrog.nix
   ];
 
   # Headless JDK for the openapi-generator CLI jar; nothing else needs Java.

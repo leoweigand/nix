@@ -54,8 +54,8 @@ Swamp is not included in the Mac configurations.
 
 ## Machines
 - **picard (NixOS VM on laforge)**: Runs the homelab edge (reverse proxy, DNS), plus apps (Immich, Paperless-ngx, etc.). Laforge is the Unraid host with the storage array and SSD cache drives.
-- **crusher (macOS)**: Includes `tsql` and `tsql-prod`. The latter connects to the
-  production read-only PostgreSQL role, fetching its connection string from
+- **crusher (macOS)**: Includes `rainfrog` and `rainfrog-prod`. The latter connects
+  to the production read-only PostgreSQL role, fetching its connection string from
   the Elephant 1Password account at launch and passing it through `DATABASE_URL`.
 
 ## Darwin Package Policy
