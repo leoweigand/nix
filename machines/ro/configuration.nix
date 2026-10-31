@@ -25,6 +25,7 @@
       "ghostty"
       "macwhisper"
       "obsidian"
+      "signal"
       "tailscale-app"
       "zed"
     ];
