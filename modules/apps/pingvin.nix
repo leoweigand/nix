@@ -38,8 +38,7 @@ in
 
     image = lib.mkOption {
       type = lib.types.str;
-      # v2.0.0 adds HTTP range requests for seeking within shared media.
-      default = "ghcr.io/smp46/pingvin-share-x:v2.0.0@sha256:d509135afd1d2cefcdeae64a455d52ad5635f7bb37701c6f858f179023ba2910";
+      default = "ghcr.io/smp46/pingvin-share-x:v2.1.0@sha256:0b3e52a50d233957d8a05632ee13554ad775ee9af757591c36c885973deb590d";
       description = "Pingvin Share X container image, pinned to a release and digest";
     };
 

@@ -22,7 +22,7 @@ in
 
     imageTag = lib.mkOption {
       type = lib.types.str;
-      default = "2.5.2";
+      default = "2.12.1";
       description = "Container image tag for SilverBullet";
     };
   };

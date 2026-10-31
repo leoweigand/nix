@@ -28,7 +28,7 @@ in
 
     imageTag = lib.mkOption {
       type = lib.types.str;
-      default = "1.46.2-plus";
+      default = "1.47.0-plus";
       description = "Container image tag for Linkding";
     };
 

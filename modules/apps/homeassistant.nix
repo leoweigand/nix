@@ -23,7 +23,7 @@ in
 
     imageTag = lib.mkOption {
       type = lib.types.str;
-      default = "stable";
+      default = "2026.10.4";
       description = "Container image tag for Home Assistant";
     };
 
