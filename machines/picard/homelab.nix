@@ -49,43 +49,6 @@ in
     mounts = mounts;
 
     infra = {
-      swamp = {
-        enable = true;
-        environmentReference = "op://Homelab/Swamp/env";
-        schedule = "*-*-* *:0/15:00";
-        mounts = [
-          {
-            path = mounts.fast;
-            source = "nixos-cache";
-          }
-          {
-            path = mounts.media;
-            source = "media";
-          }
-        ];
-        dnsServer = "192.168.2.4";
-        expectedAddress = "192.168.2.4";
-        dnsNames = [
-          "auth.leolab.party"
-          "jellyfin.leolab.party"
-          "notifications.leolab.party"
-        ];
-        endpoints = [
-          {
-            name = "pocket-id";
-            url = "https://auth.leolab.party/healthz";
-          }
-          {
-            name = "jellyfin";
-            url = "https://jellyfin.leolab.party/health";
-          }
-          {
-            name = "notification-gateway";
-            url = "https://notifications.leolab.party/healthz";
-          }
-        ];
-      };
-
       edge = {
         enable = true;
         acmeEmail = "admin@leolab.party";

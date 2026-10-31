@@ -13,7 +13,6 @@
     ./oauth2-proxy.nix
     ./pocket-id.nix
     ./reverse-proxy.nix
-    ./swamp
     ./tailscale.nix
   ];
 }
