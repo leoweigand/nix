@@ -195,7 +195,7 @@ an immediate reconciliation; inspect its results with
 
 ### Authentication
 
-Pocket ID 2.14.0 runs natively on Picard behind Caddy at `auth.leolab.party`.
+Pocket ID 2.19.1 runs natively on Picard behind Caddy at `auth.leolab.party`.
 Its application name is `LeoLab`, managed declaratively in Nix.
 Its live SQLite database and uploads are on local disk in `/var/lib/pocket-id`;
 `/mnt/fast` is virtiofs and does not hold the live database. Before the existing
@@ -249,7 +249,7 @@ at startup; no secrets enter the Nix store. Picard enables this service.
 `https://share.leolab.party`, with native Pocket ID login and public sharing links.
 Enabling it starts one Podman container, bound to
 `127.0.0.1:3005`, with persistent SQLite, uploads and custom images in
-`/var/lib/pingvin`. Its v2.0.0 image is pinned by digest and supports HTTP range
+`/var/lib/pingvin`. Its v2.1.0 image is pinned by digest and supports HTTP range
 requests for seeking in browser-compatible media. Picard declares the public
 edge route separately; recipients can open shared links without an account.
 Uploading and administration require the Pocket ID `admins` group. Password
