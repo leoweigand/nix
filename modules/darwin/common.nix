@@ -1,4 +1,9 @@
-{ inputs, machineName, pkgs, ... }:
+{
+  inputs,
+  machineName,
+  pkgs,
+  ...
+}:
 
 let
   cleanshot = pkgs.stdenvNoCC.mkDerivation {
@@ -40,6 +45,7 @@ in
       "1password-cli"
       "claude-code"
       "cleanshot"
+      "rex-desktop"
     ];
 
   # Home Manager runs as a nix-darwin module, sharing the system package set.
@@ -61,9 +67,23 @@ in
   ];
 
   homebrew.casks = [
+    "1password"
     "abue-ammar/tinycast/tinycast"
+    "cap"
+    "firefox@nightly"
+    "google-chrome@canary"
     "keepingyouawake"
+    "macwhisper"
+    "obsidian"
+    "opencode-desktop"
+    "tailscale-app"
+    "tidal"
+    "vlc"
+    "zed"
+    "zen"
   ];
+
+  homebrew.masApps."Things 3" = 904280696;
 
   system.activationScripts.homebrew.text = pkgs.lib.mkBefore ''
     if [ -x /opt/homebrew/bin/brew ] && sudo --user=leo --set-home /opt/homebrew/bin/brew list --cask cleanshot >/dev/null 2>&1; then
@@ -74,7 +94,28 @@ in
     fi
   '';
 
-  environment.systemPackages = [ cleanshot ];
+  environment.systemPackages = [
+    cleanshot
+    (pkgs.callPackage ../../packages/rex-desktop { })
+  ];
+
+  # Migrate the manually installed Rex bundle only after its Nix copy is ready.
+  system.activationScripts.applications.text = pkgs.lib.mkAfter ''
+    if [ -d '/Applications/Nix Apps/Rex Beta.app' ]; then
+      if [ -d '/Applications/Rex Beta.app' ] && [ ! -L '/Applications/Rex Beta.app' ]; then
+        backupDir='/Users/leo/Library/Application Support/nix-darwin/app-backups'
+        if [ -e "$backupDir/Rex Beta.app" ]; then
+          echo >&2 "Refusing to overwrite the existing Rex app backup: $backupDir/Rex Beta.app"
+          exit 1
+        fi
+        install -d -m 700 -o leo -g staff "$backupDir"
+        mv '/Applications/Rex Beta.app' "$backupDir/Rex Beta.app"
+      fi
+      if [ ! -e '/Applications/Rex Beta.app' ] && [ ! -L '/Applications/Rex Beta.app' ]; then
+        ln -s 'Nix Apps/Rex Beta.app' '/Applications/Rex Beta.app'
+      fi
+    fi
+  '';
 
   home-manager.users.leo = {
     imports = [
@@ -95,7 +136,10 @@ in
   time.timeZone = "Europe/Berlin";
 
   nix.settings = {
-    experimental-features = [ "nix-command" "flakes" ];
+    experimental-features = [
+      "nix-command"
+      "flakes"
+    ];
     # Keep an accidental source build responsive instead of letting several
     # highly parallel compiler jobs contend for all CPU and memory.
     max-jobs = 2;
@@ -104,7 +148,7 @@ in
 
   system.defaults = {
     NSGlobalDomain = {
-      AppleKeyboardUIMode = 3;  # full keyboard access (tab in dialogs)
+      AppleKeyboardUIMode = 3; # full keyboard access (tab in dialogs)
       InitialKeyRepeat = 12;
       KeyRepeat = 2;
       "com.apple.trackpad.scaling" = 7.0;

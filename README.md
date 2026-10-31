@@ -81,6 +81,29 @@ exceptions. Before adding an external flake package, verify that its complete
 `scripts/check-darwin-build-plan.sh <machine>` before a rebuild to surface
 unexpected local compilation.
 
+### Application ownership
+
+Shared GUI apps live in `modules/darwin/common.nix`; Ro-only apps live in
+`machines/ro/configuration.nix`. Casks use the upstream prebuilt apps. App Store
+installs retain their existing distribution: Things is shared, while 1Password
+for Safari, AdGuard Mini and Bitwarden are Ro-only.
+
+Ro deliberately leaves its other apps, including Codex CLI, Ghostty and the iA
+Writer Quattro font, manually managed. Its Homebrew activation installs and
+upgrades declared apps without cleaning up undeclared packages. Crusher retains
+its cask/formula cleanup in a separate `brew bundle cleanup --no-mas --zap --force`
+pass. This excludes App Store apps, so adding Things does not remove other App
+Store purchases; Homebrew's combined install/cleanup currently ignores the MAS
+exclusion environment variable.
+
+CleanShot X and Rex Beta use pinned upstream DMGs wrapped by Nix, with no source
+compilation. Rex Beta remains on preview 1642, matching the previously installed
+version; this is separate from Picard's Rex login server and CLI. Its first switch
+backs up a manually installed `/Applications/Rex Beta.app` under
+`~/Library/Application Support/nix-darwin/app-backups/` and creates an alias to
+the managed copy in `/Applications/Nix Apps`. Calibre's first managed installation
+replaces its older manual app bundle; its library and preferences stay in place.
+
 ## Edge Routing Model
 
 - Shared edge settings live in `modules/infra/reverse-proxy.nix`.

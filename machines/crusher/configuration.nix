@@ -1,4 +1,9 @@
-{ lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 {
   imports = [
@@ -68,7 +73,8 @@
     onActivation = {
       autoUpdate = true;
       upgrade = true;
-      cleanup = "zap";
+      # Use a separate cleanup pass below so App Store apps can be excluded.
+      cleanup = "none";
     };
     brews = [
       "awscli"
@@ -79,12 +85,17 @@
       "codex"
       "ghostty"
       "google-drive"
-      "macwhisper"
-      "obsidian"
-      "tailscale-app"
-      "zed"
     ];
   };
+
+  # Combined install/cleanup ignores the MAS exclusion environment variable.
+  system.activationScripts.homebrew.text = lib.mkAfter ''
+    if [ "$?" -eq 0 ] && [ -x /opt/homebrew/bin/brew ]; then
+      sudo --user=leo --set-home /opt/homebrew/bin/brew bundle cleanup \
+        --file='${pkgs.writeText "Brewfile" config.homebrew.brewfile}' \
+        --no-mas --zap --force
+    fi
+  '';
 
   system.stateVersion = 5;
 }
