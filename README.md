@@ -110,8 +110,16 @@ endpoint accepts at most 20 MiB and returns caller-bound opaque references.
 Private staging expires after 24 hours; durable receipts prevent upload replay
 across restarts. State lives in `/var/lib/private/leolab-mcp`, included in Picard's
 appdata backup. Telegram receives PDFs/photos only in Leo's private DM and never
-passes file bytes or Telegram credentials to the model. This implementation is
-prepared but has not yet been activated on Picard.
+passes file bytes or Telegram credentials to the model. Deployed on Picard on
+1 November 2026. Paperless calls pin API v9 so task status and document IDs retain
+the validated response shape.
+
+The Paperless title hook inherits its worker's systemd restrictions. Its two
+worker units disable `MemoryDenyWriteExecute` only when title extraction is
+enabled: Node's JIT, TypeScript loading and HTTP parser require executable memory.
+Their Landlock, filesystem, syscall and process-visibility restrictions remain.
+The shared launcher adds `/proc/meminfo` and `/proc/cpuinfo` read rules only when
+those files exist, allowing workers with `ProcSubset=pid` to start the hook.
 
 ## Telegram assistant
 
