@@ -88,7 +88,7 @@ separate by chat/sender/topic. Replies preserve their original message and topic
 Telegram group privacy must allow mention delivery before group use is reliable.
 
 `packages/assistant/` independently locks Pi and patched dependencies. The worker
-uses DeepSeek V4.1 Flash through the AI gateway and the requesting sender's MCP
+uses Claude Haiku 5.5 through the AI gateway and the requesting sender's MCP
 connection for media lookup/acquisition and approved Home Assistant controls. It has no coding tools. Ordinary
 conversation works without OAuth; a request needing MCP triggers a private
 Pocket ID sign-in link and resumes after authorization. `/connect` renews or

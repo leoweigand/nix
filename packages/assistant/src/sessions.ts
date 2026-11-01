@@ -5,7 +5,7 @@ import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { readJson, writeJson } from "./storage.ts";
 import { messageContent, type ConversationMessage } from "./conversation.ts";
 
-export const MODEL_ID = "deepseek-v4.1-flash";
+export const MODEL_ID = "claude-haiku-5-5";
 export const MESSAGE_LIMIT = 10;
 export const IDLE_MS = 10 * 60_000;
 export interface Instructions {

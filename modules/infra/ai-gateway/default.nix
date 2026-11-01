@@ -46,6 +46,7 @@ in
     chatModels = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [
+        "claude-haiku-5-5"
         "beam-free"
         "glm-5.3"
         "glm-5.3-flash"

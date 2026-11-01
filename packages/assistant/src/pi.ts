@@ -66,10 +66,10 @@ export class PiAssistant {
             models: [
               {
                 id: MODEL_ID,
-                name: "LeoLab DeepSeek Flash",
-                reasoning: false,
+                name: "LeoLab Claude Haiku 5.5",
+                reasoning: true,
                 input: ["text"],
-                contextWindow: 131072,
+                contextWindow: 1000000,
                 maxTokens: 2048,
                 cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
               },
