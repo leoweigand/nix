@@ -200,6 +200,15 @@ test("search combines catalog results with actual library state, with bounded mi
     ],
   );
   assert.equal(state.writes.length, 0);
+  state.shows.push({
+    ...structuredClone(show),
+    id: 22,
+    statistics: { episodeFileCount: 5, totalEpisodeCount: 5 },
+  });
+  const complete = await service.search(
+    searchSchema.parse({ query: "Test", type: "tv" }),
+  );
+  assert.equal(complete.results[0].libraryStatus, "available");
   state.failTv = true;
   const partial = await service.search(searchSchema.parse({ query: "Test" }));
   assert.equal(partial.results.length, 1);

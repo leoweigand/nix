@@ -216,6 +216,10 @@ function summary(item: Item, kind: Kind, existing?: Item) {
     kind === "movie"
       ? existing?.hasFile
       : (existing?.statistics?.episodeFileCount ?? 0) > 0;
+  const complete =
+    (existing?.statistics?.totalEpisodeCount ?? 0) > 0 &&
+    existing!.statistics!.episodeFileCount >=
+      existing!.statistics!.totalEpisodeCount;
   return {
     mediaId:
       kind === "movie" ? `movie:tmdb:${item.tmdbId}` : `tv:tvdb:${item.tvdbId}`,
@@ -226,7 +230,7 @@ function summary(item: Item, kind: Kind, existing?: Item) {
     libraryStatus: !existing
       ? "not_requested"
       : available
-        ? kind === "movie"
+        ? kind === "movie" || complete
           ? "available"
           : "partially_available"
         : existing.monitored
