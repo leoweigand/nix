@@ -124,6 +124,12 @@ test("OAuth discovery is available and unauthenticated calls receive a challenge
     response.headers.get("www-authenticate")!,
     /resource_metadata=.*oauth-protected-resource\/mcp/,
   );
+  const scopes = response.headers
+    .get("www-authenticate")!
+    .match(/scope="([^"]+)"/)![1]
+    .split(" ");
+  assert.deepEqual(scopes, ["lab:read", "media:read", "media:request"]);
+  assert.deepEqual(metadata.scopes_supported, scopes);
 });
 test("rejects invalid, expired, wrong-audience and ID tokens", async () => {
   for (const value of [
@@ -132,7 +138,12 @@ test("rejects invalid, expired, wrong-audience and ID tokens", async () => {
     await token({ aud: "https://other.example" }),
     await token({}, "JWT"),
   ]) {
-    assert.equal((await request("/mcp", value)).status, 401);
+    const response = await request("/mcp", value);
+    assert.equal(response.status, 401);
+    assert.match(
+      response.headers.get("www-authenticate")!,
+      /scope="lab:read media:read media:request"/,
+    );
   }
   assert.equal(
     (await request("/mcp", await token({ scope: "other:read" }))).status,

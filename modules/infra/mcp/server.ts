@@ -20,6 +20,9 @@ export interface Config {
   issuer: string;
 }
 
+// Clients prioritize challenge scopes over discovery metadata during sign-in.
+const defaultScopes = ["lab:read", "media:read", "media:request"] as const;
+
 export function createApp(
   config: Config,
   verify: (token: string) => Promise<AuthInfo>,
@@ -243,7 +246,7 @@ export function createApp(
         json(200, {
           resource: config.resource,
           authorization_servers: [config.issuer],
-          scopes_supported: ["lab:read", "media:read", "media:request"],
+          scopes_supported: defaultScopes,
           bearer_methods_supported: ["header"],
           resource_name: "LeoLab MCP",
         });
@@ -258,7 +261,7 @@ export function createApp(
       if (!match) {
         res.setHeader(
           "WWW-Authenticate",
-          `Bearer resource_metadata="${metadataUrl}", scope="lab:read"`,
+          `Bearer resource_metadata="${metadataUrl}", scope="${defaultScopes.join(" ")}"`,
         );
         json(401, { error: "unauthorized" });
         return;
@@ -268,19 +271,15 @@ export function createApp(
       } catch {
         res.setHeader(
           "WWW-Authenticate",
-          `Bearer error="invalid_token", resource_metadata="${metadataUrl}"`,
+          `Bearer error="invalid_token", resource_metadata="${metadataUrl}", scope="${defaultScopes.join(" ")}"`,
         );
         json(401, { error: "invalid_token" });
         return;
       }
-      if (
-        !["lab:read", "media:read", "media:request"].some((scope) =>
-          req.auth!.scopes.includes(scope),
-        )
-      ) {
+      if (!defaultScopes.some((scope) => req.auth!.scopes.includes(scope))) {
         res.setHeader(
           "WWW-Authenticate",
-          `Bearer error="insufficient_scope", scope="lab:read", resource_metadata="${metadataUrl}"`,
+          `Bearer error="insufficient_scope", scope="${defaultScopes.join(" ")}", resource_metadata="${metadataUrl}"`,
         );
         json(403, { error: "insufficient_scope" });
         return;
