@@ -1,0 +1,103 @@
+import { execFileSync } from "node:child_process";
+
+// Run explicitly as the lab administrator; credentials never enter server config.
+const key = execFileSync(
+  "op",
+  [
+    "--account",
+    "my.1password.eu",
+    "read",
+    "op://Homelab/Pocket ID API Key/credential",
+  ],
+  { encoding: "utf8" },
+).trim();
+const issuer = "https://auth.leolab.party";
+const resource = "https://mcp.leolab.party/mcp";
+async function api(path: string, method = "GET", body?: unknown) {
+  const response = await fetch(`${issuer}/api${path}`, {
+    method,
+    headers: { "X-API-KEY": key, "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok)
+    throw new Error(`Pocket ID ${method} ${path}: HTTP ${response.status}`);
+  return response.status === 204 ? null : response.json();
+}
+const apis = await api("/apis?pagination%5Blimit%5D=100");
+let entry = apis.data.find(
+  (item: { resource: string }) => item.resource === resource,
+);
+if (!entry)
+  entry = await api("/apis", "POST", { name: "LeoLab MCP", resource });
+if (entry.name !== "LeoLab MCP")
+  throw new Error("Resource exists with a different owner name");
+if (!entry.permissions.some((p: { key: string }) => p.key === "lab:read")) {
+  entry = await api(`/apis/${entry.id}/permissions`, "PUT", {
+    permissions: [
+      ...entry.permissions.map(
+        (p: { key: string; name: string; description?: string }) => ({
+          key: p.key,
+          name: p.name,
+          description: p.description ?? null,
+        }),
+      ),
+      {
+        key: "lab:read",
+        name: "Read lab status",
+        description:
+          "Inspect caller identity and HTTP health of fixed lab services",
+      },
+    ],
+  });
+}
+const permissionId = entry.permissions.find(
+  (p: { key: string }) => p.key === "lab:read",
+).id;
+const clientId = "leolab-mcp-codex";
+const clients = await api("/oidc/clients?pagination%5Blimit%5D=100");
+const existing = clients.data.find(
+  (item: { id: string }) => item.id === clientId,
+);
+if (!existing) {
+  await api("/oidc/clients", "POST", {
+    id: clientId,
+    name: "LeoLab MCP — Codex",
+    description: "Codex desktop and CLI access to private LeoLab tools",
+    isPublic: true,
+    pkceEnabled: true,
+    isGroupRestricted: true,
+    skipConsent: false,
+    callbackURLs: ["http://127.0.0.1:47831/callback"],
+    logoutCallbackURLs: [],
+    accessTokenDurationMinutes: 10,
+    refreshTokenDurationMinutes: 43200,
+  });
+} else if (!existing.isPublic || existing.name !== "LeoLab MCP — Codex") {
+  throw new Error(
+    "Client ID already has a different configuration; inspect it manually",
+  );
+}
+const groups = await api("/user-groups?pagination%5Blimit%5D=100");
+const admins = groups.data.find(
+  (group: { name: string }) => group.name === "admins",
+);
+if (!admins) throw new Error("Missing admins group");
+await api(`/oidc/clients/${clientId}/allowed-user-groups`, "PUT", {
+  userGroupIds: [admins.id],
+});
+await api(`/apis/${entry.id}/clients/${clientId}`, "PUT", {
+  userDelegatedAccess: true,
+  clientAccess: false,
+  userDelegatedPermissionIds: [permissionId],
+  clientPermissionIds: [],
+});
+console.log(
+  JSON.stringify({
+    resource,
+    apiId: entry.id,
+    clientId,
+    permission: "lab:read",
+    callback: "http://127.0.0.1:47831/callback",
+  }),
+);

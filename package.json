@@ -14,11 +14,15 @@
   },
   "dependencies": {
     "@jd1378/another-cookiejar": "npm:@jsr/jd1378__another-cookiejar@5.0.7",
-    "@std/xml": "npm:@jsr/std__xml@0.2.0"
+    "@modelcontextprotocol/node": "2.1.2",
+    "@modelcontextprotocol/server": "2.4.0",
+    "@std/xml": "npm:@jsr/std__xml@0.2.0",
+    "jose": "6.2.14",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
-    "typescript": "^6.0.0",
-    "prettier": "^3.6.0"
+    "prettier": "^3.6.0",
+    "typescript": "^6.0.0"
   }
 }

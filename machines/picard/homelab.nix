@@ -114,9 +114,11 @@ in
         apiKeyReference = "op://Homelab/OpenCode Zen/credential";
       };
 
+      mcp.enable = true;
+
       edgeDns = {
         enable = true;
-        serial = 2026101801; # Bump whenever DNS names or values change
+        serial = 2026110101; # Bump whenever DNS names or values change
         lanListenAddress = "192.168.2.4";
         lanAnswerAddress = "192.168.2.4";
         tailnetListenAddress = "100.104.119.103";

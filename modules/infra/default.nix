@@ -8,6 +8,7 @@
     ./cloudflare-tunnel.nix
     ./edge-dns.nix
     ./homepage.nix
+    ./mcp.nix
     ./mqtt.nix
     ./notification-gateway
     ./oauth2-proxy.nix

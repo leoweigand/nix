@@ -19,7 +19,7 @@ buildNpmPackage {
       (lib.fileset.fileFilter (file: file.hasExt "ts") ../../modules)
     ];
   };
-  npmDepsHash = "sha256-92Pr5T1rFvpvLXyBT4FEHOAB2cjjKjJ7WJLxnZNK8g8=";
+  npmDepsHash = "sha256-3P4CU+JvEfdmXAdrfoKpj5Ac8ZY0IXwm+u2UFqud6W0=";
   dontNpmBuild = true;
   npmFlags = [ "--ignore-scripts" ];
   doCheck = true;
