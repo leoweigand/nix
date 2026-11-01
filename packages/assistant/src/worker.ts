@@ -11,6 +11,7 @@ import {
 import { messageForJob } from "./telegram.ts";
 import { Sessions } from "./sessions.ts";
 import type { PiAssistant } from "./pi.ts";
+import { randomBytes } from "node:crypto";
 
 type Gateway = (endpoint: string, body: unknown) => Promise<void>;
 interface Options {
@@ -95,6 +96,50 @@ export class Worker {
         }
       }
       const payload = JSON.parse(body);
+      if (payload && typeof payload === "object" && payload.callback_query) {
+        const callback = payload.callback_query;
+        if (
+          typeof callback !== "object" ||
+          !callback ||
+          typeof callback.data !== "string" ||
+          !callback.from ||
+          String(callback.from.id) !== this.options.policy.ownerId ||
+          !callback.message?.chat ||
+          !Number.isSafeInteger(callback.message.message_id)
+        )
+          return new Response(null, { status: 204 });
+        const chatId = String(callback.message.chat.id);
+        const original = this.options.inbox
+          .jobs()
+          .find(
+            (candidate) =>
+              candidate.chatId === chatId &&
+              candidate.senderId === this.options.policy.ownerId &&
+              (candidate.buttonsExpireAt ?? 0) > Date.now() &&
+              candidate.buttons?.some(
+                (button) => button.token === callback.data,
+              ),
+          );
+        const button = original?.buttons?.find(
+          (item) => item.token === callback.data,
+        );
+        if (!original || !button) return new Response(null, { status: 204 });
+        const result = this.options.inbox.enqueue({
+          id: `choice-${original.id}`,
+          chatId,
+          senderId: original.senderId,
+          destination: original.destination,
+          text: button.label,
+          messageId: callback.message.message_id,
+          ...(original.topicId === undefined
+            ? {}
+            : { topicId: original.topicId }),
+          receivedAt: Date.now(),
+        });
+        if (result === "full") return new Response(null, { status: 503 });
+        setImmediate(() => void this.drain());
+        return new Response(null, { status: 204 });
+      }
       const job =
         notificationJob(payload, this.options.policy) ??
         eligibleJob(payload, this.options.policy);
@@ -160,10 +205,12 @@ export class Worker {
     job.authNoticeSent = true;
     this.options.inbox.save(job);
   }
-  private async reply(job: Job, message: string): Promise<void> {
+  private async reply(job: Job, message: string, rich = false): Promise<void> {
     await this.options.gateway("/v1/assistant-replies", {
       to: job.destination,
       message,
+      ...(rich ? { rich: true } : {}),
+      ...(rich && job.buttons?.length ? { buttons: job.buttons } : {}),
       message_id: job.messageId,
       ...(job.topicId === undefined ? {} : { message_thread_id: job.topicId }),
       secret: this.options.secret,
@@ -192,7 +239,7 @@ export class Worker {
         manager.appendCustomEntry("compaction-notice", { count });
       }
     }
-    await this.reply(job, job.reply!);
+    await this.reply(job, job.reply!, job.generated === true);
     this.finish(job);
   }
   private finish(job: Job): void {
@@ -296,6 +343,14 @@ export class Worker {
         if (!needsConnection) {
           job.reply = result.text;
           job.generated = true;
+          if (result.buttons?.length) {
+            job.buttons = result.buttons.map((button) =>
+              button.url
+                ? button
+                : { ...button, token: randomBytes(18).toString("base64url") },
+            );
+            job.buttonsExpireAt = Date.now() + 10 * 60 * 1000;
+          }
         }
       } catch {
         this.log.error(

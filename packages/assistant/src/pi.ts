@@ -41,7 +41,12 @@ export class PiAssistant {
     react: (emoji: string) => Promise<void> = async () => {
       throw new Error("Reaction unavailable");
     },
-  ): Promise<{ text: string; needsConnection: boolean; compacted?: boolean }> {
+  ): Promise<{
+    text: string;
+    needsConnection: boolean;
+    compacted?: boolean;
+    buttons?: Array<{ label: string; url?: string }>;
+  }> {
     const agentDir = join(this.stateDir, "agents", "runtime");
     const cwd = join(this.stateDir, "workspace");
     for (const dir of [agentDir, cwd])
@@ -88,6 +93,7 @@ export class PiAssistant {
     });
     let toolCalls = 0;
     let needsConnection = false;
+    let buttons: Array<{ label: string; url?: string }> = [];
     const loader = new DefaultResourceLoader({
       cwd,
       agentDir,
@@ -131,6 +137,41 @@ export class PiAssistant {
           : []),
         (pi) => {
           pi.registerTool({
+            name: "telegram_buttons",
+            label: "Add Telegram buttons",
+            description:
+              "Attach up to six buttons to your next reply. A choice button sends its visible label as the user's next message; a link button opens its HTTPS URL. Labels must fully describe any action they authorize.",
+            parameters: Type.Object({
+              buttons: Type.Array(
+                Type.Object({
+                  label: Type.String({ minLength: 1, maxLength: 80 }),
+                  url: Type.Optional(Type.String({ maxLength: 2048 })),
+                }),
+                { minItems: 1, maxItems: 6 },
+              ),
+            }),
+            execute: async (_id, args) => {
+              for (const button of args.buttons) {
+                if (
+                  button.url &&
+                  (!URL.canParse(button.url) ||
+                    new URL(button.url).protocol !== "https:")
+                )
+                  throw new Error("Button URL must be HTTPS");
+              }
+              buttons = args.buttons;
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: "Buttons will accompany your next reply.",
+                  },
+                ],
+                details: {},
+              };
+            },
+          });
+          pi.registerTool({
             name: "react_to_message",
             label: "React to message",
             description:
@@ -168,7 +209,11 @@ export class PiAssistant {
             });
           pi.on("tool_call", (event) => {
             if (!token && event.toolName === "connect_mcp") return;
-            if (event.toolName === "react_to_message") return;
+            if (
+              event.toolName === "react_to_message" ||
+              event.toolName === "telegram_buttons"
+            )
+              return;
             if (!allowedTools.includes(event.toolName) || ++toolCalls > 8)
               return {
                 block: true,
@@ -202,8 +247,8 @@ export class PiAssistant {
       model,
       thinkingLevel: "off",
       tools: token
-        ? [...allowedTools, "react_to_message"]
-        : ["connect_mcp", "react_to_message"],
+        ? [...allowedTools, "react_to_message", "telegram_buttons"]
+        : ["connect_mcp", "react_to_message", "telegram_buttons"],
       resourceLoader: loader,
       sessionManager,
       settingsManager,
@@ -279,6 +324,7 @@ export class PiAssistant {
       return {
         text,
         needsConnection,
+        buttons,
         compacted: sessionManager
           .getEntries()
           .some((e) => e.type === "compaction"),

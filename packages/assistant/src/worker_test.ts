@@ -119,6 +119,50 @@ test("the reaction tool is bound to the incoming message and conversation", asyn
     f.cleanup();
   }
 });
+test("button choices are bound to the owner and chat, expire, and accept only one selection", async () => {
+  const f = fixture();
+  try {
+    const source = {
+      ...f.job(21, true),
+      done: true,
+      buttons: [
+        { label: "Select Dune (2021)", token: "abcdefghijklmnopqrstuvwx" },
+        { label: "Select Dune (1984)", token: "zyxwvutsrqponmlkjihgfedc" },
+      ],
+      buttonsExpireAt: Date.now() + 60000,
+    };
+    f.inbox.enqueue(source);
+    const worker = new Worker(f.options);
+    worker.drain = async () => {};
+    const press = (sender: number, chat: number, token: string) =>
+      worker.handle(
+        new Request("http://worker/inbox", {
+          method: "POST",
+          headers: { "x-assistant-secret": "test-secret" },
+          body: JSON.stringify({
+            update_id: 99,
+            callback_query: {
+              from: { id: sender },
+              data: token,
+              message: { message_id: 100, chat: { id: chat } },
+            },
+          }),
+        }),
+      );
+    await press(999, -456, source.buttons[0].token);
+    await press(123, -999, source.buttons[0].token);
+    assert.equal(f.inbox.jobs().length, 1);
+    await press(123, -456, source.buttons[0].token);
+    await press(123, -456, source.buttons[1].token);
+    assert.equal(f.inbox.jobs().length, 2);
+    assert.equal(
+      f.inbox.jobs().find((job) => job.id === "choice-21")?.text,
+      "Select Dune (2021)",
+    );
+  } finally {
+    f.cleanup();
+  }
+});
 test("a media request gets a private group link, persists while waiting and resumes in its original group topic", async () => {
   const f = fixture();
   try {

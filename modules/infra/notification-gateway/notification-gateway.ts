@@ -327,6 +327,7 @@ export async function registerTelegramWebhook(
             "edited_message",
             "channel_post",
             "edited_channel_post",
+            "callback_query",
           ],
         }),
       },
@@ -355,6 +356,12 @@ function telegramChat(update: unknown): Record<string, unknown> | undefined {
   if (!isRecord(update)) {
     return undefined;
   }
+  if (
+    isRecord(update.callback_query) &&
+    isRecord(update.callback_query.message) &&
+    isRecord(update.callback_query.message.chat)
+  )
+    return update.callback_query.message;
   for (const key of [
     "message",
     "edited_message",
@@ -755,7 +762,11 @@ async function handleTelegramWebhook(
     return new Response(null, { status: 204 });
   }
 
-  if (config.assistantEnabled && isRecord(update) && isRecord(update.message)) {
+  if (
+    config.assistantEnabled &&
+    isRecord(update) &&
+    (isRecord(update.message) || isRecord(update.callback_query))
+  ) {
     try {
       const response = await dependencies.fetch("http://127.0.0.1:9090/inbox", {
         method: "POST",
@@ -767,6 +778,14 @@ async function handleTelegramWebhook(
         signal: AbortSignal.timeout(5000),
       });
       if (!response.ok) return new Response(null, { status: 503 });
+      if (
+        isRecord(update.callback_query) &&
+        typeof update.callback_query.id === "string"
+      ) {
+        await callTelegram(config, dependencies, "answerCallbackQuery", {
+          callback_query_id: update.callback_query.id,
+        }).catch(() => {});
+      }
     } catch {
       return new Response(null, { status: 503 });
     }
@@ -793,6 +812,24 @@ async function handleAssistantReply(
       !chatId ||
       typeof value.message !== "string" ||
       !value.message.trim() ||
+      (value.rich !== undefined && typeof value.rich !== "boolean") ||
+      (value.buttons !== undefined &&
+        (!Array.isArray(value.buttons) ||
+          value.buttons.length > 6 ||
+          value.buttons.some(
+            (button: unknown) =>
+              !isRecord(button) ||
+              typeof button.label !== "string" ||
+              !button.label.trim() ||
+              button.label.length > 80 ||
+              (typeof button.url === "string"
+                ? !URL.canParse(button.url) ||
+                  new URL(button.url).protocol !== "https:" ||
+                  button.url.length > 2048 ||
+                  button.token !== undefined
+                : typeof button.token !== "string" ||
+                  !/^[A-Za-z0-9_-]{24}$/.test(button.token)),
+          ))) ||
       (value.message_id !== undefined &&
         (!Number.isSafeInteger(value.message_id) ||
           (value.message_id as number) < 1)) ||
@@ -807,7 +844,70 @@ async function handleAssistantReply(
           !Number.isSafeInteger(Number(value.ephemeral_receiver))))
     )
       return new Response(null, { status: 400 });
-    const characters = Array.from(value.message);
+    const replyMarkup =
+      Array.isArray(value.buttons) && value.buttons.length
+        ? {
+            inline_keyboard: value.buttons.map(
+              (button: { label: string; url?: string; token?: string }) => [
+                {
+                  text: button.label,
+                  ...(button.url
+                    ? { url: button.url }
+                    : { callback_data: button.token }),
+                },
+              ],
+            ),
+          }
+        : undefined;
+    if (
+      value.rich === true &&
+      value.ephemeral_receiver === undefined &&
+      Buffer.byteLength(value.message, "utf8") <= 30000
+    ) {
+      const response = await dependencies.fetch(
+        `https://api.telegram.org/bot${config.telegramBotToken}/sendRichMessage`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            rich_message: { markdown: value.message },
+            ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+            ...(value.message_id === undefined
+              ? {}
+              : {
+                  reply_parameters: {
+                    message_id: value.message_id,
+                    allow_sending_without_reply: true,
+                  },
+                }),
+            ...(value.message_thread_id === undefined
+              ? {}
+              : { message_thread_id: value.message_thread_id }),
+          }),
+          signal: AbortSignal.timeout(10000),
+        },
+      );
+      const result: unknown = await response.json();
+      if (response.ok && isRecord(result) && result.ok === true)
+        return new Response(null, { status: 204 });
+      // Only a definite Telegram rejection permits a plain-text fallback. An ambiguous
+      // transport error must be retried by the caller to avoid a second delivery here.
+      if (!isRecord(result) || result.ok !== false)
+        return new Response(null, { status: 502 });
+    }
+    // Keep spoilers hidden even if Telegram cannot render the rich reply.
+    const plain =
+      value.rich === true
+        ? value.message
+            .replace(/\|\|[\s\S]*?\|\|/g, "[spoiler omitted]")
+            .replace(/!\[([^\]]*)\]\(tg:\/\/time\?[^)]*\)/g, "$1")
+            .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+            .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, "$1 ($2)")
+            .replace(/<[^>]+>/g, "")
+            .replace(/\*\*|__|```/g, "")
+        : value.message;
+    const characters = Array.from(plain.trim() ? plain : "[Media unavailable]");
     for (let offset = 0; offset < characters.length; offset += 3500) {
       const response = await dependencies.fetch(
         `https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`,
@@ -817,6 +917,9 @@ async function handleAssistantReply(
           body: JSON.stringify({
             chat_id: chatId,
             text: characters.slice(offset, offset + 3500).join(""),
+            ...(replyMarkup && offset === 0
+              ? { reply_markup: replyMarkup }
+              : {}),
             ...(value.ephemeral_receiver === undefined
               ? {}
               : {

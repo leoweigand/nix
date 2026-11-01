@@ -249,6 +249,7 @@ test("startup registers the configured Telegram webhook", async () => {
           "edited_message",
           "channel_post",
           "edited_channel_post",
+          "callback_query",
         ],
       }),
   );
@@ -643,6 +644,97 @@ test("assistant replies require their secret and preserve message and topic rout
     body.chat_id === "-100123" &&
       body.reply_parameters.message_id === 17 &&
       body.message_thread_id === 4,
+  );
+});
+
+test("generated assistant replies use rich messages and validated buttons", async () => {
+  const t = handler(config({ assistantEnabled: true }));
+  const request = (buttons: unknown) =>
+    new Request("http://gateway/v1/assistant-replies", {
+      method: "POST",
+      body: JSON.stringify({
+        secret: "test-webhook-secret",
+        to: "leo",
+        message: "**Dune**",
+        rich: true,
+        buttons,
+      }),
+    });
+  assert(
+    (
+      await t.handler(
+        request([
+          { label: "Open", url: "https://example.com" },
+          { label: "Select Dune", token: "abcdefghijklmnopqrstuvwx" },
+        ]),
+      )
+    ).status === 204,
+  );
+  assert(String(t.calls[0].input).endsWith("/sendRichMessage"));
+  const body = JSON.parse(String(t.calls[0].init?.body));
+  assert(
+    body.rich_message.markdown === "**Dune**" &&
+      body.reply_markup.inline_keyboard[1][0].callback_data ===
+        "abcdefghijklmnopqrstuvwx",
+  );
+  assert(
+    (await t.handler(request([{ label: "Bad", url: "javascript:alert(1)" }])))
+      .status === 400,
+  );
+});
+
+test("a definite rich-message rejection falls back to plain delivery", async () => {
+  const t = handler(config({ assistantEnabled: true }), [
+    new Response(JSON.stringify({ ok: false }), { status: 400 }),
+    new Response(JSON.stringify({ ok: true })),
+  ]);
+  const response = await t.handler(
+    new Request("http://gateway/v1/assistant-replies", {
+      method: "POST",
+      body: JSON.stringify({
+        secret: "test-webhook-secret",
+        to: "leo",
+        message: "**Title** ||secret plot|| [source](https://example.com)",
+        rich: true,
+      }),
+    }),
+  );
+  assert(
+    response.status === 204 &&
+      t.calls.length === 2 &&
+      String(t.calls[1].input).endsWith("/sendMessage"),
+  );
+  const body = JSON.parse(String(t.calls[1].init?.body));
+  assert(body.text === "Title [spoiler omitted] source (https://example.com)");
+});
+
+test("button callbacks are forwarded and acknowledged", async () => {
+  const t = handler(config({ assistantEnabled: true }), [
+    new Response(null, { status: 204 }),
+    new Response(JSON.stringify({ ok: true })),
+  ]);
+  const response = await t.handler(
+    new Request("http://gateway/v1/telegram-webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-telegram-bot-api-secret-token": "test-webhook-secret",
+      },
+      body: JSON.stringify({
+        update_id: 123,
+        callback_query: {
+          id: "query",
+          from: { id: 42 },
+          data: "token",
+          message: { message_id: 1, chat: { id: "42", type: "private" } },
+        },
+      }),
+    }),
+  );
+  assert(
+    response.status === 204 &&
+      String(t.calls[0].input).endsWith("/inbox") &&
+      String(t.calls[1].input).endsWith("/answerCallbackQuery"),
   );
 });
 

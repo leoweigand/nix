@@ -30,6 +30,8 @@ export interface Job {
   messageId: number;
   topicId?: number;
   reply?: string;
+  buttons?: Array<{ label: string; url?: string; token?: string }>;
+  buttonsExpireAt?: number;
   done?: boolean;
   waitingForAuth?: boolean;
   authNoticeSent?: boolean;
