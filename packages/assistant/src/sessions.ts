@@ -187,7 +187,7 @@ export class Sessions {
       meta = this.metadata(manager),
       events = this.events(manager);
     const compacted = manager.getEntries().some((e) => e.type === "compaction");
-    return `Session: ${ref.id.slice(0, 8)}\nStarted: ${new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", dateStyle: "medium", timeStyle: "short" }).format(new Date(meta.createdAt))} (Europe/Berlin) (${meta.reason})\nMessages: ${events.length}/${MESSAGE_LIMIT}\nIdle timeout: 10 minutes\nModel: ${MODEL_ID}\nInstructions: ${meta.revision}\nChannel: ${meta.instructions.channelName}\nEarlier history summarized: ${compacted ? "yes" : "no"}`;
+    return `Session: ${ref.id.slice(-8)}\nStarted: ${new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", dateStyle: "medium", timeStyle: "short" }).format(new Date(meta.createdAt))} (Europe/Berlin) (${meta.reason})\nMessages: ${events.length}/${MESSAGE_LIMIT}\nIdle timeout: 10 minutes\nModel: ${MODEL_ID}\nInstructions: ${meta.revision}\nChannel: ${meta.instructions.channelName}\nEarlier history summarized: ${compacted ? "yes" : "no"}`;
   }
   loadInstructions(ref: SessionRef): Instructions {
     return this.metadata(this.open(ref)).instructions;

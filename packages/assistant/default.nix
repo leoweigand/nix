@@ -27,7 +27,7 @@ buildNpmPackage {
     runHook preCheck
     npx --no-install tsc --noEmit
     node --test src/*_test.ts
-    npx --no-install prettier --check src package.json tsconfig.json
+    npx --no-install prettier --check src scripts package.json tsconfig.json
     runHook postCheck
   '';
   installPhase = ''
