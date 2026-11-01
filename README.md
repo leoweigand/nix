@@ -88,6 +88,16 @@ serialize overlapping writes and report per-target HA read-back. Uncertain write
 are never automatically replayed. The assistant saves durable receipts for both
 media and home writes and exposes only tools allowed by its current user grant.
 
+Bookmark tools (`search_bookmarks`, `get_bookmark`, `save_bookmark`) use one global
+Linkding API token through opnix/systemd credentials. `bookmarks:read` and
+`bookmarks:write` are separate OAuth permissions; both also require the exact
+`homelab.infra.mcp.bookmarks.ownerSubject`. Other subjects are rejected before
+backend calls even when their token has those scopes. Pocket ID currently gates
+whole clients by group, not individual API permissions by user. No per-user
+credential mapping or default-account fallback exists. Results contain bookmark
+metadata and notes, not article bodies. The Telegram assistant exposes these tools
+only in private conversations and records durable receipts before saves.
+
 ## Telegram assistant
 
 `homelab.infra.assistant` runs Pi 1.4.0 as a separate worker behind the existing

@@ -3,6 +3,7 @@ import { isElement, isText, parse } from "@std/xml";
 import { MediaService, type MediaConfig } from "./media.ts";
 import { HomeService, type HomeConfig } from "./home.ts";
 import { TransferService, type TransferConfig } from "./transfer.ts";
+import { BookmarkService } from "./bookmarks.ts";
 import { createVerifier } from "./auth.ts";
 import { createApp, type Config } from "./server.ts";
 
@@ -13,6 +14,10 @@ const config = JSON.parse(
   media: MediaConfig;
   home?: HomeConfig;
   transfer?: TransferConfig;
+  bookmarks?: {
+    url: string;
+    ownerSubject: string;
+  };
 };
 for (const name of ["sonarr", "radarr"] as const) {
   const xml = parse(
@@ -81,6 +86,16 @@ const app = createApp(
             return "";
           }
         })(),
+      })
+    : undefined,
+  config.bookmarks
+    ? new BookmarkService({
+        url: config.bookmarks.url,
+        ownerSubject: config.bookmarks.ownerSubject,
+        token: readFileSync(
+          `${process.env.CREDENTIALS_DIRECTORY!}/linkding-token`,
+          "utf8",
+        ).trim(),
       })
     : undefined,
 );

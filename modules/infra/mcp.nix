@@ -7,6 +7,7 @@
 let
   cfg = config.homelab.infra.mcp;
   transferEnabled = config.homelab.apps.syncthing.enable;
+  bookmarkEnabled = cfg.bookmarks.enable;
   host = "mcp.${config.homelab.baseDomain}";
   launcher = pkgs.callPackage ../../packages/automation/launcher.nix { } {
     name = "leolab-mcp";
@@ -16,14 +17,16 @@ let
       "CREDENTIALS_DIRECTORY"
     ];
     credentialNames =
-      lib.optional cfg.home.enable "home-token"
+      lib.optional bookmarkEnabled "linkding-token"
+      ++ lib.optional cfg.home.enable "home-token"
       ++ lib.optional transferEnabled "syncthing-config"
       ++ [
         "sonarr-config"
         "radarr-config"
       ];
     connectPorts =
-      lib.optional cfg.home.enable 8123
+      lib.optional bookmarkEnabled config.homelab.apps.linkding.port
+      ++ lib.optional cfg.home.enable 8123
       ++ lib.optional transferEnabled 8384
       ++ [
         443
@@ -37,6 +40,14 @@ let
       inherit (cfg) port;
       resource = "https://${host}/mcp";
       issuer = cfg.issuer;
+      bookmarks =
+        if bookmarkEnabled then
+          {
+            url = "http://127.0.0.1:${toString config.homelab.apps.linkding.port}";
+            ownerSubject = cfg.bookmarks.ownerSubject;
+          }
+        else
+          null;
       home =
         if cfg.home.enable then
           {
@@ -72,6 +83,19 @@ in
     port = lib.mkOption {
       type = lib.types.port;
       default = 9089;
+    };
+    bookmarks = {
+      enable = lib.mkEnableOption "owner-only Linkding bookmark tools";
+      ownerSubject = lib.mkOption {
+        type = lib.types.str;
+        default = "";
+        description = "Immutable Pocket ID subject exclusively allowed to use bookmark tools";
+      };
+      tokenReference = lib.mkOption {
+        type = lib.types.str;
+        default = "op://Homelab/Linkding/mcp-api-token";
+        description = "Global Linkding API token, supplied only to MCP as a credential";
+      };
     };
     home = {
       enable = lib.mkEnableOption "Home Assistant device tools";
@@ -125,6 +149,12 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
+        assertion =
+          !bookmarkEnabled || (config.homelab.apps.linkding.enable && cfg.bookmarks.ownerSubject != "");
+        message = "MCP bookmarks require Linkding and an explicit owner subject";
+      }
+
+      {
         assertion = !cfg.home.enable || config.homelab.apps.homeassistant.enable;
         message = "MCP home tools require Home Assistant";
       }
@@ -144,18 +174,28 @@ in
         "100.64.0.0/10"
       ];
     };
-    services.onepassword-secrets.secrets = lib.mkIf cfg.home.enable {
-      mcpHomeToken = {
-        reference = cfg.home.tokenReference;
-        services = [ "leolab-mcp" ];
+    services.onepassword-secrets.secrets =
+      lib.optionalAttrs bookmarkEnabled {
+        mcpLinkdingToken = {
+          reference = cfg.bookmarks.tokenReference;
+          services = [ "leolab-mcp" ];
+        };
+      }
+      // lib.optionalAttrs cfg.home.enable {
+        mcpHomeToken = {
+          reference = cfg.home.tokenReference;
+          services = [ "leolab-mcp" ];
+        };
       };
-    };
     systemd.services.leolab-mcp = {
       description = "Authenticated LeoLab MCP tools";
       wantedBy = [ "multi-user.target" ];
-      after = [ "network-online.target" ] ++ lib.optional cfg.home.enable "opnix-secrets.service";
+      after = [
+        "network-online.target"
+      ]
+      ++ lib.optional (cfg.home.enable || bookmarkEnabled) "opnix-secrets.service";
       wants = [ "network-online.target" ];
-      requires = lib.optional cfg.home.enable "opnix-secrets.service";
+      requires = lib.optional (cfg.home.enable || bookmarkEnabled) "opnix-secrets.service";
       unitConfig.RequiresMountsFor = [
         config.homelab.apps.sonarr.dataDir
         config.homelab.apps.radarr.dataDir
@@ -166,7 +206,8 @@ in
       serviceConfig = {
         ExecStart = "${launcher}/bin/leolab-mcp";
         LoadCredential =
-          lib.optional cfg.home.enable "home-token:${config.services.onepassword-secrets.secretPaths.mcpHomeToken}"
+          lib.optional bookmarkEnabled "linkding-token:${config.services.onepassword-secrets.secretPaths.mcpLinkdingToken}"
+          ++ lib.optional cfg.home.enable "home-token:${config.services.onepassword-secrets.secretPaths.mcpHomeToken}"
           ++ lib.optional transferEnabled "syncthing-config:${config.homelab.apps.syncthing.dataDir}/config.xml"
           ++ [
             "sonarr-config:${config.homelab.apps.sonarr.dataDir}/config.xml"

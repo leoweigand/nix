@@ -16,6 +16,7 @@ import { searchWeb } from "./web-search.ts";
 
 import {
   HomeWriteGuard,
+  BookmarkWriteGuard,
   availableTools,
   maxToolCalls,
   recordWrite,
@@ -95,8 +96,9 @@ export class PiAssistant {
         keepRecentTokens: 12000,
       },
     });
-    const allowedTools = availableTools(token);
+    const allowedTools = availableTools(token, message.audience);
     const homeWriteGuard = new HomeWriteGuard();
+    const bookmarkWriteGuard = new BookmarkWriteGuard();
     let toolCalls = 0;
     let searchCalls = 0;
     let needsConnection = false;
@@ -114,9 +116,12 @@ export class PiAssistant {
       appendSystemPrompt: [instructions.channel],
       systemPrompt:
         instructions.system +
+        (message.audience === "shared"
+          ? "\nPersonal bookmark tools are disabled in shared conversations. Ask the user to continue in a private DM. Never use web search to look up their private bookmarks."
+          : "") +
         (token
-          ? "\nYour MCP connection is authenticated for the current sender. Only tools permitted by the current grant are enabled. Call connect_mcp to request missing home or media permissions."
-          : "\nMCP is not connected. For ANY home device discovery, state read or control, media search, library availability, details or download request, call connect_mcp. Do not answer those from memory or claim they are unavailable. You may answer ordinary conversation without connecting. Do not invent a sign-in URL."),
+          ? "\nYour MCP connection is authenticated for the current sender. Only tools permitted by the current grant are enabled. Call connect_mcp to request missing home, media or bookmark permissions."
+          : "\nMCP is not connected. For personal bookmark searches, details or saves, or ANY home device discovery, state read or control, media search, library availability, details or download request, call connect_mcp. Do not answer those from memory or claim they are unavailable. You may answer ordinary conversation without connecting. Do not invent a sign-in URL."),
       extensionFactories: [
         ...(token
           ? [
@@ -300,18 +305,20 @@ export class PiAssistant {
             {
               try {
                 homeWriteGuard.before(event.toolName, event.input);
+                bookmarkWriteGuard.before(event.toolName, event.input);
                 recordWrite(event.toolName, event.input, onWriteAttempt);
               } catch {
                 return {
                   block: true,
                   reason:
-                    "The change is blocked because a previous device command is pending/uncertain or its durable receipt could not be saved. Read current state; do not retry this change in this request.",
+                    "The change is blocked because a previous change is pending/uncertain or its durable receipt could not be saved. Read current state; do not retry this change in this request.",
                 };
               }
             }
           });
           pi.on("tool_result", (event) => {
             homeWriteGuard.after(event.toolName, event.structuredContent);
+            bookmarkWriteGuard.after(event.toolName, event.structuredContent);
           });
           pi.on("turn_start", (_event, ctx) => {
             if (toolCalls > maxToolCalls) ctx.abort();

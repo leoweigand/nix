@@ -378,7 +378,7 @@ export class Worker {
     if (command === "/start" || command === "/help") {
       job.control = true;
       job.reply =
-        "Hi! Ask me to inspect or control your lights and blinds, look up a film or request a movie or TV season. I'll send you a private Pocket ID link when I need MCP access. /connect connects or renews your account; /reset starts a new conversation; /session shows the current session. Sessions restart after ten conversation messages or ten minutes of inactivity.";
+        "Hi! Ask me to save or find your bookmarks, inspect or control your lights and blinds, look up a film or request a movie or TV season. I'll send you a private Pocket ID link when I need MCP access. /connect connects or renews your account; /reset starts a new conversation; /session shows the current session. Sessions restart after ten conversation messages or ten minutes of inactivity.";
     } else if (job.control) {
       // Deterministic commands do not invoke the model or consume the conversation budget.
     } else if (job.writeAttempted) {
@@ -386,8 +386,10 @@ export class Worker {
       const operation =
         job.writeOperation?.tool === "mcp__leolab__control_home_entities"
           ? `a device command (${job.writeOperation.action ?? "control"}: ${job.writeOperation.entityIds?.join(", ") ?? "unknown target"})`
-          : "a change";
-      job.reply = `I was interrupted after starting ${operation}, so I won't repeat it automatically. Ask me to check the current device or library state before trying again.`;
+          : job.writeOperation?.tool === "mcp__leolab__save_bookmark"
+            ? "a bookmark save"
+            : "a change";
+      job.reply = `I was interrupted after starting ${operation}, so I won't repeat it automatically. Ask me to check the current bookmark, device or library state before trying again.`;
     } else {
       this.prepare(job);
       this.options.sessions.record(job.session!, messageForJob(job));
@@ -476,7 +478,7 @@ export class Worker {
           JSON.stringify({ event: "assistant_failed", updateId: job.id }),
         );
         job.reply = job.writeAttempted
-          ? "The change's result is uncertain. I won't retry it automatically; ask me to check the current device or library state first."
+          ? "The change's result is uncertain. I won't retry it automatically; ask me to check the current bookmark, device or library state first."
           : "I couldn't complete that request. Please try again shortly, or send /connect if my MCP connection needs renewing.";
       } finally {
         settled = true;

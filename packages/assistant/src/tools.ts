@@ -1,6 +1,9 @@
 import { decodeJwt } from "jose";
 
 export const toolRegistry = {
+  mcp__leolab__search_bookmarks: { scope: "bookmarks:read", write: false },
+  mcp__leolab__get_bookmark: { scope: "bookmarks:read", write: false },
+  mcp__leolab__save_bookmark: { scope: "bookmarks:write", write: true },
   mcp__leolab__whoami: { scope: null, write: false },
   mcp__leolab__search_media: { scope: "media:read", write: false },
   mcp__leolab__get_media_details: { scope: "media:read", write: false },
@@ -15,16 +18,29 @@ export interface WriteAttempt {
   entityIds?: string[];
   action?: string;
   mediaId?: string;
+  url?: string;
 }
 export const maxToolCalls = 12;
 // The host verifies this token cryptographically before passing it to Pi.
 // This decoding only controls presentation; MCP independently enforces scopes.
-export function availableTools(token?: string): string[] {
+export function availableTools(
+  token?: string,
+  audience: "private" | "shared" = "private",
+): string[] {
   if (!token) return [];
   const scope = decodeJwt(token).scope;
   const scopes = typeof scope === "string" ? scope.split(" ") : [];
   return Object.entries(toolRegistry)
     .filter(([, rule]) => rule.scope === null || scopes.includes(rule.scope))
+    .filter(
+      ([name]) =>
+        audience === "private" ||
+        ![
+          "mcp__leolab__search_bookmarks",
+          "mcp__leolab__get_bookmark",
+          "mcp__leolab__save_bookmark",
+        ].includes(name),
+    )
     .map(([name]) => name);
 }
 export function recordWrite(
@@ -46,10 +62,12 @@ export function recordWrite(
             : [],
           action: typeof input.action === "string" ? input.action : undefined,
         }
-      : {
-          mediaId:
-            typeof input.mediaId === "string" ? input.mediaId : undefined,
-        }),
+      : tool === "mcp__leolab__save_bookmark"
+        ? { url: typeof input.url === "string" ? input.url : undefined }
+        : {
+            mediaId:
+              typeof input.mediaId === "string" ? input.mediaId : undefined,
+          }),
   });
 }
 
@@ -84,5 +102,32 @@ export class HomeWriteGuard {
       )
         this.pending.delete(result.entityId);
     }
+  }
+}
+
+export class BookmarkWriteGuard {
+  private pending = new Set<string>();
+  before(tool: string, input: Record<string, unknown>) {
+    if (tool !== "mcp__leolab__save_bookmark" || typeof input.url !== "string")
+      return;
+    if (this.pending.has(input.url))
+      throw new Error(
+        "Bookmark save pending or uncertain; search before a new user-authorized attempt",
+      );
+    this.pending.add(input.url);
+  }
+  after(tool: string, output: unknown) {
+    if (
+      tool !== "mcp__leolab__save_bookmark" ||
+      !output ||
+      typeof output !== "object"
+    )
+      return;
+    const result = output as { outcome?: string; bookmark?: { url?: string } };
+    if (
+      result.bookmark?.url &&
+      ["saved", "updated", "already_saved"].includes(result.outcome ?? "")
+    )
+      this.pending.delete(result.bookmark.url);
   }
 }

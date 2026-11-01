@@ -118,6 +118,10 @@ in
 
       mcp = {
         enable = true;
+        bookmarks = {
+          enable = true;
+          ownerSubject = "10bca0fd-70f4-4bec-ac14-365ce6d29454";
+        };
         home = {
           enable = true;
           tokenReference = "op://Homelab/MCP Server/HA_TOKEN";

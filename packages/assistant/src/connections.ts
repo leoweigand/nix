@@ -14,7 +14,7 @@ export const issuer = "https://auth.leolab.party";
 export const resource = "https://mcp.leolab.party/mcp";
 export const clientId = "leolab-mcp-telegram";
 export const scopes =
-  "openid offline_access lab:read media:read media:request home:read home:control";
+  "openid offline_access lab:read media:read media:request home:read home:control bookmarks:read bookmarks:write";
 export const callbackPath = "/assistant/oauth/callback";
 const permissionScopes = [
   "lab:read",
@@ -22,6 +22,8 @@ const permissionScopes = [
   "media:request",
   "home:read",
   "home:control",
+  "bookmarks:read",
+  "bookmarks:write",
 ];
 interface Pending {
   telegramId: string;

@@ -42,6 +42,16 @@ if (entry.name !== "LeoLab MCP")
   throw new Error("Resource exists with a different owner name");
 const permissions = [
   {
+    key: "bookmarks:read",
+    name: "Read personal bookmarks",
+    description: "Search and inspect your own Linkding bookmarks",
+  },
+  {
+    key: "bookmarks:write",
+    name: "Save personal bookmarks",
+    description: "Save URLs, tags and notes to your own Linkding account",
+  },
+  {
     key: "home:read",
     name: "Read home devices",
     description:

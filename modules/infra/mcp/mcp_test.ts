@@ -3,6 +3,20 @@ import { after, before, test } from "node:test";
 import { createServer, request as httpRequest, type Server } from "node:http";
 import { generateKeyPair, exportJWK, SignJWT } from "jose";
 import { createApp } from "./server.ts";
+import { BookmarkService } from "./bookmarks.ts";
+const bookmarkFixture = (id: number) => ({
+  id,
+  url: `https://example.com/${id}`,
+  title: `Article ${id}`,
+  description: "Description",
+  notes: "Personal note",
+  tag_names: ["existing"],
+  is_archived: false,
+  unread: false,
+  shared: false,
+  date_added: "2026-11-01",
+  date_modified: "2026-11-01",
+});
 import { createVerifier } from "./auth.ts";
 import { MediaService } from "./media.ts";
 import { HomeService, homePolicySchema } from "./home.ts";
@@ -97,6 +111,24 @@ before(async () => {
           attributes: { supported_color_modes: ["onoff"] },
         }),
     ),
+    new BookmarkService(
+      {
+        url: "http://127.0.0.1:9094",
+        ownerSubject: "leo-id",
+        token: "a".repeat(40),
+      },
+      async (url, init) => {
+        assert.equal(
+          (init?.headers as Record<string, string>).Authorization,
+          `Token ${"a".repeat(40)}`,
+        );
+        if (new URL(String(url)).pathname === "/api/bookmarks/")
+          return Response.json({ count: 1, results: [bookmarkFixture(1)] });
+        return new URL(String(url)).pathname === "/api/bookmarks/1/"
+          ? Response.json(bookmarkFixture(1))
+          : new Response(null, { status: 404 });
+      },
+    ),
   );
   base = await listen(app.server);
 });
@@ -114,7 +146,7 @@ async function token(overrides: Record<string, unknown> = {}, typ = "at+jwt") {
     .setProtectedHeader({ alg: "RS256", kid: "test", typ })
     .setIssuer(issuer)
     .setAudience(typeof overrides.aud === "string" ? overrides.aud : resource)
-    .setSubject("leo-id")
+    .setSubject(typeof overrides.sub === "string" ? overrides.sub : "leo-id")
     .setJti("unique-test")
     .setIssuedAt()
     .setExpirationTime(typeof overrides.exp === "number" ? overrides.exp : "5m")
@@ -180,6 +212,8 @@ test("OAuth discovery is available and unauthenticated calls receive a challenge
     "media:request",
     "home:read",
     "home:control",
+    "bookmarks:read",
+    "bookmarks:write",
   ]);
   assert.deepEqual(metadata.scopes_supported, scopes);
 });
@@ -194,7 +228,7 @@ test("rejects invalid, expired, wrong-audience and ID tokens", async () => {
     assert.equal(response.status, 401);
     assert.match(
       response.headers.get("www-authenticate")!,
-      /scope="lab:read media:read media:request home:read home:control"/,
+      /scope="lab:read media:read media:request home:read home:control bookmarks:read bookmarks:write"/,
     );
   }
   assert.equal(
@@ -243,10 +277,13 @@ test("authenticated MCP handshake, tool discovery and calls", async () => {
   const tools = await rpc("tools/list");
   assert.deepEqual(tools.tools.map((x: { name: string }) => x.name).sort(), [
     "control_home_entities",
+    "get_bookmark",
     "get_download_progress",
     "get_home_entity",
     "get_media_details",
     "request_media",
+    "save_bookmark",
+    "search_bookmarks",
     "search_home_entities",
     "search_media",
     "whoami",
@@ -404,5 +441,61 @@ test("download progress requires media read scope and returns the structured out
   assert.deepEqual(
     JSON.parse(data.result.content[0].text),
     data.result.structuredContent,
+  );
+});
+
+test("bookmark tools enforce the owner subject even with valid bookmark scopes", async () => {
+  async function call(
+    subject: string,
+    scope: string,
+    name: string,
+    args: unknown,
+  ) {
+    return request("/mcp", await token({ sub: subject, scope }), {
+      jsonrpc: "2.0",
+      id: 42,
+      method: "tools/call",
+      params: { name, arguments: args },
+    });
+  }
+  async function result(response: Response) {
+    assert.equal(response.status, 200);
+    const raw = await response.text();
+    return (
+      raw.startsWith("event:")
+        ? JSON.parse(raw.split("data: ")[1].split("\n")[0])
+        : JSON.parse(raw)
+    ).result;
+  }
+  const found = await result(
+    await call("leo-id", "bookmarks:read", "search_bookmarks", {}),
+  );
+  assert.equal(found.structuredContent.bookmarks[0].bookmarkId, 1);
+  const missing = await result(
+    await call("leo-id", "bookmarks:read", "get_bookmark", { bookmarkId: 2 }),
+  );
+  assert.match(missing.content[0].text, /bookmark_not_found/);
+  for (const subject of ["other-id", "unbound-id"]) {
+    for (const [scope, name, args] of [
+      ["bookmarks:read", "search_bookmarks", {}],
+      ["bookmarks:read", "get_bookmark", { bookmarkId: 1 }],
+      ["bookmarks:write", "save_bookmark", { url: "https://example.com" }],
+    ] as const) {
+      const denied = await result(await call(subject, scope, name, args));
+      assert(denied.isError);
+      assert.match(denied.content[0].text, /bookmarks_forbidden/);
+    }
+  }
+  assert.equal(
+    (
+      await call("leo-id", "bookmarks:read", "save_bookmark", {
+        url: "https://example.com",
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (await call("leo-id", "bookmarks:write", "search_bookmarks", {})).status,
+    403,
   );
 });
