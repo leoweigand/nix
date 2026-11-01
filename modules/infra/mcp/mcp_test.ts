@@ -35,6 +35,30 @@ before(async () => {
       res.end();
     } else if (req.url === "/slow") {
       /* client timeout closes this connection */
+    } else if (req.url?.startsWith("/api/v3/movie/lookup?")) {
+      res.setHeader("Content-Type", "application/json");
+      res.end(
+        JSON.stringify([
+          {
+            id: 0,
+            title: "Test Movie",
+            year: 2020,
+            tmdbId: 100,
+            images: [
+              {
+                coverType: "poster",
+                remoteUrl: "https://image.tmdb.org/t/p/w500/test.jpg",
+              },
+            ],
+          },
+        ]),
+      );
+    } else if (req.url === "/api/v3/movie") {
+      res.setHeader("Content-Type", "application/json");
+      res.end("[]");
+    } else if (req.url === "/api/v3/qualityprofile") {
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify([{ id: 1, name: "HD" }]));
     } else {
       res.writeHead(503);
       res.end();
@@ -195,6 +219,8 @@ test("authenticated MCP handshake, tool discovery and calls", async () => {
     "search_media",
     "whoami",
   ]);
+  for (const tool of tools.tools)
+    assert.equal(tool.outputSchema.type, "object");
   const identity = await rpc("tools/call", { name: "whoami", arguments: {} });
   assert.equal(identity.structuredContent.subject, "leo-id");
   assert.equal(identity.structuredContent.clientId, "codex");
@@ -223,4 +249,50 @@ test("authenticated MCP handshake, tool discovery and calls", async () => {
   });
   assert.equal(bad.status, 200);
   assert.match(await bad.text(), /isError/);
+});
+
+test("MCP delivers rich structured results matching JSON text and limits action hints to the caller's permissions", async () => {
+  const rpc = async (scope: string, name: string, args: unknown) => {
+    const response = await request("/mcp", await token({ scope }), {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name, arguments: args },
+    });
+    assert.equal(response.status, 200);
+    const raw = await response.text();
+    const data = raw.startsWith("event:")
+      ? JSON.parse(raw.split("data: ")[1].split("\n")[0])
+      : JSON.parse(raw);
+    assert.equal(data.error, undefined, raw);
+    assert(!data.result.isError, raw);
+    assert.deepEqual(
+      JSON.parse(data.result.content[0].text),
+      data.result.structuredContent,
+    );
+    return data.result.structuredContent;
+  };
+  const search = await rpc("media:read", "search_media", {
+    query: "Test",
+    type: "movie",
+  });
+  assert.equal(
+    search.results[0].images.poster.url,
+    "https://image.tmdb.org/t/p/w500/test.jpg",
+  );
+  assert.equal(search.results[0].availableActions[0].tool, "get_media_details");
+  const readOnly = await rpc("media:read", "get_media_details", {
+    mediaId: "movie:tmdb:100",
+  });
+  assert.equal(readOnly.canRequest, true);
+  assert.deepEqual(readOnly.availableActions, []);
+  const writable = await rpc("media:read media:request", "get_media_details", {
+    mediaId: "movie:tmdb:100",
+  });
+  assert.deepEqual(writable.availableActions[0], {
+    id: "request_movie",
+    tool: "request_media",
+    requiredScope: "media:request",
+    arguments: { mediaId: "movie:tmdb:100", qualityProfile: "HD" },
+  });
 });

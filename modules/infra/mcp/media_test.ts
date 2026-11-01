@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { test, type TestContext } from "node:test";
 import { MediaService, requestSchema, searchSchema } from "./media.ts";
+import {
+  searchOutputSchema,
+  detailsOutputSchema,
+  requestOutputSchema,
+  detailsSchema,
+} from "./contracts.ts";
+import { mediaMetadata } from "./artwork.ts";
 
 const now = Date.parse("2026-11-01T10:00:00Z");
 const movie = {
@@ -12,6 +19,26 @@ const movie = {
   monitored: false,
   hasFile: false,
   qualityProfileId: 1,
+  runtime: 123,
+  genres: ["Science Fiction", "Adventure"],
+  status: "released",
+  certification: "PG-13",
+  imdbId: "tt1234567",
+  releaseDate: "2020-03-01T00:00:00Z",
+  inCinemas: "2020-02-01T00:00:00Z",
+  images: [
+    {
+      coverType: "poster",
+      url: "/MediaCover/11/poster.jpg?apikey=fixture-key",
+      remoteUrl: "https://image.tmdb.org/t/p/w500/poster.jpg",
+      width: 500,
+      height: 750,
+    },
+    {
+      coverType: "fanart",
+      url: "https://image.tmdb.org/t/p/original/backdrop.jpg",
+    },
+  ],
 };
 const show = {
   id: 0,
@@ -249,6 +276,9 @@ test("new TV details provide aired counts without adding a series or leaking API
     availableEpisodes: 0,
     missingEpisodes: 2,
     monitoredEpisodes: 0,
+    alreadyAvailable: false,
+    alreadyRequested: false,
+    canRequest: true,
   });
   assert.equal(state.writes.length, 0);
 });
@@ -474,4 +504,141 @@ test("search submission failures explicitly preserve partial library success wit
   assert.equal(result.searchStatus, "unknown");
   assert.equal(state.movies.length, 1);
   assert(!JSON.stringify(result).includes("fixture-key"));
+});
+
+test("search returns public artwork, release facts and complete read actions without exposing private URLs", async (t) => {
+  const { service, state } = await fixture(t);
+  const result = searchOutputSchema.parse(
+    await service.search(searchSchema.parse({ query: "Test", type: "movie" })),
+  );
+  const item = result.results[0];
+  assert.deepEqual(item.images.poster, {
+    url: "https://image.tmdb.org/t/p/w500/poster.jpg",
+    alt: "Test Movie (2020) poster",
+    width: 500,
+    height: 750,
+    mimeType: "image/jpeg",
+  });
+  assert.equal(
+    item.images.backdrop?.url,
+    "https://image.tmdb.org/t/p/original/backdrop.jpg",
+  );
+  assert.equal(item.runtimeMinutes, 123);
+  assert.deepEqual(item.genres, ["Science Fiction", "Adventure"]);
+  assert.equal(item.status, "released");
+  assert.equal(item.releaseDate, "2020-03-01T00:00:00.000Z");
+  assert.deepEqual(item.releaseDates, [
+    { type: "cinema", date: "2020-02-01T00:00:00.000Z" },
+  ]);
+  assert.deepEqual(item.links, [
+    { provider: "tmdb", url: "https://www.themoviedb.org/movie/100" },
+    { provider: "imdb", url: "https://www.imdb.com/title/tt1234567/" },
+  ]);
+  assert.equal(item.canRequest, true);
+  assert.equal(item.alreadyAvailable, false);
+  assert.equal(item.availableActions.length, 1);
+  assert.equal(item.availableActions[0].tool, "get_media_details");
+  assert.deepEqual(detailsSchema.parse(item.availableActions[0].arguments), {
+    mediaId: item.mediaId,
+  });
+  assert(!JSON.stringify(result).includes("MediaCover"));
+  assert(!JSON.stringify(result).includes("fixture-key"));
+  assert.equal(state.writes.length, 0);
+});
+
+test("movie details offer an executable default request action, preserve existing profiles and omit fulfilled actions", async (t) => {
+  const { service, state } = await fixture(t);
+  const details = detailsOutputSchema.parse(
+    await service.details("movie:tmdb:100"),
+  );
+  const action = details.availableActions[0];
+  assert.equal(action.tool, "request_media");
+  const args = requestSchema.parse(action.arguments);
+  assert.deepEqual(args, { mediaId: "movie:tmdb:100", qualityProfile: "HD" });
+  assert.equal(state.writes.length, 0);
+  const result = requestOutputSchema.parse(await service.request(args));
+  assert.equal(result.outcome, "accepted");
+  assert.equal(result.availableActions[0].tool, "get_media_details");
+  assert.deepEqual(
+    (await service.details("movie:tmdb:100")).availableActions,
+    [],
+  );
+  state.movies[0].monitored = false;
+  state.movies[0].qualityProfileId = 2;
+  const existing = await service.details("movie:tmdb:100");
+  assert.equal(
+    requestSchema.parse(existing.availableActions[0].arguments).qualityProfile,
+    "4K preferred",
+  );
+  state.movies[0].hasFile = true;
+  const available = await service.details("movie:tmdb:100");
+  assert.equal(available.alreadyAvailable, true);
+  assert.equal(available.canRequest, false);
+  assert.deepEqual(available.availableActions, []);
+});
+
+test("TV actions identify requestable aired seasons and never offer entirely unaired or already monitored seasons", async (t) => {
+  const { service, state } = await fixture(t);
+  state.episodes[4].airDateUtc = "2027-01-01T00:00:00Z";
+  const details = detailsOutputSchema.parse(
+    await service.details("tv:tvdb:200"),
+  );
+  assert.equal(details.availableActions.length, 1);
+  assert.deepEqual(requestSchema.parse(details.availableActions[0].arguments), {
+    mediaId: "tv:tvdb:200",
+    qualityProfile: "HD",
+    seasons: [1],
+  });
+  assert.equal(details.seasons?.[1].canRequest, false);
+  state.shows.push({ ...structuredClone(show), id: 22 });
+  state.episodes[0].monitored = true;
+  const monitored = await service.details("tv:tvdb:200");
+  assert.equal(monitored.seasons?.[0].alreadyRequested, true);
+  assert.deepEqual(monitored.availableActions, []);
+  state.shows[0].monitored = false;
+  const disabled = await service.details("tv:tvdb:200");
+  assert.equal(disabled.alreadyRequested, false);
+  assert.equal(disabled.availableActions.length, 1);
+  assert.equal(state.writes.length, 0);
+});
+
+test("optional metadata degrades to null and untrusted or private artwork never becomes a client image URL", () => {
+  const result = mediaMetadata(
+    {
+      title: "Unknown",
+      year: 0,
+      runtime: -1,
+      firstAired: "not a date",
+      genres: null,
+      imdbId: "tt1234567/../../secret",
+      images: [
+        null,
+        { coverType: "poster", url: "http://127.0.0.1/private.jpg" },
+        {
+          coverType: "poster",
+          url: "https://image.tmdb.org@evil.example/image.jpg",
+        },
+        {
+          coverType: "fanart",
+          url: "https://user:password@image.tmdb.org/private.jpg",
+        },
+      ],
+      remotePoster: "https://artworks.thetvdb.com/banners/poster.webp",
+    },
+    "tv",
+  );
+  assert.deepEqual(result.images.poster, {
+    url: "https://artworks.thetvdb.com/banners/poster.webp",
+    alt: "Unknown poster",
+    mimeType: "image/webp",
+  });
+  assert.equal(result.images.backdrop, null);
+  assert.equal(result.releaseDate, null);
+  assert.equal(result.runtimeMinutes, null);
+  assert.deepEqual(result.links, []);
+  assert.deepEqual(result.genres, []);
+  assert.deepEqual(mediaMetadata({ title: "Unknown" }, "movie").images, {
+    poster: null,
+    backdrop: null,
+  });
 });

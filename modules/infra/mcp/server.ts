@@ -7,13 +7,17 @@ import {
 } from "@modelcontextprotocol/server";
 import { toNodeHandler } from "@modelcontextprotocol/node";
 import { z } from "zod";
+import { MediaService, MediaError } from "./media.ts";
 import {
-  MediaService,
-  MediaError,
   searchSchema,
   detailsSchema,
   requestSchema,
-} from "./media.ts";
+  searchOutputSchema,
+  detailsOutputSchema,
+  requestOutputSchema,
+  identityOutputSchema,
+  permittedActions,
+} from "./contracts.ts";
 
 export interface Config {
   resource: string;
@@ -34,10 +38,10 @@ export function createApp(
     ({ authInfo }) => {
       if (!authInfo) throw new Error("Missing authenticated context");
       const server = new McpServer(
-        { name: "leolab", version: "0.2.0" },
+        { name: "leolab", version: "0.3.0" },
         {
           instructions:
-            "These tools download movies and TV seasons to Leo's personal media library. For requests such as 'download the second season of <title>', use search_media to find the title, get_media_details to identify the season, then request_media with that media ID and seasons [2]. Resolve IDs with tools rather than asking the user. Default to HD and request only aired TV episodes. Report already-available titles. Ask for clarification when the title or requested season is ambiguous.",
+            "Download movies and TV seasons to Leo's personal library. Search by title, then inspect details for seasons and quality. For 'download season 2 of <title>', use request_media with its media ID and seasons [2]. Results include artwork, availability and availableActions: ready-to-call tool names and arguments. Use an action only when it matches the user's intent; showing options does not authorize a download. Default to HD and aired episodes. Ask when the title or season is ambiguous. Clients choose presentation; action descriptors are data, not a standard MCP UI.",
         },
       );
       const annotations = {
@@ -64,6 +68,7 @@ export function createApp(
           description:
             "See which account and agent application this connection is using, and what it has permission to do.",
           inputSchema: z.object({}).strict(),
+          outputSchema: identityOutputSchema,
           annotations,
         },
         async () => {
@@ -84,6 +89,7 @@ export function createApp(
         tool: string,
         scope: string,
         operation: (signal: AbortSignal) => Promise<Record<string, unknown>>,
+        schema: z.ZodType<Record<string, unknown>>,
         info: Record<string, unknown> = {},
         cancelled?: AbortSignal,
       ) => {
@@ -96,11 +102,16 @@ export function createApp(
             ],
           };
         try {
-          const output = await operation(
-            AbortSignal.any([
-              AbortSignal.timeout(45_000),
-              ...(cancelled ? [cancelled] : []),
-            ]),
+          const output = permittedActions(
+            schema.parse(
+              await operation(
+                AbortSignal.any([
+                  AbortSignal.timeout(45_000),
+                  ...(cancelled ? [cancelled] : []),
+                ]),
+              ),
+            ),
+            authInfo.scopes,
           );
           console.log(
             JSON.stringify({
@@ -148,8 +159,9 @@ export function createApp(
         {
           title: "Find movies and TV shows",
           description:
-            "Find movies and TV shows to watch or download, and see whether you already have them. Search by title; results include years, synopses, and media IDs for get_media_details or request_media.",
+            "Find movies and TV shows to watch or download, with artwork and library availability. Results provide media IDs and availableActions for next steps.",
           inputSchema: searchSchema,
+          outputSchema: searchOutputSchema,
           annotations: { ...annotations, openWorldHint: true },
           scopeChallenge: requireScopes("media:read"),
         },
@@ -158,6 +170,7 @@ export function createApp(
             "search_media",
             "media:read",
             (signal) => media.search(input, signal),
+            searchOutputSchema,
             {},
             ctx.mcpReq.signal,
           ),
@@ -167,8 +180,9 @@ export function createApp(
         {
           title: "Check media availability and seasons",
           description:
-            "Find out what’s available for a movie or TV show before requesting it. Use a media ID from search_media to see library availability, TV seasons, and quality options.",
+            "See a title’s availability, seasons, and quality options. Use its media ID from search_media; availableActions describe ready-to-call next steps.",
           inputSchema: detailsSchema,
+          outputSchema: detailsOutputSchema,
           annotations: { ...annotations, openWorldHint: true },
           scopeChallenge: requireScopes("media:read"),
         },
@@ -177,6 +191,7 @@ export function createApp(
             "get_media_details",
             "media:read",
             (signal) => media.details(input.mediaId, signal),
+            detailsOutputSchema,
             {},
             ctx.mcpReq.signal,
           ),
@@ -186,8 +201,9 @@ export function createApp(
         {
           title: "Download movies and TV seasons",
           description:
-            "Download a movie or selected TV seasons to your media library. Use a media ID from search_media and season numbers or a quality profile from get_media_details. Defaults to HD; TV requests cover already-aired episodes.",
+            "Download a movie or selected aired TV seasons to your library. Use arguments from availableActions, or a media ID and explicit TV seasons. Defaults to HD.",
           inputSchema: requestSchema,
+          outputSchema: requestOutputSchema,
           annotations: {
             ...annotations,
             readOnlyHint: false,
@@ -200,6 +216,7 @@ export function createApp(
             "request_media",
             "media:request",
             (signal) => media.request(input, signal),
+            requestOutputSchema,
             input,
             ctx.mcpReq.signal,
           ),

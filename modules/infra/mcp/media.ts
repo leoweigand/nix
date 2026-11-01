@@ -1,44 +1,20 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
 
-export const mediaIdSchema = z
-  .string()
-  .regex(/^(movie:tmdb|tv:tvdb):[1-9]\d{0,9}$/);
-export const searchSchema = z
-  .object({
-    query: z.string().trim().min(1).max(200),
-    type: z.enum(["movie", "tv"]).optional(),
-    limit: z.number().int().min(1).max(20).default(5),
-  })
-  .strict();
-export const detailsSchema = z.object({ mediaId: mediaIdSchema }).strict();
-export const requestSchema = z
-  .object({
-    mediaId: mediaIdSchema,
-    qualityProfile: z.string().trim().min(1).max(100).default("HD"),
-    seasons: z
-      .array(z.number().int().min(0).max(9999))
-      .min(1)
-      .max(100)
-      .optional(),
-  })
-  .strict()
-  .superRefine((value, ctx) => {
-    if (value.mediaId.startsWith("tv:") !== (value.seasons !== undefined)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["seasons"],
-        message: "TV requires explicit seasons; movies must omit seasons",
-      });
-    }
-    if (value.seasons && new Set(value.seasons).size !== value.seasons.length) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["seasons"],
-        message: "Season numbers must be unique",
-      });
-    }
-  });
+import {
+  mediaIdSchema,
+  searchSchema,
+  detailsSchema,
+  requestSchema,
+  detailsAction,
+  requestAction,
+  type MediaSummary,
+  type MediaAction,
+  type MediaDetails,
+  requestOutputSchema,
+} from "./contracts.ts";
+import { mediaMetadata } from "./artwork.ts";
+export { mediaIdSchema, searchSchema, detailsSchema, requestSchema };
 
 const seasonSchema = z
   .object({
@@ -211,7 +187,7 @@ function hasAired(episode: Episode, now: number) {
     Date.parse(episode.airDateUtc) <= now
   );
 }
-function summary(item: Item, kind: Kind, existing?: Item) {
+function summary(item: Item, kind: Kind, existing?: Item): MediaSummary {
   const available =
     kind === "movie"
       ? existing?.hasFile
@@ -238,6 +214,30 @@ function summary(item: Item, kind: Kind, existing?: Item) {
           : "in_library",
     inLibrary: !!existing,
     monitored: existing?.monitored ?? false,
+    ...mediaMetadata(item, kind),
+    alreadyAvailable:
+      kind === "movie"
+        ? !!existing?.hasFile
+        : !existing
+          ? false
+          : complete
+            ? true
+            : null,
+    alreadyRequested:
+      kind === "movie"
+        ? !!existing?.monitored && !existing.hasFile
+        : existing
+          ? null
+          : false,
+    canRequest:
+      kind === "movie" ? !existing?.hasFile && !existing?.monitored : null,
+    availableActions: [
+      detailsAction(
+        kind === "movie"
+          ? `movie:tmdb:${item.tmdbId}`
+          : `tv:tvdb:${item.tvdbId}`,
+      ),
+    ],
   };
 }
 
@@ -338,7 +338,7 @@ export class MediaService {
     );
     return z.object({ episodes: z.array(episodeSchema) }).parse(data).episodes;
   }
-  async details(mediaId: string, signal?: AbortSignal) {
+  async details(mediaId: string, signal?: AbortSignal): Promise<MediaDetails> {
     const { kind, arr, item, existing, profiles, externalId } =
       await this.resolve(mediaId, signal);
     const episodes =
@@ -348,35 +348,69 @@ export class MediaService {
           : await this.catalogEpisodes(externalId, signal)
         : [];
     const now = this.now();
-    return {
+    const result = {
       ...summary(item, kind, existing),
       qualityProfile:
         profiles.find((p) => p.id === existing?.qualityProfileId)?.name ?? null,
       qualityProfiles: profiles.map((p) => p.name),
-      ...(kind === "tv"
-        ? {
-            monitorNewSeasons: existing?.monitorNewItems ?? "none",
-            seasons: item.seasons.map((season) => {
-              const selected = episodes.filter(
-                (e) => e.seasonNumber === season.seasonNumber,
-              );
-              const aired = selected.filter((e) => hasAired(e, now));
-              return {
-                seasonNumber: season.seasonNumber,
-                monitored: existing ? season.monitored : false,
-                totalEpisodes: selected.length,
-                airedEpisodes: aired.length,
-                availableEpisodes: selected.filter((e) => e.hasFile).length,
-                missingEpisodes: aired.filter((e) => !e.hasFile).length,
-                monitoredEpisodes: existing
-                  ? selected.filter((e) => e.monitored).length
-                  : 0,
-              };
-            }),
-          }
-        : {}),
+      availableActions: [] as MediaAction[],
+    };
+    const profile = existing
+      ? result.qualityProfile
+      : profiles.find((p) => p.name === "HD")?.name;
+    if (kind === "movie") {
+      if (result.canRequest && profile)
+        result.availableActions.push(requestAction(mediaId, profile));
+      return result;
+    }
+    const seasons = item.seasons.map((season) => {
+      const selected = episodes.filter(
+        (e) => e.seasonNumber === season.seasonNumber,
+      );
+      const aired = selected.filter((e) => hasAired(e, now));
+      const missing = aired.filter((e) => !e.hasFile);
+      const alreadyAvailable = aired.length > 0 && missing.length === 0;
+      const alreadyRequested =
+        !!existing?.monitored &&
+        missing.length > 0 &&
+        missing.every((e) => e.monitored);
+      return {
+        seasonNumber: season.seasonNumber,
+        monitored: existing ? season.monitored : false,
+        totalEpisodes: selected.length,
+        airedEpisodes: aired.length,
+        availableEpisodes: selected.filter((e) => e.hasFile).length,
+        missingEpisodes: missing.length,
+        monitoredEpisodes: existing
+          ? selected.filter((e) => e.monitored).length
+          : 0,
+        alreadyAvailable,
+        alreadyRequested,
+        canRequest: missing.length > 0 && !alreadyRequested,
+      };
+    });
+    result.alreadyAvailable =
+      episodes.some((e) => hasAired(e, now)) &&
+      episodes.filter((e) => hasAired(e, now)).every((e) => e.hasFile);
+    const missing = episodes.filter((e) => hasAired(e, now) && !e.hasFile);
+    result.alreadyRequested =
+      !!existing?.monitored &&
+      missing.length > 0 &&
+      missing.every((e) => e.monitored);
+    result.canRequest = seasons.some((season) => season.canRequest);
+    if (profile)
+      result.availableActions = seasons
+        .filter((season) => season.canRequest)
+        .map((season) =>
+          requestAction(mediaId, profile, [season.seasonNumber]),
+        );
+    return {
+      ...result,
+      monitorNewSeasons: existing?.monitorNewItems ?? "none",
+      seasons,
     };
   }
+
   async request(input: z.infer<typeof requestSchema>, signal?: AbortSignal) {
     // Serialize requests for the same title; independent titles can progress concurrently.
     const prior = this.pending.get(input.mediaId) ?? Promise.resolve();
@@ -385,7 +419,10 @@ export class MediaService {
       .then(() => this.requestLocked(input, signal));
     this.pending.set(input.mediaId, task);
     try {
-      return await task;
+      return requestOutputSchema.parse({
+        ...(await task),
+        availableActions: [detailsAction(input.mediaId)],
+      });
     } finally {
       if (this.pending.get(input.mediaId) === task)
         this.pending.delete(input.mediaId);
