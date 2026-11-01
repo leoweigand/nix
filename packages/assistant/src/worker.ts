@@ -360,7 +360,7 @@ export class Worker {
       job.reply = this.options.sessions.status(
         messageForJob(job).conversationId,
       );
-    } else if (command === "/reset") {
+    } else if (command === "/clear") {
       job.control = true;
       this.prepare(job, true);
       job.reply = "Context cleared";
@@ -379,7 +379,7 @@ export class Worker {
     if (command === "/start" || command === "/help") {
       job.control = true;
       job.reply =
-        "Hi! Ask me to find a document, file a PDF/photo in our private chat, save or find your bookmarks, inspect or control your lights and blinds, look up a film or request a movie or TV season. I'll send you a private Pocket ID link when I need MCP access. /connect connects or renews your account; /reset starts a new conversation; /session shows the current session. Sessions restart after ten conversation messages or ten minutes of inactivity.";
+        "Hi! Ask me to find a document, file a PDF/photo in our private chat, save or find your bookmarks, inspect or control your lights and blinds, look up a film or request a movie or TV season. I'll send you a private Pocket ID link when I need MCP access. /connect connects or renews your account; /clear starts a new conversation; /session shows the current session. Sessions restart after ten conversation messages or ten minutes of inactivity.";
     } else if (job.control) {
       // Deterministic commands do not invoke the model or consume the conversation budget.
     } else if (job.writeAttempted) {
@@ -538,7 +538,7 @@ export class Worker {
           if (
             blockedChats.has(chat) &&
             job.kind !== "notification" &&
-            !["/connect", "/help", "/start", "/reset", "/session"].includes(
+            !["/connect", "/help", "/start", "/clear", "/session"].includes(
               this.command(job) ?? "",
             )
           ) {
@@ -551,7 +551,7 @@ export class Worker {
           await this.process(job);
           if (job.waitingForAuth && job.session)
             blockedChats.set(chat, job.session.file);
-          if (this.command(job) === "/reset") blockedChats.delete(chat);
+          if (this.command(job) === "/clear") blockedChats.delete(chat);
         } catch {
           this.log.error(
             JSON.stringify({

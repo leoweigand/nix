@@ -408,7 +408,7 @@ test("notifications and resets proceed while a human request waits for OAuth, wi
       true,
     );
     assert.match(f.sessions.status("123:0"), /Messages: 2\/10/);
-    f.inbox.enqueue({ ...f.job(3), text: "/reset" });
+    f.inbox.enqueue({ ...f.job(3), text: "/clear" });
     await new Worker(f.options).drain();
     const fresh = f.sessions.select("123:0", Date.now());
     assert.notEqual(fresh.file, original.file);
@@ -697,7 +697,7 @@ test("legacy session notices and explicit resets are not repeated on the next an
     f.inbox.enqueue(f.job(100));
     await new Worker(f.options).drain();
     assert.equal(f.messages.at(-1)?.body.message, "Dune (2021), available");
-    f.inbox.enqueue({ ...f.job(101), text: "/reset" });
+    f.inbox.enqueue({ ...f.job(101), text: "/clear" });
     await new Worker(f.options).drain();
     assert.equal(f.messages.at(-1)?.body.message, "Context cleared");
     f.inbox.enqueue(f.job(102));

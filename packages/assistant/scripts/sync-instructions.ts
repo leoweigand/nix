@@ -26,5 +26,5 @@ execFileSync(
   { input: JSON.stringify(bundle), stdio: ["pipe", "inherit", "inherit"] },
 );
 console.log(
-  "Instructions synced. Existing sessions keep their pinned version; /reset or the next session boundary loads this version.",
+  "Instructions synced. Existing sessions keep their pinned version; /clear or the next session boundary loads this version.",
 );
