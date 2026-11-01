@@ -514,23 +514,6 @@ export class MediaService {
             message:
               "All aired episodes in the selected seasons are already available.",
           };
-        if (
-          existing &&
-          !existing.monitored &&
-          (existing.monitorNewItems !== "none" ||
-            existing.seasons.some(
-              (s) => !seasons.has(s.seasonNumber) && s.monitored,
-            ) ||
-            episodes.some((e) => !seasons.has(e.seasonNumber) && e.monitored))
-        )
-          return {
-            ...result,
-            message:
-              "Enabling this unmonitored series would activate unrelated or future monitoring. Adjust its existing monitoring in Sonarr first.",
-          };
-        const alreadyRequested =
-          !!existing?.monitored &&
-          selectedAired.filter((e) => !e.hasFile).every((e) => e.monitored);
         if (!existing) {
           await this.checkRoot(arr, signal);
           mutating = true;
@@ -586,7 +569,7 @@ export class MediaService {
           )
             throw new MediaError("episode_metadata_not_ready");
         }
-        // Refresh immediately before writing and preserve every unselected season.
+        // Re-read the current series before deciding how to preserve effective monitoring.
         existing = storedItemSchema.parse(
           await arr.api(`series/${existing.id}`, "GET", undefined, signal),
         );
@@ -596,6 +579,60 @@ export class MediaService {
             message:
               "The quality profile changed during this request; inspect the title before retrying.",
           };
+        episodes = await arr.episodes(existing.id, signal);
+        const missingAired = episodes.filter(
+          (e) => seasons.has(e.seasonNumber) && hasAired(e, now) && !e.hasFile,
+        );
+        const alreadyRequested =
+          existing.monitored &&
+          missingAired.length > 0 &&
+          missingAired.every((e) => e.monitored);
+        if (!existing.monitored) {
+          // A disabled series has no effective episode monitoring. Clear dormant
+          // flags before enabling it so unrelated downloads cannot reactivate.
+          mutating = true;
+          result.libraryChanged = null;
+          await arr.api(
+            `series/${existing.id}`,
+            "PUT",
+            {
+              ...existing,
+              monitored: false,
+              monitorNewItems: "none",
+              seasons: existing.seasons.map((s) => ({
+                ...s,
+                monitored: false,
+              })),
+            },
+            signal,
+          );
+          result.libraryChanged = true;
+          episodes = await arr.episodes(existing.id, signal);
+          const dormant = episodes.filter((e) => e.monitored).map((e) => e.id!);
+          if (dormant.length) {
+            result.libraryChanged = null;
+            await arr.api(
+              "episode/monitor",
+              "PUT",
+              { episodeIds: dormant, monitored: false },
+              signal,
+            );
+            result.libraryChanged = true;
+          }
+          existing = storedItemSchema.parse(
+            await arr.api(`series/${existing.id}`, "GET", undefined, signal),
+          );
+          episodes = await arr.episodes(existing.id, signal);
+          if (
+            existing.monitored ||
+            existing.monitorNewItems !== "none" ||
+            existing.qualityProfileId !== profile.id ||
+            existing.seasons.some((s) => s.monitored) ||
+            episodes.some((e) => e.monitored)
+          ) {
+            throw new MediaError("monitoring_changed_during_request");
+          }
+        }
         if (
           !existing.monitored ||
           existing.seasons.some(

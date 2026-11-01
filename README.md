@@ -50,7 +50,9 @@ requires PKCE and the `admins` group. `lab:read` remains for identity diagnostic
 Sonarr and Radarr over fixed loopback APIs. HD is the default; other configured
 profile names can be selected explicitly. TV requests monitor only aired
 episodes in explicit seasons, with future monitoring disabled for new shows.
-Existing quality profiles and monitoring outside the selection are preserved.
+Existing quality profiles are preserved. Active shows retain monitoring outside
+the selection. Disabled shows are enabled only after dormant monitoring flags
+are cleared, so unrelated episodes and future seasons stay off.
 These requests bypass Seerr's request history and approval workflow.
 
 The existing locked Node automation package and Landlock launcher restrict file

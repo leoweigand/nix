@@ -73,7 +73,14 @@ async function fixture(t: TestContext) {
     shows: [] as Record<string, any>[],
     episodes: structuredClone(episodes),
     writes: [] as { path: string; body: any }[],
+    enableSnapshots: [] as {
+      monitoredEpisodeIds: number[];
+      seasons: boolean[];
+      monitorNewItems: string;
+    }[],
     failCommand: false,
+    failEpisodeMonitor: false,
+    changeMonitoringAfterReset: false,
     failLookup: false,
     failTv: false,
   };
@@ -127,6 +134,7 @@ async function fixture(t: TestContext) {
     }
     if (path === "series/22") {
       if (req.method === "PUT") {
+        const enabling = body.monitored && !state.shows[0].monitored;
         // Sonarr propagates changed season flags to all episodes in that season.
         for (const season of body.seasons) {
           const old = state.shows[0].seasons.find(
@@ -140,13 +148,28 @@ async function fixture(t: TestContext) {
             }
         }
         state.shows[0] = body;
+        if (enabling)
+          state.enableSnapshots.push({
+            monitoredEpisodeIds: state.episodes
+              .filter((e) => e.monitored)
+              .map((e) => e.id),
+            seasons: body.seasons.map(
+              (s: { monitored: boolean }) => s.monitored,
+            ),
+            monitorNewItems: body.monitorNewItems,
+          });
       }
       return reply(state.shows[0]);
     }
     if (path === "episode") return reply(state.episodes);
     if (path === "episode/monitor") {
+      if (state.failEpisodeMonitor) return reply({}, 503);
       for (const e of state.episodes)
         if (body.episodeIds.includes(e.id)) e.monitored = body.monitored;
+      if (!body.monitored && state.changeMonitoringAfterReset) {
+        state.shows[0].monitored = true;
+        state.episodes[4].monitored = true;
+      }
       return reply([]);
     }
     if (path === "command")
@@ -325,7 +348,52 @@ test("TV updates preserve unselected seasons and prevent later episode discovery
     [true, true, false, false, true],
   );
 });
-test("TV requests refuse to activate unrelated monitoring on a disabled series", async (t) => {
+test("TV requests activate disabled series without reviving dormant episode or future-season monitoring", async (t) => {
+  const { service, state } = await fixture(t);
+  state.shows.push({
+    ...structuredClone(show),
+    id: 22,
+    monitored: false,
+    monitorNewItems: "all",
+    seasons: [
+      { seasonNumber: 1, monitored: true },
+      { seasonNumber: 2, monitored: false },
+    ],
+  });
+  // Season two is off but still has an individually monitored episode. Both
+  // season-level and individual dormant flags must be cleared before activation.
+  state.episodes[0].monitored = true;
+  state.episodes[2].monitored = true;
+  state.episodes[3].monitored = true;
+  state.episodes[4].monitored = true;
+  const result = await service.request(
+    request("tv:tvdb:200", { seasons: [1] }),
+  );
+  assert.equal(result.outcome, "accepted");
+  assert.equal(result.searchStarted, true);
+  assert.equal(state.shows[0].monitored, true);
+  assert.deepEqual(state.enableSnapshots, [
+    {
+      monitoredEpisodeIds: [],
+      seasons: [false, false],
+      monitorNewItems: "none",
+    },
+  ]);
+  assert.deepEqual(
+    state.episodes.map((e) => e.monitored),
+    [true, true, false, false, false],
+  );
+  assert.deepEqual(state.writes.find((w) => w.path === "command")?.body, {
+    name: "EpisodeSearch",
+    episodeIds: [1],
+  });
+  assert.equal(
+    (await service.request(request("tv:tvdb:200", { seasons: [1] }))).outcome,
+    "already_requested",
+  );
+  assert.equal(state.writes.filter((w) => w.path === "command").length, 1);
+});
+test("failed dormant-flag cleanup leaves the series disabled and never starts a search", async (t) => {
   const { service, state } = await fixture(t);
   state.shows.push({
     ...structuredClone(show),
@@ -333,11 +401,40 @@ test("TV requests refuse to activate unrelated monitoring on a disabled series",
     monitored: false,
     monitorNewItems: "all",
   });
+  state.episodes[4].monitored = true;
+  state.failEpisodeMonitor = true;
   const result = await service.request(
     request("tv:tvdb:200", { seasons: [1] }),
   );
-  assert.equal(result.outcome, "needs_input");
-  assert.equal(state.writes.length, 0);
+  assert.equal(result.outcome, "partial_failure");
+  assert.equal(state.shows[0].monitored, false);
+  assert.equal(state.enableSnapshots.length, 0);
+  assert.equal(
+    state.writes.some((w) => w.path === "command"),
+    false,
+  );
+});
+test("a concurrent monitoring change aborts normalization before requesting any search", async (t) => {
+  const { service, state } = await fixture(t);
+  state.shows.push({
+    ...structuredClone(show),
+    id: 22,
+    monitored: false,
+    monitorNewItems: "all",
+  });
+  state.episodes[4].monitored = true;
+  state.changeMonitoringAfterReset = true;
+  const result = await service.request(
+    request("tv:tvdb:200", { seasons: [1] }),
+  );
+  assert.equal(result.outcome, "partial_failure");
+  assert("error" in result);
+  assert.equal(result.error, "monitoring_changed_during_request");
+  assert.equal(state.enableSnapshots.length, 0);
+  assert.equal(
+    state.writes.some((w) => w.path === "command"),
+    false,
+  );
 });
 test("invalid or entirely unaired seasons cause no library mutations", async (t) => {
   const { service, state } = await fixture(t);
