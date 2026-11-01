@@ -55,6 +55,11 @@ the selection. Disabled shows are enabled only after dormant monitoring flags
 are cleared, so unrelated episodes and future seasons stay off.
 These requests bypass Seerr's request history and approval workflow.
 
+Search and details return public artwork URLs, release metadata, library facts
+and permission-filtered `availableActions` containing complete tool arguments.
+Every tool publishes an output schema from `modules/infra/mcp/contracts.ts`.
+These are data contracts; assistants and clients own presentation and controls.
+
 The existing locked Node automation package and Landlock launcher restrict file
 access and TCP ports. Arr API keys come from systemd credential copies of their
 existing XML configurations, never from the Nix store. No persistent request
