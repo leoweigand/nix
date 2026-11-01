@@ -4,6 +4,7 @@ export const toolRegistry = {
   mcp__leolab__whoami: { scope: null, write: false },
   mcp__leolab__search_media: { scope: "media:read", write: false },
   mcp__leolab__get_media_details: { scope: "media:read", write: false },
+  mcp__leolab__get_download_progress: { scope: "media:read", write: false },
   mcp__leolab__request_media: { scope: "media:request", write: true },
   mcp__leolab__search_home_entities: { scope: "home:read", write: false },
   mcp__leolab__get_home_entity: { scope: "home:read", write: false },

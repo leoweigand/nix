@@ -5,6 +5,16 @@ const token = (scope: string) =>
   `e30.${Buffer.from(JSON.stringify({ scope })).toString("base64url")}.fixture`;
 test("tool presentation follows granted capabilities", () => {
   assert.deepEqual(availableTools(), []);
+  assert(
+    availableTools(token("media:read")).includes(
+      "mcp__leolab__get_download_progress",
+    ),
+  );
+  assert(
+    !availableTools(token("media:request")).includes(
+      "mcp__leolab__get_download_progress",
+    ),
+  );
   assert.deepEqual(availableTools(token("home:read")), [
     "mcp__leolab__whoami",
     "mcp__leolab__search_home_entities",
