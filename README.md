@@ -76,13 +76,20 @@ mentions in configured groups, persists accepted jobs, and keeps Pi sessions
 separate by chat/sender/topic. Replies preserve their original message and topic.
 Telegram group privacy must allow mention delivery before group use is reliable.
 
-`packages/assistant/` independently locks Pi and patched dependencies; its Nix
-package runs TypeScript, inbox authorization/persistence tests and formatting
-checks. The worker has only read-only LeoLab MCP tools, no coding tools, and uses
-DeepSeek V4.1 Flash through the existing AI gateway. A dedicated Pocket ID public PKCE client
-has `lab:read` and `media:read` delegated permissions. Bootstrap it with
-`node modules/infra/mcp/provision-pocket-id.ts --assistant`, then complete the
-manual OAuth sign-in using `packages/assistant/src/login.ts`.
+`packages/assistant/` independently locks Pi and patched dependencies. The worker
+uses DeepSeek V4.1 Flash through the AI gateway and the requesting sender's MCP
+connection for media lookup and acquisition. It has no coding tools. Ordinary
+conversation works without OAuth; a request needing MCP triggers a private
+Pocket ID sign-in link and resumes after authorization. `/connect` renews or
+resends the link. The public callback is on Picard, so no Mac helper is required.
+
+The dedicated Pocket ID public PKCE client has `lab:read`, `media:read` and
+`media:request` delegated permissions. Its callback verifies the token's issuer,
+audience, client ID, scopes and configured immutable owner subject before saving
+the Telegram/Pocket ID binding. Only Leo's Telegram ID is allowed initially.
+Provision the client with `node modules/infra/mcp/provision-pocket-id.ts --assistant`.
+The package checks cover identity binding, PKCE/replay/expiry, rotating refresh
+grants, persistent resumption, private routing and interrupted write handling.
 
 Landlock and systemd restrict the worker to its state directory and declared
 network ports. Its process never receives the Telegram bot token. The inbox,

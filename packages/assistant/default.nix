@@ -16,7 +16,7 @@ buildNpmPackage {
       ./src
     ];
   };
-  npmDepsHash = "sha256-EfRItAzlnbY3INx0BBZY8LlleItjhxjmljQ+NPaM+FA=";
+  npmDepsHash = "sha256-/ybcRMvtUJghw+vcciGDx1RII6zCnGsBayStUVvB1bg=";
   npmFlags = [ "--ignore-scripts" ];
   dontNpmBuild = true;
   doCheck = true;

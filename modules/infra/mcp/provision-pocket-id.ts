@@ -6,7 +6,7 @@ const clientName = assistant
   ? "LeoLab MCP — Telegram Assistant"
   : "LeoLab MCP — Codex";
 const callback = assistant
-  ? "http://127.0.0.1:47832/callback"
+  ? "https://webhooks.leolab.party/assistant/oauth/callback"
   : "http://127.0.0.1:47831/callback";
 const key = execFileSync(
   "op",
@@ -74,10 +74,8 @@ entry = await api(`/apis/${entry.id}/permissions`, "PUT", {
   ],
 });
 const permissionIds = entry.permissions
-  .filter(
-    (p: { key: string }) =>
-      permissions.some((permission) => permission.key === p.key) &&
-      (!assistant || p.key !== "media:request"),
+  .filter((p: { key: string }) =>
+    permissions.some((permission) => permission.key === p.key),
   )
   .map((p: { id: string }) => p.id);
 const clientId = assistant ? "leolab-mcp-telegram" : "leolab-mcp-codex";
@@ -90,7 +88,7 @@ if (!existing) {
     id: clientId,
     name: clientName,
     description: assistant
-      ? "Read-only media lookup for Leo through the Telegram assistant"
+      ? "User-bound media lookup and requests through the Telegram assistant"
       : "Codex desktop and CLI access to private LeoLab tools",
     isPublic: true,
     pkceEnabled: true,
@@ -105,6 +103,21 @@ if (!existing) {
   throw new Error(
     "Client ID already has a different configuration; inspect it manually",
   );
+}
+if (assistant && existing) {
+  await api(`/oidc/clients/${clientId}`, "PUT", {
+    name: clientName,
+    description:
+      "User-bound media lookup and requests through the Telegram assistant",
+    isPublic: true,
+    pkceEnabled: true,
+    isGroupRestricted: true,
+    skipConsent: false,
+    callbackURLs: [callback],
+    logoutCallbackURLs: [],
+    accessTokenDurationMinutes: 10,
+    refreshTokenDurationMinutes: 43200,
+  });
 }
 const groups = await api("/user-groups?pagination%5Blimit%5D=100");
 const admins = groups.data.find(
@@ -125,9 +138,7 @@ console.log(
     resource,
     apiId: entry.id,
     clientId,
-    permissions: permissions
-      .filter((p) => !assistant || p.key !== "media:request")
-      .map((p) => p.key),
+    permissions: permissions.map((p) => p.key),
     callback,
   }),
 );

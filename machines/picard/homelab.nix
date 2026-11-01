@@ -118,6 +118,7 @@ in
       assistant = {
         enable = true;
         botUsername = "purrmeister_bot";
+        pocketIdSubject = "10bca0fd-70f4-4bec-ac14-365ce6d29454";
       };
 
       edgeDns = {

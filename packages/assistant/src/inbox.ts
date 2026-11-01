@@ -21,6 +21,9 @@ export interface Job {
   topicId?: number;
   reply?: string;
   done?: boolean;
+  waitingForAuth?: boolean;
+  authNoticeSent?: boolean;
+  writeAttempted?: boolean;
 }
 export interface Policy {
   ownerId: string;
