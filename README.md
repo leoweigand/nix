@@ -91,8 +91,18 @@ Provision the client with `node modules/infra/mcp/provision-pocket-id.ts --assis
 The package checks cover identity binding, PKCE/replay/expiry, rotating refresh
 grants, persistent resumption, private routing and interrupted write handling.
 
-Landlock and systemd restrict the worker to its state directory and declared
-network ports. Its process never receives the Telegram bot token. The inbox,
+The routing layer selects a native Pi session per DM or group/topic, starting
+fresh after ten conversation messages or ten minutes of inactivity, or on
+`/reset`. Tool calls and controls do not consume this counter. Notifications enter
+Pi history without invoking inference, quoted messages accompany requests, and
+`/session` reports the current session, model and pinned instruction revision.
+Core behavior is Markdown in `packages/assistant/instructions/SYSTEM.md`; the
+selected presentation skill is `packages/assistant/skills/telegram/SKILL.md`.
+After committing edits, `node packages/assistant/scripts/sync-instructions.ts`
+updates the runtime bundle without a rebuild; new sessions load the new version.
+
+Landlock and systemd restrict the worker to its state directory, read-only
+instruction bundle and declared network ports. Its process never receives the Telegram bot token. The inbox,
 private OAuth credentials and transcripts live under
 `/mnt/fast/appdata/leolab-assistant`, covered by appdata backups. See the
 [assistant runbook](../homelab/docs/telegram-assistant.md) for setup, grant renewal,

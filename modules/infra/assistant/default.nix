@@ -8,6 +8,14 @@ let
   cfg = config.homelab.infra.assistant;
   assistant = pkgs.callPackage ../../../packages/assistant { };
   sandbox = pkgs.callPackage ../../../packages/automation/sandbox.nix { };
+  instructionsDir = "/var/lib/leolab-assistant-instructions";
+  instructionBundle = pkgs.writeText "assistant-instructions.json" (
+    builtins.toJSON {
+      system = builtins.readFile ../../../packages/assistant/instructions/SYSTEM.md;
+      channel = builtins.readFile ../../../packages/assistant/skills/telegram/SKILL.md;
+      channelName = "telegram";
+    }
+  );
   launcher = pkgs.writeShellApplication {
     name = "leolab-assistant";
     text = ''
@@ -15,6 +23,8 @@ let
         --rox /nix/store --ro /etc/resolv.conf --ro /etc/nsswitch.conf \
         --ro /etc/hosts --ro /dev/urandom --ro /proc/self --ro /proc/meminfo --ro /proc/cpuinfo \
         --rw ${lib.escapeShellArg cfg.stateDir} \
+        --ro ${instructionsDir} \
+        --env ASSISTANT_INSTRUCTIONS_FILE=${instructionsDir}/current.json \
         --env SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt \
         --env HOME=${lib.escapeShellArg cfg.stateDir} \
         --env PI_CODING_AGENT_DIR=${lib.escapeShellArg "${cfg.stateDir}/agent"} \
@@ -67,7 +77,11 @@ in
       isSystemUser = true;
       group = "leolab-assistant";
     };
-    systemd.tmpfiles.rules = [ "d ${cfg.stateDir} 0700 leolab-assistant leolab-assistant - -" ];
+    systemd.tmpfiles.rules = [
+      "d ${cfg.stateDir} 0700 leolab-assistant leolab-assistant - -"
+      "d ${instructionsDir} 0750 root leolab-assistant - -"
+      "C ${instructionsDir}/current.json 0640 root leolab-assistant - ${instructionBundle}"
+    ];
     systemd.services.leolab-assistant = {
       description = "Pi Telegram assistant";
       wantedBy = [ "multi-user.target" ];

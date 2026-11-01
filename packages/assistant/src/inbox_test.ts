@@ -116,3 +116,20 @@ test("accepted jobs and completed receipts survive reopening without replay", ()
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("quoted messages are context and group conversation identity does not depend on the requester", () => {
+  const job = eligibleJob(
+    update({
+      text: "Explain this",
+      reply_to_message: {
+        text: "Backup failed",
+        from: { first_name: "Backup service" },
+        date: 100,
+      },
+    }),
+    policy,
+  )!;
+  assert.equal(job.message?.quote?.text, "Backup failed");
+  assert.equal(job.message?.quote?.author, "Backup service");
+  assert.equal(job.message?.conversationId, "123:0");
+});

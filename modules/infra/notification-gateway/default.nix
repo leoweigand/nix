@@ -12,6 +12,7 @@ let
     name = serviceName;
     script = "modules/infra/notification-gateway/notification-gateway.ts";
     bindPorts = [ cfg.port ];
+    writePaths = lib.optional config.homelab.infra.assistant.enable "/var/lib/notification-gateway";
     connectPorts = [ 443 ] ++ lib.optional config.homelab.infra.assistant.enable 9090;
     environmentNames = [
       "TELEGRAM_BOT_TOKEN"
@@ -19,6 +20,7 @@ let
       "TELEGRAM_WEBHOOK_SECRET"
       "TELEGRAM_WEBHOOK_URL"
       "TELEGRAM_ASSISTANT_ENABLED"
+      "NOTIFICATION_CONTEXT_DIR"
       "NOTIFICATION_GATEWAY_PORT"
     ];
   };
@@ -105,6 +107,7 @@ in
           "TELEGRAM_WEBHOOK_URL=https://webhooks.${config.homelab.baseDomain}${cfg.webhookPath}"
         ];
         DynamicUser = true;
+        StateDirectory = lib.optional config.homelab.infra.assistant.enable "notification-gateway";
         Restart = "on-failure";
         RestartSec = "5s";
         NoNewPrivileges = true;

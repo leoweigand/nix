@@ -1,3 +1,4 @@
+import { ContextOutbox, type NotificationContext } from "./context-outbox.ts";
 import { restrictedFetch } from "../../runtime/network.ts";
 import { createWebServer } from "../../runtime/http.ts";
 
@@ -39,6 +40,7 @@ export interface GatewayConfig {
 interface GatewayDependencies {
   fetch: typeof fetch;
   log: Pick<Console, "info" | "warn" | "error">;
+  recordContext?: (event: NotificationContext) => void;
 }
 
 const defaultDependencies: GatewayDependencies = {
@@ -101,6 +103,29 @@ export function loadConfig(
     webhookUrl,
     assistantEnabled: environment["TELEGRAM_ASSISTANT_ENABLED"] === "true",
   };
+}
+
+function recordNotification(
+  config: GatewayConfig,
+  dependencies: GatewayDependencies,
+  chatId: string,
+  messageId: number,
+  text: string,
+) {
+  if (!config.assistantEnabled) return;
+  try {
+    dependencies.recordContext?.({
+      type: "notification",
+      chatId,
+      messageId,
+      text,
+      at: Date.now(),
+    });
+  } catch {
+    dependencies.log.error(
+      "Notification delivered but context could not be queued",
+    );
+  }
 }
 
 async function readBytes(
@@ -381,6 +406,13 @@ async function handleNotification(
     if (messageId === undefined) {
       return new Response(null, { status: 502 });
     }
+    recordNotification(
+      config,
+      dependencies,
+      destination.chatId,
+      messageId,
+      notification.message,
+    );
     return Response.json(
       { to: destination.name, message_id: messageId },
       { status: 201 },
@@ -509,6 +541,13 @@ async function handleMedia(
     if (!isRecord(result) || typeof result.message_id !== "number") {
       return new Response(null, { status: 502 });
     }
+    recordNotification(
+      config,
+      dependencies,
+      destination.chatId,
+      result.message_id,
+      `[${kind} message]${notification.caption ? " " + notification.caption : ""}`,
+    );
     return Response.json(
       { to: destination.name, message_id: result.message_id },
       { status: 201 },
@@ -754,8 +793,9 @@ async function handleAssistantReply(
       !chatId ||
       typeof value.message !== "string" ||
       !value.message.trim() ||
-      !Number.isSafeInteger(value.message_id) ||
-      (value.message_id as number) < 1 ||
+      (value.message_id !== undefined &&
+        (!Number.isSafeInteger(value.message_id) ||
+          (value.message_id as number) < 1)) ||
       (value.message_thread_id !== undefined &&
         !Number.isSafeInteger(value.message_thread_id))
     )
@@ -770,10 +810,14 @@ async function handleAssistantReply(
           body: JSON.stringify({
             chat_id: chatId,
             text: characters.slice(offset, offset + 3500).join(""),
-            reply_parameters: {
-              message_id: value.message_id,
-              allow_sending_without_reply: true,
-            },
+            ...(value.message_id === undefined
+              ? {}
+              : {
+                  reply_parameters: {
+                    message_id: value.message_id,
+                    allow_sending_without_reply: true,
+                  },
+                }),
             ...(value.message_thread_id === undefined
               ? {}
               : { message_thread_id: value.message_thread_id }),
@@ -835,5 +879,25 @@ if (import.meta.main) {
     throw new Error("NOTIFICATION_GATEWAY_PORT must be a valid TCP port");
   }
   await registerTelegramWebhook(config);
-  createWebServer(createHandler(config)).listen(port, "127.0.0.1");
+  const outbox = config.assistantEnabled
+    ? new ContextOutbox(
+        process.env.NOTIFICATION_CONTEXT_DIR ??
+          "/var/lib/notification-gateway/context",
+        config.webhookSecret,
+        automationFetch,
+      )
+    : undefined;
+  if (outbox) {
+    void outbox.flush();
+    setInterval(() => void outbox.flush(), 5000);
+  }
+  createWebServer(
+    createHandler(config, {
+      ...defaultDependencies,
+      recordContext: (event) => {
+        outbox?.enqueue(event);
+        setImmediate(() => void outbox?.flush());
+      },
+    }),
+  ).listen(port, "127.0.0.1");
 }

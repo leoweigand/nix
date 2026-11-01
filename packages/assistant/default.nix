@@ -14,6 +14,9 @@ buildNpmPackage {
       ./package-lock.json
       ./tsconfig.json
       ./src
+      ./instructions
+      ./skills
+      ./scripts
     ];
   };
   npmDepsHash = "sha256-BSq8XRX93QQuY7SpOqxwQIOWf7OPM4hTu8KhqoGLtjs=";
@@ -31,7 +34,7 @@ buildNpmPackage {
     runHook preInstall
     npm prune --omit=dev --ignore-scripts
     mkdir -p "$out/lib/leolab-assistant"
-    cp -r src node_modules package.json "$out/lib/leolab-assistant/"
+    cp -r src instructions skills scripts node_modules package.json "$out/lib/leolab-assistant/"
     runHook postInstall
   '';
   passthru.nodejs = nodejs_26;

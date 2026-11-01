@@ -698,3 +698,41 @@ test("the startup environment enables forwarding of an untagged private DM", asy
     }
   }
 });
+
+test("operational notifications are recorded as context but private assistant controls are not", async () => {
+  const recorded: unknown[] = [];
+  const configValue = config({ assistantEnabled: true });
+  const handle = createHandler(configValue, {
+    fetch: async () => Response.json({ ok: true, result: { message_id: 17 } }),
+    log: { info: () => {}, warn: () => {}, error: () => {} },
+    recordContext: (event) => recorded.push(event),
+  });
+  assert(
+    (
+      await handle(
+        new Request("http://gateway/v1/notifications", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ to: "leo", message: "Backup failed" }),
+        }),
+      )
+    ).status === 201,
+  );
+  assert(recorded.length === 1);
+  assert((recorded[0] as { text: string }).text === "Backup failed");
+  assert(
+    (
+      await handle(
+        new Request("http://gateway/v1/assistant-replies", {
+          method: "POST",
+          body: JSON.stringify({
+            secret: "test-webhook-secret",
+            to: "leo",
+            message: "Private sign-in link",
+          }),
+        }),
+      )
+    ).status === 204,
+  );
+  assert(recorded.length === 1);
+});

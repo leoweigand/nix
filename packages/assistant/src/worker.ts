@@ -3,15 +3,19 @@ import { callbackPath, ConnectionRequired } from "./connections.ts";
 import {
   authorized,
   eligibleJob,
+  notificationJob,
   type Inbox,
   type Job,
   type Policy,
 } from "./inbox.ts";
+import { messageForJob } from "./telegram.ts";
+import { Sessions } from "./sessions.ts";
 import type { PiAssistant } from "./pi.ts";
 
 type Gateway = (endpoint: string, body: unknown) => Promise<void>;
 interface Options {
   secret: string;
+  sessions: Sessions;
   policy: Policy;
   inbox: Inbox;
   connections: Pick<Connections, "begin" | "complete" | "token">;
@@ -90,13 +94,34 @@ export class Worker {
           reader.releaseLock();
         }
       }
-      const job = eligibleJob(JSON.parse(body), this.options.policy);
+      const payload = JSON.parse(body);
+      const job =
+        notificationJob(payload, this.options.policy) ??
+        eligibleJob(payload, this.options.policy);
       if (!job) return new Response(null, { status: 204 });
       const result = this.options.inbox.enqueue(job);
       setImmediate(() => void this.drain());
       return new Response(null, { status: result === "full" ? 503 : 204 });
     } catch {
       return new Response(null, { status: 400 });
+    }
+  }
+  private prepare(job: Job, reset = false): void {
+    if (!job.session) {
+      const message = messageForJob(job);
+      job.session = this.options.sessions.select(
+        message.conversationId,
+        message.at,
+        reset,
+      );
+      this.options.inbox.save(job);
+    }
+  }
+  private async notice(job: Job): Promise<void> {
+    if (job.session?.notice && !job.noticeSent) {
+      await this.reply(job, job.session.notice);
+      job.noticeSent = true;
+      this.options.inbox.save(job);
     }
   }
   private command(job: Job): string | undefined {
@@ -118,7 +143,8 @@ export class Worker {
     if (job.authNoticeSent) return;
     const url = await this.options.connections.begin(job.senderId);
     // The allowlisted owner's private destination is never selected from model output.
-    await this.options.gateway("/v1/notifications", {
+    await this.options.gateway("/v1/assistant-replies", {
+      secret: this.options.secret,
       to: "leo",
       message: `Connect your Pocket ID account so I can search and request media for you:\n${url}\n\nThis link expires in 10 minutes. After you approve, I'll continue your pending request. Send /connect for a new link if it expires.`,
     });
@@ -139,9 +165,43 @@ export class Worker {
       secret: this.options.secret,
     });
   }
+  private async deliver(job: Job): Promise<void> {
+    if (job.session) {
+      const manager = this.options.sessions.open(job.session);
+      const count = manager
+        .getEntries()
+        .filter((e) => e.type === "compaction").length;
+      const previous = [...manager.getEntries()]
+        .reverse()
+        .find(
+          (e) => e.type === "custom" && e.customType === "compaction-notice",
+        );
+      const noticed =
+        previous?.type === "custom"
+          ? Number((previous.data as { count: number }).count)
+          : 0;
+      if (count > noticed) {
+        await this.reply(
+          job,
+          "Earlier conversation in this session has been summarized.",
+        );
+        manager.appendCustomEntry("compaction-notice", { count });
+      }
+    }
+    await this.reply(job, job.reply!);
+    this.finish(job);
+  }
   private finish(job: Job): void {
+    if (job.session && job.kind !== "notification" && !job.control && job.reply)
+      this.options.sessions.delivered(
+        job.session,
+        `reply-${job.id}`,
+        job.reply,
+        job.generated ?? false,
+      );
     job.done = true;
     job.text = "";
+    delete job.message;
     delete job.reply;
     delete job.waitingForAuth;
     delete job.authNoticeSent;
@@ -153,12 +213,29 @@ export class Worker {
   }
   private async process(job: Job): Promise<void> {
     if (job.reply) {
-      await this.reply(job, job.reply);
-      this.finish(job);
+      await this.deliver(job);
       return;
     }
     const command = this.command(job);
-    if (command === "/connect") {
+    if (job.kind === "notification") {
+      this.prepare(job);
+      this.options.sessions.record(job.session!, messageForJob(job));
+      await this.notice(job);
+      this.finish(job);
+      return;
+    }
+    if (command === "/session") {
+      job.control = true;
+      job.reply = this.options.sessions.status(
+        messageForJob(job).conversationId,
+      );
+    } else if (command === "/reset") {
+      job.control = true;
+      this.prepare(job, true);
+      job.reply = job.session!.notice!;
+      job.noticeSent = true;
+    } else if (command === "/connect") {
+      job.control = true;
       // Explicit /connect also resends a still-valid link to recover a missed DM.
       job.authNoticeSent = false;
       await this.connect(job);
@@ -166,13 +243,19 @@ export class Worker {
       return;
     }
     if (command === "/start" || command === "/help") {
+      job.control = true;
       job.reply =
-        "Hi! Ask me to look up a film or request a movie or TV season. I'll send you a private Pocket ID link when I need MCP access. /connect connects or renews your account; /reset starts a new conversation.";
+        "Hi! Ask me to look up a film or request a movie or TV season. I'll send you a private Pocket ID link when I need MCP access. /connect connects or renews your account; /reset starts a new conversation; /session shows the current session. Sessions restart after ten conversation messages or ten minutes of inactivity.";
+    } else if (job.control) {
+      // Deterministic commands do not invoke the model or consume the conversation budget.
     } else if (job.writeAttempted) {
       // A restart after a write cannot prove its result. Never replay acquisition automatically.
       job.reply =
         "I was interrupted after starting a media request, so I won't repeat it automatically. Ask me to check the title's current library status before trying again.";
     } else {
+      this.prepare(job);
+      this.options.sessions.record(job.session!, messageForJob(job));
+      await this.notice(job);
       const token = await this.options.connections.token(job.senderId);
       if (job.waitingForAuth && !token) {
         await this.connect(job);
@@ -190,13 +273,20 @@ export class Worker {
       const timer = setInterval(() => void typing(), 4500);
       let needsConnection = false;
       try {
-        const input = command === "/reset" ? { ...job, text: "/reset" } : job;
-        const result = await this.options.assistant.answer(input, token, () => {
-          job.writeAttempted = true;
-          this.options.inbox.save(job);
-        });
+        const result = await this.options.assistant.answer(
+          messageForJob(job),
+          job.session!,
+          token,
+          () => {
+            job.writeAttempted = true;
+            this.options.inbox.save(job);
+          },
+        );
         needsConnection = result.needsConnection;
-        if (!needsConnection) job.reply = result.text;
+        if (!needsConnection) {
+          job.reply = result.text;
+          job.generated = true;
+        }
       } catch {
         this.log.error(
           JSON.stringify({ event: "assistant_failed", updateId: job.id }),
@@ -213,25 +303,35 @@ export class Worker {
       }
     }
     this.options.inbox.save(job);
-    await this.reply(job, job.reply!);
-    this.finish(job);
+    await this.deliver(job);
   }
   async drain(): Promise<void> {
     if (this.working || this.stopping) return;
     this.working = true;
     try {
-      const blockedChats = new Set<string>();
+      const blockedChats = new Map<string, string>();
       for (const job of this.options.inbox.jobs().filter((j) => !j.done)) {
         if (this.stopping) break;
-        const chat = `${job.chatId}:${job.senderId}:${job.topicId ?? 0}`;
-        if (
-          blockedChats.has(chat) &&
-          !["/connect", "/help", "/start"].includes(this.command(job) ?? "")
-        )
-          continue;
+        const message = messageForJob(job);
+        const chat = message.conversationId;
         try {
+          if (
+            blockedChats.has(chat) &&
+            job.kind !== "notification" &&
+            !["/connect", "/help", "/start", "/reset", "/session"].includes(
+              this.command(job) ?? "",
+            )
+          ) {
+            const candidate =
+              job.session ?? this.options.sessions.select(chat, message.at);
+            if (candidate.file === blockedChats.get(chat)) continue;
+            job.session = candidate;
+            this.options.inbox.save(job);
+          }
           await this.process(job);
-          if (job.waitingForAuth) blockedChats.add(chat);
+          if (job.waitingForAuth && job.session)
+            blockedChats.set(chat, job.session.file);
+          if (this.command(job) === "/reset") blockedChats.delete(chat);
         } catch {
           this.log.error(
             JSON.stringify({

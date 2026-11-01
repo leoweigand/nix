@@ -15,6 +15,8 @@ let
     appdata = [
       "${mounts.fast}/appdata"
       "/var/lib/private/cloudflare-publication" # DynamicUser's persistent route ownership state
+      "/var/lib/private/notification-gateway" # Delivered alerts waiting to enter assistant context
+      "/var/lib/leolab-assistant-instructions"
     ];
     paperless = [
       "${mounts.fast}/documents/paperless/library"

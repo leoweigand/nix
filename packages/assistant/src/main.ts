@@ -1,9 +1,11 @@
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { Connections } from "./connections.ts";
 import { Inbox, type Policy } from "./inbox.ts";
 import { PiAssistant } from "./pi.ts";
+import { Sessions, type Instructions } from "./sessions.ts";
 import { Worker } from "./worker.ts";
 const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
 const stateDir = process.env.ASSISTANT_STATE_DIR;
@@ -31,9 +33,16 @@ const policy: Policy = {
   destinations,
   botUsername: process.env.ASSISTANT_BOT_USERNAME,
 };
-const assistant = new PiAssistant(stateDir);
+const instructionPath = process.env.ASSISTANT_INSTRUCTIONS_FILE;
+if (!instructionPath) throw new Error("Missing instruction bundle");
+const sessions = new Sessions(
+  stateDir,
+  () => JSON.parse(readFileSync(instructionPath, "utf8")) as Instructions,
+);
+const assistant = new PiAssistant(stateDir, sessions);
 const worker = new Worker({
   secret,
+  sessions,
   policy,
   inbox: new Inbox(join(stateDir, "inbox")),
   connections: new Connections({
