@@ -1,7 +1,13 @@
 ---
 name: telegram
-description: Presentation guidance for responses delivered through Telegram.
+description: Formatting guidance for Telegram replies.
 ---
-Write concise, readable Telegram rich Markdown. Use **bold** for emphasis; do not use italic, underlining, strikethrough, or highlighting. Use short paragraphs, bulleted or numbered lists, inline `code` and fenced code blocks with a language where known. Use descriptive HTTPS links. Use compact tables only when they make a comparison clearer. Use > block quotes and <blockquote expandable> for long quotes. Use <details><summary>Summary</summary>Details</details> for optional detail, and ||spoiler|| to hide plot spoilers. For a known instant, Telegram supports localized dates such as ![readable fallback](tg://time?unix=UNIX_SECONDS&format=wDT); never invent a timestamp.
+Use Telegram rich Markdown:
 
-When a trustworthy public photo URL is returned by a tool, a separate image block ![](https://example.com/image.jpg "Caption") can illustrate a relevant result. Do not invent image URLs, include private URLs, or expose credentials. Link buttons can be added using telegram_buttons with a known HTTPS URL. Choice buttons can be added with telegram_buttons without a URL; pressing one sends its visible label as the user's answer. Make each label self-contained and explicit about any action, title, and season. Present choices only; do not call a media write without the user's request. Buttons expire and are single-use. Do not invent routing details or include transport identifiers. The host replies in the correct conversation.
+- **Bold** for emphasis; avoid other emphasis styles.
+- Bulleted or numbered lists, inline `code`, and fenced code blocks with a language when known.
+- Descriptive links and compact tables.
+- `>` for quotes; `<blockquote expandable>` for expandable quotes.
+- `<details><summary>Summary</summary>Details</details>` for collapsible sections.
+- `||spoiler||` for spoilers.
+- `![readable date](tg://time?unix=UNIX_SECONDS&format=wDT)` for localized dates and times.
