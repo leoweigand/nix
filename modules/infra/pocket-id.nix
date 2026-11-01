@@ -78,6 +78,7 @@ in
       credentials.ENCRYPTION_KEY = config.services.onepassword-secrets.secretPaths.pocketIdEncryptionKey;
       settings = {
         APP_NAME = cfg.appName;
+        SESSION_DURATION = 43200; # 30 days, expressed in minutes.
         APP_URL = "https://${serviceHost}";
         HOST = "127.0.0.1";
         PORT = cfg.port;

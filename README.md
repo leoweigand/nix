@@ -197,6 +197,7 @@ an immediate reconciliation; inspect its results with
 
 Pocket ID 2.19.1 runs natively on Picard behind Caddy at `auth.leolab.party`.
 Its application name is `LeoLab`, managed declaratively in Nix.
+Pocket ID sign-in sessions last 30 days (`SESSION_DURATION=43200` minutes).
 Its live SQLite database and uploads are on local disk in `/var/lib/pocket-id`;
 `/mnt/fast` is virtiofs and does not hold the live database. Before the existing
 appdata restic job, `pocket-id-backup.service` creates a consistent SQLite backup
