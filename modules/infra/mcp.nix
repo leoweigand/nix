@@ -93,7 +93,7 @@ in
       };
       tokenReference = lib.mkOption {
         type = lib.types.str;
-        default = "op://Homelab/Linkding/mcp-api-token";
+        default = "op://Homelab/MCP Server/LEO_LINKDING_API_TOKEN";
         description = "Global Linkding API token, supplied only to MCP as a credential";
       };
     };
