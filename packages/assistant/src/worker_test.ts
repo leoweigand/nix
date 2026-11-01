@@ -242,6 +242,36 @@ test("ordinary conversation needs no OAuth and explicit /connect sends a private
     f.cleanup();
   }
 });
+test("group OAuth falls back to a DM if Telegram rejects ephemeral delivery", async () => {
+  const f = fixture();
+  try {
+    f.inbox.enqueue(f.job(4, true));
+    const worker = new Worker({
+      ...f.options,
+      gateway: async (endpoint, body: any) => {
+        if (body.ephemeral_receiver)
+          throw new Error("Telegram rejected ephemeral message");
+        await f.options.gateway(endpoint, body);
+      },
+    });
+    await worker.drain();
+    const link = f.messages.find((m) =>
+      String(m.body.message).includes("state=private"),
+    );
+    assert.equal(link?.body.to, "leo");
+    assert.equal(
+      f.messages.some(
+        (m) =>
+          m.body.to === "group" &&
+          String(m.body.message).includes("state=private"),
+      ),
+      false,
+    );
+    assert.equal(f.inbox.jobs()[0].waitingForAuth, true);
+  } finally {
+    f.cleanup();
+  }
+});
 test("an interrupted media write is not replayed and a failed DM delivery retains the pending request", async () => {
   const f = fixture();
   try {

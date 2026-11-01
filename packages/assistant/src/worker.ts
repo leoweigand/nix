@@ -187,21 +187,38 @@ export class Worker {
     this.options.inbox.save(job);
     if (job.authNoticeSent) return;
     const url = await this.options.connections.begin(job.senderId);
+    const message = `Connect your Pocket ID account so I can search and request media for you:\n${url}\n\nThis link expires in 10 minutes. After you approve, I'll continue your pending request. Send /connect for a new link if it expires.`;
     // The allowlisted owner's private destination is never selected from model output.
-    await this.options.gateway("/v1/assistant-replies", {
-      secret: this.options.secret,
-      to: job.chatId === job.senderId ? "leo" : job.destination,
-      message: `Connect your Pocket ID account so I can search and request media for you:\n${url}\n\nThis link expires in 10 minutes. After you approve, I'll continue your pending request. Send /connect for a new link if it expires.`,
-      ...(job.chatId === job.senderId
-        ? {}
-        : {
-            ephemeral_receiver: job.senderId,
-            message_id: job.messageId,
-            ...(job.topicId === undefined
-              ? {}
-              : { message_thread_id: job.topicId }),
-          }),
-    });
+    if (job.chatId === job.senderId) {
+      await this.options.gateway("/v1/assistant-replies", {
+        secret: this.options.secret,
+        to: "leo",
+        message,
+      });
+    } else {
+      try {
+        await this.options.gateway("/v1/assistant-replies", {
+          secret: this.options.secret,
+          to: job.destination,
+          message,
+          ephemeral_receiver: job.senderId,
+          message_id: job.messageId,
+          ...(job.topicId === undefined
+            ? {}
+            : { message_thread_id: job.topicId }),
+        });
+      } catch {
+        await this.options.gateway("/v1/assistant-replies", {
+          secret: this.options.secret,
+          to: "leo",
+          message,
+        });
+        await this.reply(
+          job,
+          "I've sent you a private sign-in link in our DM. I'll continue here after you connect.",
+        );
+      }
+    }
     job.authNoticeSent = true;
     this.options.inbox.save(job);
   }
