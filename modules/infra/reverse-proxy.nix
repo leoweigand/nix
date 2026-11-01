@@ -4,6 +4,16 @@ let
   cfg = config.homelab.infra.edge;
   domain = config.homelab.baseDomain;
   oauth2Proxy = config.homelab.infra.oauth2Proxy;
+  webhookExtraConfig =
+    lib.concatMapStrings (route: ''
+      handle ${route.path} {
+        rewrite * ${route.rewrite}
+        reverse_proxy ${route.upstream}
+      }
+    '') cfg.webhookRoutes
+    + ''
+      respond 404
+    '';
   requiresAuth = proxyCfg: if builtins.isBool proxyCfg.auth then proxyCfg.auth else true;
   authConfigType = lib.types.submodule {
     options = {
@@ -335,17 +345,11 @@ in
       // lib.optionalAttrs (cfg.webhookRoutes != [ ]) {
         # Plain HTTP so cloudflared can connect without TLS verification issues.
         # Cloudflare terminates TLS at the edge; the tunnel leg is already encrypted.
-        "http://webhooks.${domain}" = {
-          extraConfig =
-            lib.concatMapStrings (route: ''
-              handle ${route.path} {
-                rewrite * ${route.rewrite}
-                reverse_proxy ${route.upstream}
-              }
-            '') cfg.webhookRoutes
-            + ''
-              respond 404
-            '';
+        "http://webhooks.${domain}".extraConfig = webhookExtraConfig;
+        # Split DNS points tailnet/LAN browsers directly here, including OAuth returns.
+        "https://webhooks.${domain}" = {
+          useACMEHost = domain;
+          extraConfig = webhookExtraConfig;
         };
       }
       // lib.mapAttrs' (
