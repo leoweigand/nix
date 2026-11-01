@@ -422,7 +422,7 @@ export class Worker {
             this.options.inbox.save(job);
           })
           .catch(() => {});
-      }, this.options.reactionDelayMs ?? 2000);
+      }, this.options.reactionDelayMs ?? 3000);
       try {
         const result = await this.options.assistant.answer(
           messageForJob(job),

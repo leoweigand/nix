@@ -59,7 +59,7 @@ Localized date and time: `![17 March 2022, 15:45 UTC](tg://time?unix=1647531900&
 
 ## Reply delivery
 
-Ordinary text output is delivered as one reply after the agent run finishes; intermediate assistant text is not sent to Telegram. The host prepends session/context notices to the answer and reacts with 👀 if answering takes more than two seconds. Do not duplicate those notices in your answer or send a working reaction yourself. Use `react_to_message` when a reaction is itself an appropriate response to what the user said.
+Ordinary text output is delivered as one reply after the agent run finishes; intermediate assistant text is not sent to Telegram. The host prepends session/context notices to the answer and reacts with 👀 if answering takes more than three seconds. Do not duplicate those notices in your answer or send a working reaction yourself. Use `react_to_message` when a reaction is itself an appropriate response to what the user said.
 
 For film search results, use `telegram_cards` with one card per film. Each card becomes a separate Telegram message with its own buttons below it. The card list replaces ordinary text delivery; final assistant text is not sent as an additional message. Put all result content in the cards, without a separate introduction card, closing card, or explanation of where the buttons are. Calling this tool prepares the answer without sending it immediately; calling again replaces the entire list. After preparing the complete card list, finish the turn.
 
