@@ -43,10 +43,12 @@ isolation, atomic writes and TCP denial on Linux.
 `homelab.infra.mcp` runs private MCP tools at `https://mcp.leolab.party/mcp`.
 Pocket ID authenticates every request. `media:read` grants catalog search and
 media details; `media:request` grants acquisition requests. The Codex client
-requires PKCE and the `admins` group. `lab:read` remains for identity diagnostics.
+requires PKCE and the `admins` group. `lab:read` remains for identity diagnostics. `home:read` and `home:control` separately
+grant approved Home Assistant entity reads and runtime controls.
 
 `modules/infra/mcp/` provides `whoami`, `search_media`, `get_media_details` and
-`request_media` using the official TypeScript MCP SDK v2. Media tools talk to
+`request_media`, plus `search_home_entities`, `get_home_entity` and
+`control_home_entities`, using the official TypeScript MCP SDK v2. Media tools talk to
 Sonarr and Radarr over fixed loopback APIs. HD is the default; other configured
 profile names can be selected explicitly. TV requests monitor only aired
 episodes in explicit seasons, with future monitoring disabled for new shows.
@@ -57,7 +59,8 @@ These requests bypass Seerr's request history and approval workflow.
 
 Search and details return public artwork URLs, release metadata, library facts
 and permission-filtered `availableActions` containing complete tool arguments.
-Every tool publishes an output schema from `modules/infra/mcp/contracts.ts`.
+Every tool publishes an output schema from `modules/infra/mcp/contracts.ts`
+or `modules/infra/mcp/home.ts`.
 These are data contracts; assistants and clients own presentation and controls.
 
 The existing locked Node automation package and Landlock launcher restrict file
@@ -67,6 +70,14 @@ database or media filesystem access is needed. The private Caddy route permits
 LAN, Tailscale and loopback callers; the backend binds only to loopback. See the
 [MCP runbook](../homelab/docs/mcp.md) for schemas, scope provisioning, limitations,
 client setup and verification.
+
+`homelab.infra.mcp.home` declares the readable HA inventory, room aliases and
+per-entity writable actions. Picard exposes its nine lights and two blinds.
+MCP uses a fixed loopback REST endpoint and an opnix/systemd token credential;
+the assistant never receives that token. Controls validate the full target list,
+serialize overlapping writes and report per-target HA read-back. Uncertain writes
+are never automatically replayed. The assistant saves durable receipts for both
+media and home writes and exposes only tools allowed by its current user grant.
 
 ## Telegram assistant
 
@@ -78,13 +89,13 @@ Telegram group privacy must allow mention delivery before group use is reliable.
 
 `packages/assistant/` independently locks Pi and patched dependencies. The worker
 uses DeepSeek V4.1 Flash through the AI gateway and the requesting sender's MCP
-connection for media lookup and acquisition. It has no coding tools. Ordinary
+connection for media lookup/acquisition and approved Home Assistant controls. It has no coding tools. Ordinary
 conversation works without OAuth; a request needing MCP triggers a private
 Pocket ID sign-in link and resumes after authorization. `/connect` renews or
 resends the link. The public callback is on Picard, so no Mac helper is required.
 
 The dedicated Pocket ID public PKCE client has `lab:read`, `media:read` and
-`media:request` delegated permissions. Its callback verifies the token's issuer,
+`media:request`, `home:read` and `home:control` delegated permissions. Its callback verifies the token's issuer,
 audience, client ID, scopes and configured immutable owner subject before saving
 the Telegram/Pocket ID binding. Only Leo's Telegram ID is allowed initially.
 Provision the client with `node modules/infra/mcp/provision-pocket-id.ts --assistant`.
