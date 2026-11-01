@@ -115,6 +115,10 @@ in
       };
 
       mcp.enable = true;
+      assistant = {
+        enable = true;
+        botUsername = "purrmeister_bot";
+      };
 
       edgeDns = {
         enable = true;

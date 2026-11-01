@@ -45,9 +45,11 @@
     }@inputs:
     {
       packages = nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-darwin" ] (system: {
+        assistant = nixpkgs.legacyPackages.${system}.callPackage ./packages/assistant { };
         automation = nixpkgs.legacyPackages.${system}.callPackage ./packages/automation/default.nix { };
       });
 
+      checks.x86_64-linux.assistant = self.packages.x86_64-linux.assistant;
       checks.x86_64-linux.automation = self.packages.x86_64-linux.automation;
       checks.x86_64-linux.automation-sandbox = import ./tests/automation-sandbox.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;

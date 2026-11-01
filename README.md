@@ -68,6 +68,29 @@ LAN, Tailscale and loopback callers; the backend binds only to loopback. See the
 [MCP runbook](../homelab/docs/mcp.md) for schemas, scope provisioning, limitations,
 client setup and verification.
 
+## Telegram assistant
+
+`homelab.infra.assistant` runs Pi 1.4.0 as a separate worker behind the existing
+notification gateway's Telegram webhook. It accepts Leo's DMs and explicit bot
+mentions in configured groups, persists accepted jobs, and keeps Pi sessions
+separate by chat/sender/topic. Replies preserve their original message and topic.
+Telegram group privacy must allow mention delivery before group use is reliable.
+
+`packages/assistant/` independently locks Pi and patched dependencies; its Nix
+package runs TypeScript, inbox authorization/persistence tests and formatting
+checks. The worker has only read-only LeoLab MCP tools, no coding tools, and uses
+DeepSeek V4.1 Flash through the existing AI gateway. A dedicated Pocket ID public PKCE client
+has `lab:read` and `media:read` delegated permissions. Bootstrap it with
+`node modules/infra/mcp/provision-pocket-id.ts --assistant`, then complete the
+manual OAuth sign-in using `packages/assistant/src/login.ts`.
+
+Landlock and systemd restrict the worker to its state directory and declared
+network ports. Its process never receives the Telegram bot token. The inbox,
+private OAuth credentials and transcripts live under
+`/mnt/fast/appdata/leolab-assistant`, covered by appdata backups. See the
+[assistant runbook](../homelab/docs/telegram-assistant.md) for setup, grant renewal,
+limitations and verification status.
+
 ## Machines
 - **picard (NixOS VM on laforge)**: Runs the homelab edge (reverse proxy, DNS), plus apps (Immich, Paperless-ngx, etc.). Laforge is the Unraid host with the storage array and SSD cache drives.
 - **crusher (macOS)**: Includes `rainfrog` and `rainfrog-prod`. The latter connects

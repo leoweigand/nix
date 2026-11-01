@@ -1,6 +1,13 @@
 import { execFileSync } from "node:child_process";
 
 // Run explicitly as the lab administrator; credentials never enter server config.
+const assistant = process.argv.includes("--assistant");
+const clientName = assistant
+  ? "LeoLab MCP — Telegram Assistant"
+  : "LeoLab MCP — Codex";
+const callback = assistant
+  ? "http://127.0.0.1:47832/callback"
+  : "http://127.0.0.1:47831/callback";
 const key = execFileSync(
   "op",
   [
@@ -67,11 +74,13 @@ entry = await api(`/apis/${entry.id}/permissions`, "PUT", {
   ],
 });
 const permissionIds = entry.permissions
-  .filter((p: { key: string }) =>
-    permissions.some((permission) => permission.key === p.key),
+  .filter(
+    (p: { key: string }) =>
+      permissions.some((permission) => permission.key === p.key) &&
+      (!assistant || p.key !== "media:request"),
   )
   .map((p: { id: string }) => p.id);
-const clientId = "leolab-mcp-codex";
+const clientId = assistant ? "leolab-mcp-telegram" : "leolab-mcp-codex";
 const clients = await api("/oidc/clients?pagination%5Blimit%5D=100");
 const existing = clients.data.find(
   (item: { id: string }) => item.id === clientId,
@@ -79,18 +88,20 @@ const existing = clients.data.find(
 if (!existing) {
   await api("/oidc/clients", "POST", {
     id: clientId,
-    name: "LeoLab MCP — Codex",
-    description: "Codex desktop and CLI access to private LeoLab tools",
+    name: clientName,
+    description: assistant
+      ? "Read-only media lookup for Leo through the Telegram assistant"
+      : "Codex desktop and CLI access to private LeoLab tools",
     isPublic: true,
     pkceEnabled: true,
     isGroupRestricted: true,
     skipConsent: false,
-    callbackURLs: ["http://127.0.0.1:47831/callback"],
+    callbackURLs: [callback],
     logoutCallbackURLs: [],
     accessTokenDurationMinutes: 10,
     refreshTokenDurationMinutes: 43200,
   });
-} else if (!existing.isPublic || existing.name !== "LeoLab MCP — Codex") {
+} else if (!existing.isPublic || existing.name !== clientName) {
   throw new Error(
     "Client ID already has a different configuration; inspect it manually",
   );
@@ -114,7 +125,9 @@ console.log(
     resource,
     apiId: entry.id,
     clientId,
-    permissions: permissions.map((p) => p.key),
-    callback: "http://127.0.0.1:47831/callback",
+    permissions: permissions
+      .filter((p) => !assistant || p.key !== "media:request")
+      .map((p) => p.key),
+    callback,
   }),
 );

@@ -592,3 +592,56 @@ for (const media of [
     assert(test.calls.length === 0);
   });
 }
+
+test("assistant webhook waits for durable acceptance and retries unavailable worker", async () => {
+  const t = handler(config({ assistantEnabled: true }), [
+    new Response(null, { status: 503 }),
+    new Response(null, { status: 204 }),
+  ]);
+  const request = () =>
+    new Request("http://gateway/v1/telegram-webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-telegram-bot-api-secret-token": "test-webhook-secret",
+      },
+      body: JSON.stringify({
+        update_id: 12,
+        message: {
+          chat: { id: "42", type: "private" },
+          from: { id: 42 },
+          text: "Dune",
+        },
+      }),
+    });
+  assert((await t.handler(request())).status === 503);
+  assert((await t.handler(request())).status === 204);
+  assert(String(t.calls[0].input) === "http://127.0.0.1:9090/inbox");
+  assert(
+    new Headers(t.calls[0].init?.headers).get("x-assistant-secret") ===
+      "test-webhook-secret",
+  );
+});
+test("assistant replies require their secret and preserve message and topic routing", async () => {
+  const t = handler(config({ assistantEnabled: true }));
+  const request = (secret: string) =>
+    new Request("http://gateway/v1/assistant-replies", {
+      method: "POST",
+      body: JSON.stringify({
+        secret,
+        to: "leo",
+        message: "Dune (2021)",
+        message_id: 17,
+        message_thread_id: 4,
+      }),
+    });
+  assert((await t.handler(request("wrong"))).status === 401);
+  assert(t.calls.length === 0);
+  assert((await t.handler(request("test-webhook-secret"))).status === 204);
+  const body = JSON.parse(String(t.calls[0].init?.body));
+  assert(
+    body.chat_id === "-100123" &&
+      body.reply_parameters.message_id === 17 &&
+      body.message_thread_id === 4,
+  );
+});

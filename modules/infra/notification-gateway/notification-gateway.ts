@@ -1,7 +1,10 @@
 import { restrictedFetch } from "../../runtime/network.ts";
 import { createWebServer } from "../../runtime/http.ts";
 
-const automationFetch = restrictedFetch(["https://api.telegram.org"]);
+const automationFetch = restrictedFetch([
+  "https://api.telegram.org",
+  "http://127.0.0.1:9090",
+]);
 
 const MAX_MESSAGE_LENGTH = 3800;
 const MAX_NOTIFICATION_BODY_BYTES = 8 * 1024;
@@ -30,6 +33,7 @@ export interface GatewayConfig {
   defaultDestination?: string;
   webhookSecret: string;
   webhookUrl: string;
+  assistantEnabled?: boolean;
 }
 
 interface GatewayDependencies {
@@ -94,6 +98,7 @@ export function loadConfig(
     defaultDestination: destinations.keys().next().value,
     webhookSecret: requiredEnvironment("TELEGRAM_WEBHOOK_SECRET", environment),
     webhookUrl,
+    assistantEnabled: environment["TELEGRAM_ASSISTANT_ENABLED"] === "true",
   };
 }
 
@@ -710,7 +715,79 @@ async function handleTelegramWebhook(
     return new Response(null, { status: 204 });
   }
 
+  if (config.assistantEnabled && isRecord(update) && isRecord(update.message)) {
+    try {
+      const response = await dependencies.fetch("http://127.0.0.1:9090/inbox", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-assistant-secret": config.webhookSecret,
+        },
+        body,
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!response.ok) return new Response(null, { status: 503 });
+    } catch {
+      return new Response(null, { status: 503 });
+    }
+  }
   return new Response(null, { status: 204 });
+}
+
+async function handleAssistantReply(
+  request: Request,
+  config: GatewayConfig,
+  dependencies: GatewayDependencies,
+): Promise<Response> {
+  if (!config.assistantEnabled || request.method !== "POST")
+    return new Response(null, { status: 404 });
+  try {
+    const value = parseJson(await readBody(request, 64 * 1024));
+    if (!isRecord(value) || value.secret !== config.webhookSecret)
+      return new Response(null, { status: 401 });
+    const chatId =
+      typeof value.to === "string"
+        ? config.destinations.get(value.to)
+        : undefined;
+    if (
+      !chatId ||
+      typeof value.message !== "string" ||
+      !value.message.trim() ||
+      !Number.isSafeInteger(value.message_id) ||
+      (value.message_id as number) < 1 ||
+      (value.message_thread_id !== undefined &&
+        !Number.isSafeInteger(value.message_thread_id))
+    )
+      return new Response(null, { status: 400 });
+    const characters = Array.from(value.message);
+    for (let offset = 0; offset < characters.length; offset += 3500) {
+      const response = await dependencies.fetch(
+        `https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: characters.slice(offset, offset + 3500).join(""),
+            reply_parameters: {
+              message_id: value.message_id,
+              allow_sending_without_reply: true,
+            },
+            ...(value.message_thread_id === undefined
+              ? {}
+              : { message_thread_id: value.message_thread_id }),
+          }),
+          signal: AbortSignal.timeout(10000),
+        },
+      );
+      const result: unknown = await response.json();
+      if (!response.ok || !isRecord(result) || result.ok !== true)
+        return new Response(null, { status: 502 });
+    }
+    return new Response(null, { status: 204 });
+  } catch {
+    return new Response(null, { status: 400 });
+  }
 }
 
 export function createHandler(
@@ -721,6 +798,9 @@ export function createHandler(
     const pathname = new URL(request.url).pathname;
     if (pathname === "/healthz" && request.method === "GET") {
       return new Response(null, { status: 204 });
+    }
+    if (pathname === "/v1/assistant-replies") {
+      return await handleAssistantReply(request, config, dependencies);
     }
     if (pathname === "/v1/notifications") {
       return await handleNotification(request, config, dependencies);

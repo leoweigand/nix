@@ -3,6 +3,7 @@
 {
   imports = [
     ./1password.nix
+    ./assistant
     ./ai-gateway
     ./backup.nix
     ./cloudflare-tunnel.nix

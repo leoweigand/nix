@@ -12,11 +12,13 @@ let
     name = serviceName;
     script = "modules/infra/notification-gateway/notification-gateway.ts";
     bindPorts = [ cfg.port ];
+    connectPorts = [ 443 ] ++ lib.optional config.homelab.infra.assistant.enable 9090;
     environmentNames = [
       "TELEGRAM_BOT_TOKEN"
       "TELEGRAM_DESTINATIONS"
       "TELEGRAM_WEBHOOK_SECRET"
       "TELEGRAM_WEBHOOK_URL"
+      "TELEGRAM_ASSISTANT_ENABLED"
       "NOTIFICATION_GATEWAY_PORT"
     ];
   };
@@ -98,6 +100,7 @@ in
         ExecStart = "${launcher}/bin/${serviceName}";
         EnvironmentFile = config.services.onepassword-secrets.secretPaths.notificationGatewayEnv;
         Environment = [
+          "TELEGRAM_ASSISTANT_ENABLED=${lib.boolToString config.homelab.infra.assistant.enable}"
           "NOTIFICATION_GATEWAY_PORT=${toString cfg.port}"
           "TELEGRAM_WEBHOOK_URL=https://webhooks.${config.homelab.baseDomain}${cfg.webhookPath}"
         ];
