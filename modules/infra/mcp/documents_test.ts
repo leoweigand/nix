@@ -50,6 +50,10 @@ function fixture(request?: typeof fetch) {
         new Headers(init?.headers).get("authorization"),
         `Token ${token}`,
       );
+      assert.equal(
+        new Headers(init?.headers).get("accept"),
+        "application/json; version=9",
+      );
       assert.equal(init?.redirect, "error");
       if (url.pathname === "/api/documents/post_document/")
         return Response.json(taskId);
@@ -286,6 +290,7 @@ test("task status handles pending, duplicate, failure, missing and paginated res
       [{ status: "FAILURE", result: "duplicate document" }, "duplicate"],
       [{ status: "FAILURE", result: "OCR failed" }, "failed"],
       [{ status: "SUCCESS" }, "unconfirmed"],
+      [{ status: "UNKNOWN_NEW_STATE" }, "unconfirmed"],
     ] as const) {
       status = { results: [{ task_id: taskId, ...task }] };
       assert.equal(

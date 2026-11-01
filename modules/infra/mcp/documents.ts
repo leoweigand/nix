@@ -312,7 +312,10 @@ export class DocumentService {
     try {
       response = await this.request(new URL(path, this.origin), {
         method: body ? "POST" : "GET",
-        headers: { Authorization: `Token ${this.token}` },
+        headers: {
+          Authorization: `Token ${this.token}`,
+          Accept: "application/json; version=9",
+        },
         body,
         redirect: "error",
         signal: AbortSignal.any([
@@ -584,6 +587,10 @@ export class DocumentService {
       return result(
         /duplicate/i.test(task.result ?? "") ? "duplicate" : "failed",
       );
-    return result("processing");
+    return result(
+      ["PENDING", "STARTED", "RETRY", "RECEIVED"].includes(task.status)
+        ? "processing"
+        : "unconfirmed",
+    );
   }
 }
