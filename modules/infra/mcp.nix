@@ -6,6 +6,7 @@
 }:
 let
   cfg = config.homelab.infra.mcp;
+  transferEnabled = config.homelab.apps.syncthing.enable;
   host = "mcp.${config.homelab.baseDomain}";
   launcher = pkgs.callPackage ../../packages/automation/launcher.nix { } {
     name = "leolab-mcp";
@@ -14,15 +15,21 @@ let
       "MCP_CONFIG"
       "CREDENTIALS_DIRECTORY"
     ];
-    credentialNames = lib.optional cfg.home.enable "home-token" ++ [
-      "sonarr-config"
-      "radarr-config"
-    ];
-    connectPorts = lib.optional cfg.home.enable 8123 ++ [
-      443
-      8989
-      7878
-    ];
+    credentialNames =
+      lib.optional cfg.home.enable "home-token"
+      ++ lib.optional transferEnabled "syncthing-config"
+      ++ [
+        "sonarr-config"
+        "radarr-config"
+      ];
+    connectPorts =
+      lib.optional cfg.home.enable 8123
+      ++ lib.optional transferEnabled 8384
+      ++ [
+        443
+        8989
+        7878
+      ];
     bindPorts = [ cfg.port ];
   };
   policy = pkgs.writeText "leolab-mcp.json" (
@@ -35,6 +42,14 @@ let
           {
             url = "http://127.0.0.1:8123";
             entities = map (entity: lib.filterAttrs (_: value: value != null) entity) cfg.home.entities;
+          }
+        else
+          null;
+      transfer =
+        if transferEnabled then
+          {
+            url = "http://127.0.0.1:8384";
+            folder = "seedhost-completed";
           }
         else
           null;
@@ -152,6 +167,7 @@ in
         ExecStart = "${launcher}/bin/leolab-mcp";
         LoadCredential =
           lib.optional cfg.home.enable "home-token:${config.services.onepassword-secrets.secretPaths.mcpHomeToken}"
+          ++ lib.optional transferEnabled "syncthing-config:${config.homelab.apps.syncthing.dataDir}/config.xml"
           ++ [
             "sonarr-config:${config.homelab.apps.sonarr.dataDir}/config.xml"
             "radarr-config:${config.homelab.apps.radarr.dataDir}/config.xml"

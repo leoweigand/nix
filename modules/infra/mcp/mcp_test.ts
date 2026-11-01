@@ -54,6 +54,9 @@ before(async () => {
           },
         ]),
       );
+    } else if (req.url?.startsWith("/api/v3/queue?")) {
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ totalRecords: 0, records: [] }));
     } else if (req.url === "/api/v3/movie") {
       res.setHeader("Content-Type", "application/json");
       res.end("[]");
@@ -240,6 +243,7 @@ test("authenticated MCP handshake, tool discovery and calls", async () => {
   const tools = await rpc("tools/list");
   assert.deepEqual(tools.tools.map((x: { name: string }) => x.name).sort(), [
     "control_home_entities",
+    "get_download_progress",
     "get_home_entity",
     "get_media_details",
     "request_media",
@@ -377,5 +381,28 @@ test("home scopes, structured state results, tool schema and control enforcement
   assert.equal(
     (await parse(accepted)).result.structuredContent.outcome,
     "already_satisfied",
+  );
+});
+
+test("download progress requires media read scope and returns the structured output contract", async () => {
+  const call = async (scope: string) =>
+    request("/mcp", await token({ scope }), {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "get_download_progress", arguments: {} },
+    });
+  assert.equal((await call("media:request")).status, 403);
+  const response = await call("media:read");
+  assert.equal(response.status, 200);
+  const text = await response.text();
+  const data = text.startsWith("event:")
+    ? JSON.parse(text.split("data: ")[1].split("\n")[0])
+    : JSON.parse(text);
+  assert.equal(data.result.structuredContent.sources.length, 2);
+  assert.deepEqual(data.result.structuredContent.errors, []);
+  assert.deepEqual(
+    JSON.parse(data.result.content[0].text),
+    data.result.structuredContent,
   );
 });

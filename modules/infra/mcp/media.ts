@@ -1,3 +1,4 @@
+import type { TransferService } from "./transfer.ts";
 import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
 
@@ -13,6 +14,12 @@ import {
   type MediaDetails,
   requestOutputSchema,
 } from "./contracts.ts";
+import {
+  progressSchema,
+  queuePageSchema,
+  queueEntry,
+  progressSummary,
+} from "./progress.ts";
 import { mediaMetadata } from "./artwork.ts";
 export { mediaIdSchema, searchSchema, detailsSchema, requestSchema };
 
@@ -76,7 +83,7 @@ export class MediaError extends Error {
     this.code = code;
   }
 }
-async function jsonFetch(
+export async function jsonFetch(
   url: string,
   init: RequestInit,
   signal?: AbortSignal,
@@ -246,16 +253,117 @@ export class MediaService {
   readonly tv: Arr;
   readonly metadataBase: string;
   readonly now: () => number;
+  readonly transfer?: TransferService;
   private readonly pending = new Map<string, Promise<unknown>>();
   constructor(
     config: MediaConfig,
-    options: { metadataBase?: string; now?: () => number } = {},
+    options: {
+      metadataBase?: string;
+      now?: () => number;
+      transfer?: TransferService;
+    } = {},
   ) {
+    this.transfer = options.transfer;
     this.movie = new Arr(config.radarr, "movie");
     this.tv = new Arr(config.sonarr, "series");
     this.metadataBase =
       options.metadataBase ?? "https://skyhook.sonarr.tv/v1/tvdb/shows/en";
     this.now = options.now ?? Date.now;
+  }
+  async progress(input: z.infer<typeof progressSchema>, signal?: AbortSignal) {
+    const target = input.mediaId ? identify(input.mediaId) : undefined;
+    const kinds: Kind[] = target ? [target.kind] : ["movie", "tv"];
+    const paths = new Map<string, string>();
+    const results = await Promise.allSettled(
+      kinds.map(async (kind) => {
+        const arr = this[kind];
+        let internalId: number | undefined;
+        if (target) {
+          const library = await arr.library(signal);
+          internalId = library.find(
+            (item) =>
+              (kind === "movie" ? item.tmdbId : item.tvdbId) ===
+              target.externalId,
+          )?.id;
+          if (!internalId)
+            return { type: kind, total: 0, truncated: false, entries: [] };
+        }
+        const params = new URLSearchParams({
+          page: "1",
+          pageSize: String(input.limit),
+          ...(kind === "movie"
+            ? { includeMovie: "true" }
+            : { includeSeries: "true", includeEpisode: "true" }),
+          ...(internalId
+            ? {
+                [kind === "movie" ? "movieIds" : "seriesIds"]:
+                  String(internalId),
+              }
+            : {}),
+        });
+        const page = queuePageSchema.parse(
+          await arr.api(`queue?${params}`, "GET", undefined, signal),
+        );
+        // Reject a backend that ignores the title filter rather than showing unrelated downloads.
+        if (
+          internalId &&
+          page.records.some(
+            (item) =>
+              (kind === "movie" ? item.movieId : item.seriesId) !== internalId,
+          )
+        )
+          throw new MediaError("invalid_queue_filter");
+        for (const item of page.records.slice(0, input.limit)) {
+          if (item.outputPath) paths.set(`${kind}:${item.id}`, item.outputPath);
+        }
+        const entries = page.records
+          .slice(0, input.limit)
+          .map((item) => queueEntry(item, kind));
+        return {
+          type: kind,
+          total: page.totalRecords,
+          truncated: page.totalRecords > entries.length,
+          entries,
+        };
+      }),
+    );
+    // Fetch Syncthing only for completed entries and only once per explicit tool call.
+    const completed = results.flatMap((r) =>
+      r.status === "fulfilled"
+        ? r.value.entries.filter(
+            (e) => e.status === "completed" || e.downloadPercent === 100,
+          )
+        : [],
+    );
+    if (completed.length && this.transfer) {
+      const states = await this.transfer.states(paths, signal);
+      for (const result of results) {
+        if (result.status !== "fulfilled") continue;
+        for (const entry of result.value.entries) {
+          if (completed.includes(entry))
+            entry.transferState =
+              states.get(`${result.value.type}:${entry.queueId}`) ?? "unknown";
+        }
+      }
+    }
+    for (const result of results) {
+      if (result.status === "fulfilled")
+        for (const entry of result.value.entries)
+          entry.progressSummary = progressSummary(entry);
+    }
+    return {
+      observedAt: new Date(this.now()).toISOString(),
+      mediaId: input.mediaId ?? null,
+      sources: results.flatMap((result) =>
+        result.status === "fulfilled" ? [result.value] : [],
+      ),
+      errors: results.flatMap((result, i) =>
+        result.status === "rejected"
+          ? [{ type: kinds[i], error: "queue_unavailable" as const }]
+          : [],
+      ),
+      note: "One snapshot of Sonarr/Radarr queues. Percent and ETA describe download-client progress, not transfer to Picard or library import. Entries can share a season-pack download; do not sum them. An empty queue does not prove availability or failure. transferState is based on matching Syncthing active/queued files; unknown does not prove transfer finished. No background polling was started.",
+    };
   }
   async search(input: z.infer<typeof searchSchema>, signal?: AbortSignal) {
     const types: Kind[] = input.type ? [input.type] : ["movie", "tv"];

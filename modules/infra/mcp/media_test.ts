@@ -8,6 +8,8 @@ import {
   requestOutputSchema,
   detailsSchema,
 } from "./contracts.ts";
+import { progressSchema, progressOutputSchema } from "./progress.ts";
+import { TransferService } from "./transfer.ts";
 import { mediaMetadata } from "./artwork.ts";
 
 const now = Date.parse("2026-11-01T10:00:00Z");
@@ -105,6 +107,10 @@ async function fixture(t: TestContext) {
       seasons: boolean[];
       monitorNewItems: string;
     }[],
+    queue: [] as Record<string, any>[],
+    failQueue: false,
+    ignoreQueueFilter: false,
+    reads: [] as string[],
     failCommand: false,
     failEpisodeMonitor: false,
     changeMonitoringAfterReset: false,
@@ -137,6 +143,27 @@ async function fixture(t: TestContext) {
       ? JSON.parse(Buffer.concat(chunks).toString())
       : undefined;
     if (req.method !== "GET") state.writes.push({ path, body });
+    else state.reads.push(req.url!);
+    if (path === "queue") {
+      if (
+        state.failQueue ||
+        (state.failTv && url.searchParams.has("includeSeries"))
+      )
+        return reply({}, 503);
+      const id =
+        url.searchParams.get("movieIds") ?? url.searchParams.get("seriesIds");
+      const all = state.queue.filter((item) =>
+        url.searchParams.has("includeMovie") ? item.movieId : item.seriesId,
+      );
+      const records =
+        id && !state.ignoreQueueFilter
+          ? all.filter((item) => String(item.movieId ?? item.seriesId) === id)
+          : all;
+      return reply({
+        totalRecords: records.length,
+        records: records.slice(0, Number(url.searchParams.get("pageSize"))),
+      });
+    }
     if (state.failTv && path.startsWith("series")) return reply({}, 503);
     if (path === "qualityprofile")
       return reply([
@@ -641,4 +668,181 @@ test("optional metadata degrades to null and untrusted or private artwork never 
     poster: null,
     backdrop: null,
   });
+});
+
+const downloadingMovie = {
+  id: 1,
+  movieId: 11,
+  movie: { tmdbId: 100, title: "Test Movie" },
+  size: 1000,
+  sizeleft: 250,
+  status: "downloading",
+  trackedDownloadStatus: "ok",
+  trackedDownloadState: "downloading",
+  estimatedCompletionTime: "2026-11-01T11:00:00Z",
+  protocol: "torrent",
+  outputPath: "/secret/path",
+  downloadId: "private-hash",
+  title: "private-release-name",
+};
+test("progress reads a bounded snapshot, computes download percent and omits private backend details", async (t) => {
+  const { service, state } = await fixture(t);
+  state.queue.push(downloadingMovie, { ...downloadingMovie, id: 2 });
+  const result = progressOutputSchema.parse(
+    await service.progress(progressSchema.parse({ limit: 1 })),
+  );
+  assert.equal(result.sources[0].total, 2);
+  assert.equal(result.sources[0].truncated, true);
+  const entry = result.sources[0].entries[0];
+  assert.equal(entry.downloadPercent, 75);
+  assert.equal(entry.progressSummary, "Torrent is 75% downloaded");
+  assert.equal(
+    entry.estimatedCompletionTime,
+    downloadingMovie.estimatedCompletionTime,
+  );
+  assert.equal(entry.title, "Test Movie");
+  assert.equal(result.sources[1].total, 0);
+  assert.equal(result.observedAt, new Date(now).toISOString());
+  assert(!JSON.stringify(result).includes("private-"));
+  assert(!JSON.stringify(result).includes("/secret"));
+  assert.equal(state.reads.length, 2);
+  assert.deepEqual(state.writes, []);
+});
+test("progress filters title in backend and rejects ignored filters; unknown library title never queries all downloads", async (t) => {
+  const { service, state } = await fixture(t);
+  state.movies.push({ ...movie, id: 11 });
+  state.queue.push(downloadingMovie, {
+    ...downloadingMovie,
+    id: 2,
+    movieId: 99,
+  });
+  const result = await service.progress(
+    progressSchema.parse({ mediaId: "movie:tmdb:100" }),
+  );
+  assert.equal(result.sources.length, 1);
+  assert.equal(result.sources[0].total, 1);
+  assert(state.reads.some((url) => url.includes("movieIds=11")));
+  state.ignoreQueueFilter = true;
+  assert.deepEqual(
+    (
+      await service.progress(
+        progressSchema.parse({ mediaId: "movie:tmdb:100" }),
+      )
+    ).errors,
+    [{ type: "movie", error: "queue_unavailable" }],
+  );
+  state.reads.length = 0;
+  const missing = await service.progress(
+    progressSchema.parse({ mediaId: "movie:tmdb:999" }),
+  );
+  assert.equal(missing.sources[0].total, 0);
+  assert(!state.reads.some((url) => url.includes("queue")));
+  assert.deepEqual(state.writes, []);
+});
+test("completed TV download retains import warning and episode identity without claiming library availability", async (t) => {
+  const { service, state } = await fixture(t);
+  state.shows.push({ ...show, id: 22 });
+  state.queue.push({
+    id: 3,
+    seriesId: 22,
+    series: { tvdbId: 200, title: "Test Show" },
+    episode: { seasonNumber: 2, episodeNumber: 1 },
+    size: 100,
+    sizeleft: 0,
+    status: "completed",
+    trackedDownloadStatus: "warning",
+    trackedDownloadState: "importPending",
+    errorMessage: "/secret/import/path",
+  });
+  const result = progressOutputSchema.parse(
+    await service.progress(progressSchema.parse({ mediaId: "tv:tvdb:200" })),
+  );
+  const entry = result.sources[0].entries[0];
+  assert.equal(entry.downloadPercent, 100);
+  assert.equal(entry.trackedDownloadState, "importPending");
+  assert.equal(entry.hasIssue, true);
+  assert.equal(entry.seasonNumber, 2);
+  assert.equal(entry.episodeNumber, 1);
+  assert(!JSON.stringify(result).includes("/secret"));
+  assert.deepEqual(state.writes, []);
+});
+test("progress distinguishes queue outages from an empty queue and preserves the working source", async (t) => {
+  const { service, state } = await fixture(t);
+  state.failTv = true;
+  const partial = await service.progress(progressSchema.parse({}));
+  assert.deepEqual(partial.errors, [
+    { type: "tv", error: "queue_unavailable" },
+  ]);
+  assert.equal(partial.sources.length, 1);
+  state.failQueue = true;
+  const failed = await service.progress(progressSchema.parse({}));
+  assert.equal(failed.errors.length, 2);
+  assert.deepEqual(failed.sources, []);
+});
+test("unknown or inconsistent byte counts and invalid ETAs remain unknown", async (t) => {
+  const { service, state } = await fixture(t);
+  for (const bytes of [
+    {},
+    { size: 0, sizeleft: 0 },
+    { size: 100, sizeleft: 101 },
+  ]) {
+    state.queue = [
+      {
+        ...downloadingMovie,
+        size: undefined,
+        sizeleft: undefined,
+        ...bytes,
+        estimatedCompletionTime: "unknown",
+      },
+    ];
+    const result = progressOutputSchema.parse(
+      await service.progress(progressSchema.parse({})),
+    );
+    assert.equal(result.sources[0].entries[0].downloadPercent, null);
+    assert.equal(result.sources[0].entries[0].estimatedCompletionTime, null);
+  }
+});
+
+test("completed torrents report Syncthing transfer stages and skip Syncthing for incomplete downloads", async (t) => {
+  const { service, state } = await fixture(t);
+  let calls = 0;
+  const transfer = new TransferService({
+    url: "http://127.0.0.1:1",
+    apiKey: "unused",
+    folder: "fixture",
+  });
+  transfer.states = async (paths) => {
+    calls++;
+    assert.equal(
+      paths.get("movie:1"),
+      "/media/sources/seedbox/deluge/radarr/Movie",
+    );
+    return new Map([["movie:1", "transferring_to_server"]]);
+  };
+  const withTransfer = new MediaService(
+    { radarr: service.movie.endpoint, sonarr: service.tv.endpoint },
+    { now: () => now, transfer },
+  );
+  state.queue.push({
+    ...downloadingMovie,
+    outputPath: "/media/sources/seedbox/deluge/radarr/Movie",
+  });
+  await withTransfer.progress(progressSchema.parse({}));
+  assert.equal(calls, 0);
+  state.queue[0].sizeleft = 0;
+  state.queue[0].status = "completed";
+  const result = progressOutputSchema.parse(
+    await withTransfer.progress(progressSchema.parse({})),
+  );
+  assert.equal(calls, 1);
+  assert.equal(
+    result.sources[0].entries[0].progressSummary,
+    "Torrent is on the seedbox, currently downloading to the server",
+  );
+});
+test("a nearly completed torrent cannot round up to a completed transfer stage", async (t) => {
+  const { service, state } = await fixture(t);
+  state.queue.push({ ...downloadingMovie, size: 100000, sizeleft: 1 });
+  const result = await service.progress(progressSchema.parse({}));
+  assert.equal(result.sources[0].entries[0].downloadPercent, 99.9);
 });

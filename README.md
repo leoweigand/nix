@@ -46,8 +46,8 @@ media details; `media:request` grants acquisition requests. The Codex client
 requires PKCE and the `admins` group. `lab:read` remains for identity diagnostics. `home:read` and `home:control` separately
 grant approved Home Assistant entity reads and runtime controls.
 
-`modules/infra/mcp/` provides `whoami`, `search_media`, `get_media_details` and
-`request_media`, plus `search_home_entities`, `get_home_entity` and
+`modules/infra/mcp/` provides `whoami`, `search_media`, `get_media_details`,
+`get_download_progress` and `request_media`, plus `search_home_entities`, `get_home_entity` and
 `control_home_entities`, using the official TypeScript MCP SDK v2. Media tools talk to
 Sonarr and Radarr over fixed loopback APIs. HD is the default; other configured
 profile names can be selected explicitly. TV requests monitor only aired
@@ -56,6 +56,15 @@ Existing quality profiles are preserved. Active shows retain monitoring outside
 the selection. Disabled shows are enabled only after dormant monitoring flags
 are cleared, so unrelated episodes and future seasons stay off.
 These requests bypass Seerr's request history and approval workflow.
+
+`get_download_progress` is an explicit-user-request-only read under `media:read`.
+It takes an optional media ID or shows the current bounded movie/TV queues.
+Results distinguish torrent download percentage from transfer to Picard: a local
+Syncthing needed-files snapshot can confirm active or queued transfer for the
+completed download's exact inbox path. Unknown transfer/import state stays
+explicit; completed torrents and empty queues do not prove library availability.
+MCP receives Syncthing's existing config as a systemd credential and reads only
+its fixed local API; there is no seedbox connection, polling or media mount.
 
 Search and details return public artwork URLs, release metadata, library facts
 and permission-filtered `availableActions` containing complete tool arguments.

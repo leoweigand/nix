@@ -2,12 +2,18 @@ import { readFileSync } from "node:fs";
 import { isElement, isText, parse } from "@std/xml";
 import { MediaService, type MediaConfig } from "./media.ts";
 import { HomeService, type HomeConfig } from "./home.ts";
+import { TransferService, type TransferConfig } from "./transfer.ts";
 import { createVerifier } from "./auth.ts";
 import { createApp, type Config } from "./server.ts";
 
 const config = JSON.parse(
   readFileSync(process.env.MCP_CONFIG!, "utf8"),
-) as Config & { port: number; media: MediaConfig; home?: HomeConfig };
+) as Config & {
+  port: number;
+  media: MediaConfig;
+  home?: HomeConfig;
+  transfer?: TransferConfig;
+};
 for (const name of ["sonarr", "radarr"] as const) {
   const xml = parse(
     readFileSync(
@@ -26,7 +32,34 @@ for (const name of ["sonarr", "radarr"] as const) {
     throw new Error(`Missing ${name} API key`);
   config.media[name].apiKey = key.trim();
 }
-const media = new MediaService(config.media);
+let transfer: TransferService | undefined;
+if (config.transfer) {
+  try {
+    const xml = parse(
+      readFileSync(
+        `${process.env.CREDENTIALS_DIRECTORY!}/syncthing-config`,
+        "utf8",
+      ),
+    );
+    const gui = xml.root.children.find(
+      (node) => isElement(node) && node.name.local === "gui",
+    );
+    const key =
+      gui && isElement(gui)
+        ? gui.children.find(
+            (node) => isElement(node) && node.name.local === "apikey",
+          )
+        : undefined;
+    const apiKey =
+      key && isElement(key)
+        ? key.children.find(isText)?.text.trim()
+        : undefined;
+    if (apiKey) transfer = new TransferService({ ...config.transfer, apiKey });
+  } catch {
+    /* Missing credentials leave transfer status unknown without breaking other tools. */
+  }
+}
+const media = new MediaService(config.media, { transfer });
 const app = createApp(
   config,
   createVerifier(
