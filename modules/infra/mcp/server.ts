@@ -53,7 +53,7 @@ export function createApp(
         "whoami",
         {
           description:
-            "Return the authenticated caller’s OAuth subject, client ID, issuer, and granted permissions. Does not expose credentials or change any state.",
+            "See which account and agent application this connection is using, and what it has permission to do.",
           inputSchema: z.object({}).strict(),
           annotations,
         },
@@ -138,7 +138,7 @@ export function createApp(
         "search_media",
         {
           description:
-            "Search the movie and TV catalog by title. Returns matching titles with stable media IDs, release years, synopses, and current library status. Use these IDs with get_media_details or request_media. This searches for titles, not downloadable releases, and does not change the library.",
+            "Find movies and TV shows by title and see whether you already have them. Results include titles, years, synopses, and media IDs you can use with get_media_details or request_media.",
           inputSchema: searchSchema,
           annotations: { ...annotations, openWorldHint: true },
           scopeChallenge: requireScopes("media:read"),
@@ -156,7 +156,7 @@ export function createApp(
         "get_media_details",
         {
           description:
-            "Get details for a movie or TV show using a media ID returned by search_media. Returns library and monitoring status, available quality profiles, and—for TV—season numbers with aired, available, and missing episode counts. Use this before requesting media to resolve ambiguity and choose TV seasons. Does not change the library.",
+            "Find out what’s available for a movie or TV show before requesting it. Use a media ID from search_media to see library availability, TV seasons, and quality options.",
           inputSchema: detailsSchema,
           annotations: { ...annotations, openWorldHint: true },
           scopeChallenge: requireScopes("media:read"),
@@ -174,7 +174,7 @@ export function createApp(
         "request_media",
         {
           description:
-            "Request a movie or explicitly selected TV seasons through Radarr or Sonarr. Uses the HD quality profile unless another profile returned by get_media_details is specified. For TV, monitors and searches only episodes already aired in the selected seasons; does not enable future-episode monitoring. Preserves monitoring outside the selection and does not silently change an existing title’s quality profile. Repeated requests return the existing state or request missing selections. Reports whether changes were accepted and a download search started; acceptance does not mean media is downloading or available. May initiate downloads.",
+            "Request a movie or selected TV seasons you want added to your library. Use a media ID from search_media and season numbers or a quality profile from get_media_details. Defaults to HD; TV requests cover already-aired episodes.",
           inputSchema: requestSchema,
           annotations: {
             ...annotations,
