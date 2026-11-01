@@ -144,7 +144,11 @@ test("button choices are bound to the owner and chat, expire, and accept only on
             callback_query: {
               from: { id: sender },
               data: token,
-              message: { message_id: 100, chat: { id: chat } },
+              message: {
+                message_id: 100,
+                message_thread_id: 9,
+                chat: { id: chat },
+              },
             },
           }),
         }),
@@ -416,6 +420,292 @@ test("notifications and resets proceed while a human request waits for OAuth, wi
       original.file,
     );
     assert.equal(f.sessions.select("123:0", Date.now()).file, fresh.file);
+  } finally {
+    f.cleanup();
+  }
+});
+
+test("fast answers skip the working reaction and fold the session notice into the answer", async () => {
+  const f = fixture();
+  try {
+    f.casual();
+    f.inbox.enqueue(f.job(90));
+    await new Worker(f.options).drain();
+    const replies = f.messages.filter(
+      (m) => m.endpoint === "/v1/assistant-replies",
+    );
+    assert.equal(replies.length, 1);
+    assert.match(replies[0].body.message, /^New session.*\n\nDune/s);
+    assert.equal(
+      f.messages.some((m) => m.endpoint === "/v1/reactions"),
+      false,
+    );
+    f.inbox.enqueue(f.job(91));
+    await new Worker(f.options).drain();
+    assert.equal(f.messages.at(-1)?.body.message, "Dune (2021), available");
+  } finally {
+    f.cleanup();
+  }
+});
+
+test("slow answers react once to the incoming message before delivering, even across an auth resume", async () => {
+  const f = fixture();
+  try {
+    f.inbox.enqueue(f.job(92, true));
+    let release!: () => void;
+    const reacted = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const worker = new Worker({
+      ...f.options,
+      reactionDelayMs: 1,
+      assistant: {
+        answer: async () => {
+          await reacted;
+          return { text: "Ready", needsConnection: true };
+        },
+      },
+      gateway: async (endpoint, body) => {
+        await f.options.gateway(endpoint, body);
+        if (endpoint === "/v1/reactions") release();
+      },
+    });
+    await worker.drain();
+    assert.deepEqual(
+      f.messages.find((m) => m.endpoint === "/v1/reactions")?.body,
+      {
+        to: "group",
+        message_id: 92,
+        emoji: "👀",
+      },
+    );
+    f.setToken();
+    await new Worker(f.options).drain();
+    assert.equal(
+      f.messages.filter((m) => m.endpoint === "/v1/reactions").length,
+      1,
+    );
+    assert.match(f.messages.at(-1)?.body.message, /^New session.*\n\nDune/s);
+  } finally {
+    f.cleanup();
+  }
+});
+
+test("card delivery resumes after a failure without repeating cards or invoking the model again", async () => {
+  const f = fixture();
+  try {
+    f.inbox.enqueue(f.job(93));
+    let calls = 0;
+    let fail = true;
+    const options = {
+      ...f.options,
+      assistant: {
+        answer: async () => {
+          calls++;
+          return {
+            text: "Two films",
+            needsConnection: false,
+            cards: [
+              {
+                text: "**Dune (2021)**\nA film.",
+                poster: "https://image.tmdb.org/t/p/w500/one.jpg",
+                buttons: [{ label: "Request Dune (2021)" }],
+              },
+              {
+                text: "**Dune (1984)**\nAnother film.",
+                buttons: [{ label: "Request Dune (1984)" }],
+              },
+            ],
+          };
+        },
+      },
+      gateway: async (endpoint: string, body: any) => {
+        if (fail && String(body.message).includes("Another film"))
+          throw new Error("offline");
+        await f.options.gateway(endpoint, body);
+      },
+    };
+    await new Worker(options).drain();
+    assert.equal(f.inbox.jobs()[0].deliveredParts, 1);
+    assert.match(f.sessions.status("123:0"), /Messages: 2\/10/);
+    fail = false;
+    await new Worker(options).drain();
+    assert.equal(calls, 1);
+    assert.equal(f.inbox.jobs()[0].done, true);
+    const replies = f.messages.filter(
+      (m) => m.endpoint === "/v1/assistant-replies",
+    );
+    assert.equal(replies.length, 2);
+    assert.match(
+      replies[0].body.message,
+      /^New session.*\n\n!\[Film poster\]/s,
+    );
+    assert.equal(replies[1].body.message, "**Dune (1984)**\nAnother film.");
+    assert.equal(replies[0].body.buttons.length, 1);
+    assert.equal(replies[1].body.buttons.length, 1);
+    assert.match(f.sessions.status("123:0"), /Messages: 3\/10/);
+    assert.equal(f.inbox.jobs()[0].replyParts, undefined);
+
+    const source = f.inbox.jobs()[0];
+    const worker = new Worker(f.options);
+    worker.drain = async () => {};
+    const press = (token: string, sender = 123, chat = 123) =>
+      worker.handle(
+        new Request("http://worker/inbox", {
+          method: "POST",
+          headers: { "x-assistant-secret": "test-secret" },
+          body: JSON.stringify({
+            callback_query: {
+              from: { id: sender },
+              data: token,
+              message: { message_id: 500, chat: { id: chat } },
+            },
+          }),
+        }),
+      );
+    await press(source.buttons![0].token!, 999);
+    await press(source.buttons![0].token!, 123, -456);
+    assert.equal(f.inbox.jobs().length, 1);
+    await press(source.buttons![0].token!);
+    await press(source.buttons![1].token!);
+    await press(source.buttons![0].token!);
+    assert.equal(f.inbox.jobs().length, 3);
+    assert.deepEqual(
+      f.inbox
+        .jobs()
+        .slice(1)
+        .map((j) => j.text),
+      ["Request Dune (2021)", "Request Dune (1984)"],
+    );
+    source.buttonsExpireAt = Date.now() - 1;
+    f.inbox.save(source);
+    await press(source.buttons![1].token!);
+    assert.equal(f.inbox.jobs().length, 3);
+    assert.match(f.messages.at(-1)?.body.message, /expired/);
+  } finally {
+    f.cleanup();
+  }
+});
+
+test("notification-created sessions announce context on the next answer without sending a standalone notice", async () => {
+  const f = fixture();
+  try {
+    f.casual();
+    f.inbox.enqueue({
+      ...f.job(94),
+      kind: "notification",
+      message: {
+        conversationId: "123:0",
+        eventId: "notification-94",
+        kind: "notification",
+        text: "Backup succeeded",
+        author: "Backup",
+        audience: "private",
+        at: Date.now(),
+      },
+    });
+    await new Worker(f.options).drain();
+    assert.equal(f.messages.length, 0);
+    f.inbox.enqueue(f.job(95));
+    await new Worker(f.options).drain();
+    assert.match(f.messages.at(-1)?.body.message, /^New session.*\n\nDune/s);
+  } finally {
+    f.cleanup();
+  }
+});
+
+test("compaction notices are prepended once to the answer", async () => {
+  const f = fixture();
+  try {
+    f.casual();
+    const job = f.job(96);
+    job.session = f.sessions.select("123:0", Date.now());
+    f.sessions.record(job.session, {
+      conversationId: "123:0",
+      eventId: "setup",
+      kind: "human",
+      text: "hello",
+      author: "Leo",
+      audience: "private",
+      at: Date.now(),
+    });
+    const manager = f.sessions.open(job.session);
+    manager.appendCompaction(
+      "Earlier context summary",
+      manager.getEntries().at(-1)!.id,
+      100,
+    );
+    f.inbox.enqueue(job);
+    await new Worker(f.options).drain();
+    const replies = f.messages.filter(
+      (m) => m.endpoint === "/v1/assistant-replies",
+    );
+    assert.equal(replies.length, 1);
+    assert.match(replies[0].body.message, /summarized\.\n\nDune/);
+    f.inbox.enqueue(f.job(97));
+    await new Worker(f.options).drain();
+    assert.equal(f.messages.at(-1)?.body.message, "Dune (2021), available");
+  } finally {
+    f.cleanup();
+  }
+});
+
+test("a working reaction failure cannot prevent the answer", async () => {
+  const f = fixture();
+  try {
+    f.inbox.enqueue(f.job(98));
+    let release!: () => void;
+    const failed = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await new Worker({
+      ...f.options,
+      reactionDelayMs: 1,
+      assistant: {
+        answer: async () => {
+          await failed;
+          return { text: "Ready", needsConnection: false };
+        },
+      },
+      gateway: async (endpoint, body) => {
+        if (endpoint === "/v1/reactions") {
+          release();
+          throw new Error("Reaction rejected");
+        }
+        await f.options.gateway(endpoint, body);
+      },
+    }).drain();
+    assert.equal(f.inbox.jobs()[0].done, true);
+    assert.match(f.messages.at(-1)?.body.message, /Ready$/);
+  } finally {
+    f.cleanup();
+  }
+});
+
+test("legacy session notices and explicit resets are not repeated on the next answer", async () => {
+  const f = fixture();
+  try {
+    f.casual();
+    const session = f.sessions.select("123:0", Date.now());
+    f.sessions.record(session, {
+      conversationId: "123:0",
+      eventId: "legacy",
+      kind: "human",
+      text: "hello",
+      author: "Leo",
+      audience: "private",
+      at: Date.now(),
+    });
+    f.inbox.enqueue({ ...f.job(99), session, done: true, noticeSent: true });
+    f.inbox.enqueue(f.job(100));
+    await new Worker(f.options).drain();
+    assert.equal(f.messages.at(-1)?.body.message, "Dune (2021), available");
+    f.inbox.enqueue({ ...f.job(101), text: "/reset" });
+    await new Worker(f.options).drain();
+    assert.match(f.messages.at(-1)?.body.message, /manual reset/);
+    f.inbox.enqueue(f.job(102));
+    await new Worker(f.options).drain();
+    assert.equal(f.messages.at(-1)?.body.message, "Dune (2021), available");
   } finally {
     f.cleanup();
   }

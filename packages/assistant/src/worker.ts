@@ -1,3 +1,4 @@
+import { cardMarkdown, type ReplyButton } from "./replies.ts";
 import type { Connections } from "./connections.ts";
 import { callbackPath, ConnectionRequired } from "./connections.ts";
 import {
@@ -23,6 +24,7 @@ interface Options {
   assistant: Pick<PiAssistant, "answer">;
   gateway: Gateway;
   log?: Pick<Console, "info" | "error">;
+  reactionDelayMs?: number;
 }
 export class Worker {
   options: Options;
@@ -115,6 +117,7 @@ export class Worker {
             (candidate) =>
               candidate.chatId === chatId &&
               candidate.senderId === this.options.policy.ownerId &&
+              candidate.topicId === callback.message.message_thread_id &&
               candidate.buttons?.some(
                 (button) => button.token === callback.data,
               ),
@@ -131,7 +134,7 @@ export class Worker {
           return new Response(null, { status: 204 });
         }
         const result = this.options.inbox.enqueue({
-          id: `choice-${original.id}`,
+          id: `choice-${original.id}${button.choiceGroup ? `-${button.choiceGroup}` : ""}`,
           chatId,
           senderId: original.senderId,
           destination: original.destination,
@@ -144,10 +147,7 @@ export class Worker {
         });
         if (result === "full") return new Response(null, { status: 503 });
         if (result === "duplicate") {
-          await this.reply(
-            original,
-            "A choice has already been selected. Ask me again for fresh choices.",
-          );
+          await this.reply(original, "This choice has already been selected.");
           return new Response(null, { status: 204 });
         }
         setImmediate(() => void this.drain());
@@ -172,13 +172,6 @@ export class Worker {
         message.at,
         reset,
       );
-      this.options.inbox.save(job);
-    }
-  }
-  private async notice(job: Job): Promise<void> {
-    if (job.session?.notice && !job.noticeSent) {
-      await this.reply(job, job.session.notice);
-      job.noticeSent = true;
       this.options.inbox.save(job);
     }
   }
@@ -235,55 +228,111 @@ export class Worker {
     job.authNoticeSent = true;
     this.options.inbox.save(job);
   }
-  private async reply(job: Job, message: string, rich = false): Promise<void> {
+  private async reply(
+    job: Job,
+    message: string,
+    rich = false,
+    buttons?: ReplyButton[],
+  ): Promise<void> {
     await this.options.gateway("/v1/assistant-replies", {
       to: job.destination,
       message,
       ...(rich ? { rich: true } : {}),
-      ...(rich && job.buttons?.length ? { buttons: job.buttons } : {}),
+      ...(rich && (buttons ?? job.buttons)?.length
+        ? { buttons: buttons ?? job.buttons }
+        : {}),
       message_id: job.messageId,
       ...(job.topicId === undefined ? {} : { message_thread_id: job.topicId }),
       secret: this.options.secret,
     });
   }
   private async deliver(job: Job): Promise<void> {
-    if (job.session) {
-      const manager = this.options.sessions.open(job.session);
-      const count = manager
-        .getEntries()
-        .filter((e) => e.type === "compaction").length;
-      const previous = [...manager.getEntries()]
-        .reverse()
-        .find(
-          (e) => e.type === "custom" && e.customType === "compaction-notice",
-        );
-      const noticed =
-        previous?.type === "custom"
-          ? Number((previous.data as { count: number }).count)
-          : 0;
-      if (count > noticed) {
-        await this.reply(
-          job,
-          "Earlier conversation in this session has been summarized.",
-        );
-        manager.appendCustomEntry("compaction-notice", { count });
+    if (!job.replyPrepared) {
+      const notices: string[] = [];
+      if (job.session && !job.control) {
+        const manager = this.options.sessions.open(job.session);
+        const entries = manager.getEntries();
+        if (
+          !job.noticeSent &&
+          !this.options.inbox
+            .jobs()
+            .some(
+              (previous) =>
+                previous.noticeSent &&
+                previous.session?.file === job.session!.file,
+            ) &&
+          !entries.some(
+            (e) =>
+              e.type === "custom" &&
+              e.customType === "session-notice-delivered",
+          )
+        ) {
+          const meta = this.options.sessions.metadata(manager);
+          notices.push(
+            `New session (${meta.reason}). Earlier conversation is not included.`,
+          );
+        }
+        const count = entries.filter((e) => e.type === "compaction").length;
+        const previous = [...entries]
+          .reverse()
+          .find(
+            (e) => e.type === "custom" && e.customType === "compaction-notice",
+          );
+        const noticed =
+          previous?.type === "custom"
+            ? Number((previous.data as { count: number }).count)
+            : 0;
+        if (count > noticed)
+          notices.push(
+            "Earlier conversation in this session has been summarized.",
+          );
       }
+      job.replyParts ??= [{ text: job.reply!, buttons: job.buttons }];
+      if (notices.length)
+        job.replyParts[0].text = `${notices.join("\n")}\n\n${job.replyParts[0].text}`;
+      job.replyPrepared = true;
+      this.options.inbox.save(job);
     }
-    await this.reply(job, job.reply!, job.generated === true);
+    for (let i = job.deliveredParts ?? 0; i < job.replyParts!.length; i++) {
+      const part = job.replyParts![i];
+      await this.reply(
+        job,
+        part.text,
+        job.generated === true,
+        part.buttons ?? [],
+      );
+      job.deliveredParts = i + 1;
+      this.options.inbox.save(job);
+      this.recordReply(job, i);
+    }
+    if (job.session && !job.control) {
+      const manager = this.options.sessions.open(job.session);
+      manager.appendCustomEntry("session-notice-delivered", {});
+      manager.appendCustomEntry("compaction-notice", {
+        count: manager.getEntries().filter((e) => e.type === "compaction")
+          .length,
+      });
+    }
     this.finish(job);
   }
-  private finish(job: Job): void {
+  private recordReply(job: Job, index: number): void {
     if (job.session && job.kind !== "notification" && !job.control && job.reply)
       this.options.sessions.delivered(
         job.session,
-        `reply-${job.id}`,
-        job.reply,
+        index === 0 ? `reply-${job.id}` : `reply-${job.id}-${index}`,
+        job.replyParts?.[index].text ?? job.reply,
         job.generated ?? false,
       );
+  }
+  private finish(job: Job): void {
+    // Also reconcile a crash after saving delivery progress but before recording the session event.
+    for (let i = 0; i < (job.replyParts?.length ?? 1); i++)
+      this.recordReply(job, i);
     job.done = true;
     job.text = "";
     delete job.message;
     delete job.reply;
+    delete job.replyParts;
     delete job.waitingForAuth;
     delete job.authNoticeSent;
     delete job.writeAttempted;
@@ -301,7 +350,6 @@ export class Worker {
     if (job.kind === "notification") {
       this.prepare(job);
       this.options.sessions.record(job.session!, messageForJob(job));
-      await this.notice(job);
       this.finish(job);
       return;
     }
@@ -315,6 +363,9 @@ export class Worker {
       this.prepare(job, true);
       job.reply = job.session!.notice!;
       job.noticeSent = true;
+      this.options.sessions
+        .open(job.session!)
+        .appendCustomEntry("session-notice-delivered", {});
     } else if (command === "/connect") {
       job.control = true;
       // Explicit /connect also resends a still-valid link to recover a missed DM.
@@ -336,7 +387,6 @@ export class Worker {
     } else {
       this.prepare(job);
       this.options.sessions.record(job.session!, messageForJob(job));
-      await this.notice(job);
       const token = await this.options.connections.token(job.senderId);
       if (job.waitingForAuth && !token) {
         await this.connect(job);
@@ -353,6 +403,22 @@ export class Worker {
       await typing();
       const timer = setInterval(() => void typing(), 4500);
       let needsConnection = false;
+      let reaction: Promise<void> | undefined;
+      let settled = false;
+      const reactionTimer = setTimeout(() => {
+        if (settled || job.reactionSent) return;
+        reaction = this.options
+          .gateway("/v1/reactions", {
+            to: job.destination,
+            message_id: job.messageId,
+            emoji: "👀",
+          })
+          .then(() => {
+            job.reactionSent = true;
+            this.options.inbox.save(job);
+          })
+          .catch(() => {});
+      }, this.options.reactionDelayMs ?? 2000);
       try {
         const result = await this.options.assistant.answer(
           messageForJob(job),
@@ -362,18 +428,36 @@ export class Worker {
             job.writeAttempted = true;
             this.options.inbox.save(job);
           },
-          async (emoji) =>
-            this.options.gateway("/v1/reactions", {
+          async (emoji) => {
+            await this.options.gateway("/v1/reactions", {
               to: job.destination,
               message_id: job.messageId,
               emoji,
-            }),
+            });
+            job.reactionSent = true;
+            this.options.inbox.save(job);
+          },
         );
         needsConnection = result.needsConnection;
         if (!needsConnection) {
           job.reply = result.text;
           job.generated = true;
-          if (result.buttons?.length) {
+          if (result.cards?.length) {
+            job.replyParts = result.cards.map((card, index) => ({
+              text: cardMarkdown(card),
+              buttons: (card.buttons ?? []).map((button) =>
+                button.url
+                  ? button
+                  : {
+                      ...button,
+                      token: randomBytes(18).toString("base64url"),
+                      choiceGroup: String(index),
+                    },
+              ),
+            }));
+            job.buttons = job.replyParts.flatMap((part) => part.buttons ?? []);
+            job.buttonsExpireAt = Date.now() + 10 * 60 * 1000;
+          } else if (result.buttons?.length) {
             job.buttons = result.buttons.map((button) =>
               button.url
                 ? button
@@ -390,7 +474,10 @@ export class Worker {
           ? "The media request's result is uncertain. I won't retry it automatically; ask me to check the title's status first."
           : "I couldn't complete that request. Please try again shortly, or send /connect if my MCP connection needs renewing.";
       } finally {
+        settled = true;
+        clearTimeout(reactionTimer);
         clearInterval(timer);
+        await reaction;
       }
       if (needsConnection) {
         await this.connect(job);

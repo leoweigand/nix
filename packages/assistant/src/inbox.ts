@@ -1,3 +1,4 @@
+import type { ReplyButton } from "./replies.ts";
 import { timingSafeEqual } from "node:crypto";
 import {
   mkdirSync,
@@ -30,7 +31,11 @@ export interface Job {
   messageId: number;
   topicId?: number;
   reply?: string;
-  buttons?: Array<{ label: string; url?: string; token?: string }>;
+  buttons?: ReplyButton[];
+  replyParts?: Array<{ text: string; buttons?: ReplyButton[] }>;
+  deliveredParts?: number;
+  replyPrepared?: boolean;
+  reactionSent?: boolean;
   buttonsExpireAt?: number;
   done?: boolean;
   waitingForAuth?: boolean;

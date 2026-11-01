@@ -8,6 +8,7 @@ import {
   SettingsManager,
   type AgentSession,
 } from "@earendil-works/pi-coding-agent";
+import { cardMarkdown, type ReplyCard } from "./replies.ts";
 import { Type } from "typebox";
 import type { ConversationMessage } from "./conversation.ts";
 import { Sessions, MODEL_ID, type SessionRef } from "./sessions.ts";
@@ -46,6 +47,7 @@ export class PiAssistant {
     needsConnection: boolean;
     compacted?: boolean;
     buttons?: Array<{ label: string; url?: string }>;
+    cards?: ReplyCard[];
   }> {
     const agentDir = join(this.stateDir, "agents", "runtime");
     const cwd = join(this.stateDir, "workspace");
@@ -93,6 +95,7 @@ export class PiAssistant {
     });
     let toolCalls = 0;
     let needsConnection = false;
+    let cards: ReplyCard[] | undefined;
     let buttons: Array<{ label: string; url?: string }> = [];
     const loader = new DefaultResourceLoader({
       cwd,
@@ -136,6 +139,53 @@ export class PiAssistant {
             ]
           : []),
         (pi) => {
+          pi.registerTool({
+            name: "telegram_cards",
+            label: "Present Telegram result cards",
+            description:
+              "Prepare your complete answer as one message per result, with a public MCP poster, concise rich Markdown text and that result's own buttons. Replaces your final text reply; do not add an introduction or button instructions. A choice sends its full label as the next user request. Calling again replaces the entire card list.",
+            parameters: Type.Object({
+              cards: Type.Array(
+                Type.Object({
+                  text: Type.String({ minLength: 1, maxLength: 3000 }),
+                  poster: Type.Optional(Type.String({ maxLength: 2048 })),
+                  buttons: Type.Optional(
+                    Type.Array(
+                      Type.Object({
+                        label: Type.String({ minLength: 1, maxLength: 80 }),
+                        url: Type.Optional(Type.String({ maxLength: 2048 })),
+                      }),
+                      { maxItems: 6 },
+                    ),
+                  ),
+                }),
+                { minItems: 1, maxItems: 6 },
+              ),
+            }),
+            execute: async (_id, args) => {
+              for (const card of args.cards) {
+                cardMarkdown(card);
+                for (const button of card.buttons ?? []) {
+                  if (
+                    button.url &&
+                    (!URL.canParse(button.url) ||
+                      new URL(button.url).protocol !== "https:")
+                  )
+                    throw new Error("Button URL must be HTTPS");
+                }
+              }
+              cards = args.cards;
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: "Complete answer prepared. Finish this turn; no extra message will be sent.",
+                  },
+                ],
+                details: {},
+              };
+            },
+          });
           pi.registerTool({
             name: "telegram_buttons",
             label: "Add Telegram buttons",
@@ -211,7 +261,8 @@ export class PiAssistant {
             if (!token && event.toolName === "connect_mcp") return;
             if (
               event.toolName === "react_to_message" ||
-              event.toolName === "telegram_buttons"
+              event.toolName === "telegram_buttons" ||
+              event.toolName === "telegram_cards"
             )
               return;
             if (!allowedTools.includes(event.toolName) || ++toolCalls > 8)
@@ -247,8 +298,18 @@ export class PiAssistant {
       model,
       thinkingLevel: "off",
       tools: token
-        ? [...allowedTools, "react_to_message", "telegram_buttons"]
-        : ["connect_mcp", "react_to_message", "telegram_buttons"],
+        ? [
+            ...allowedTools,
+            "react_to_message",
+            "telegram_buttons",
+            "telegram_cards",
+          ]
+        : [
+            "connect_mcp",
+            "react_to_message",
+            "telegram_buttons",
+            "telegram_cards",
+          ],
       resourceLoader: loader,
       sessionManager,
       settingsManager,
@@ -302,7 +363,9 @@ export class PiAssistant {
         (last.stopReason === "error" || last.stopReason === "aborted")
       )
         throw new Error("Assistant inference failed");
-      const text = session.getLastAssistantText()?.trim();
+      const text =
+        cards?.map(cardMarkdown).join("\n\n") ??
+        session.getLastAssistantText()?.trim();
       if (!text) throw new Error("Assistant returned no response");
       console.info(
         JSON.stringify({
@@ -311,6 +374,13 @@ export class PiAssistant {
           toolCalls,
         }),
       );
+      if (cards && !needsConnection) {
+        const lastEntry = [...sessionManager.getEntries()]
+          .reverse()
+          .find((e) => e.type === "message" && e.message.role === "assistant");
+        if (lastEntry)
+          sessionManager.appendContextEdit(lastEntry.id, { content: text });
+      }
       if (needsConnection) {
         const lastEntry = [...sessionManager.getEntries()]
           .reverse()
@@ -324,7 +394,8 @@ export class PiAssistant {
       return {
         text,
         needsConnection,
-        buttons,
+        buttons: cards ? undefined : buttons,
+        cards,
         compacted: sessionManager
           .getEntries()
           .some((e) => e.type === "compaction"),
