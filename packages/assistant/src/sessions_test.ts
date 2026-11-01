@@ -58,7 +58,11 @@ test("ten visible messages rotate a session without copying history, while tool 
     assert.match(f.sessions.status("chat"), /Messages: 10\/10/);
     const next = f.sessions.select("chat", f.now());
     assert.notEqual(next.id, ref.id);
-    assert.match(next.notice!, /ten-message/);
+    assert.equal(next.notice, "🐾");
+    assert.equal(
+      f.sessions.metadata(f.sessions.open(next)).reason,
+      "ten-message limit",
+    );
     assert.equal(
       f.sessions
         .open(next)
@@ -101,7 +105,11 @@ test("inactivity is measured from the latest conversation message and survives r
     );
     const next = restarted.select("chat", f.now());
     assert.notEqual(next.id, ref.id);
-    assert.match(next.notice!, /inactivity/);
+    assert.equal(next.notice, "🐾");
+    assert.equal(
+      f.sessions.metadata(f.sessions.open(next)).reason,
+      "ten minutes of inactivity",
+    );
   } finally {
     f.cleanup();
   }
@@ -115,6 +123,12 @@ test("instruction revisions are pinned, reset reloads them, and an old request c
     assert.equal(f.sessions.select("chat", f.now()).id, old.id);
     assert.equal(f.sessions.loadInstructions(old).system, "First instructions");
     const next = f.sessions.select("chat", f.now(), true);
+    assert.equal(next.notice, "🐾");
+    const context = JSON.stringify(
+      f.sessions.open(next).buildSessionContext().messages,
+    );
+    assert.match(context, /manual reset/);
+    assert.match(context, /Earlier conversation is not included/);
     assert.equal(f.sessions.loadInstructions(next).system, "New instructions");
     f.sessions.delivered(old, "late-reply", "Finished old request", false);
     assert.equal(f.sessions.select("chat", f.now()).id, next.id);

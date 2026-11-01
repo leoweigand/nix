@@ -133,7 +133,7 @@ export class Sessions {
       createdAt: at,
     } satisfies Metadata);
     const notice = `New session (${reason}). Earlier conversation is not included.`;
-    // Pi persists setup entries when the first message is appended. This is also the visible boundary notice.
+    // Keep the reset explanation in model context; Telegram gets a quiet marker.
     manager.appendMessage({
       role: "user",
       content: JSON.stringify({ type: "session_notice", text: notice }),
@@ -142,7 +142,7 @@ export class Sessions {
     const ref = {
       file: manager.getSessionFile()!,
       id: manager.getSessionId(),
-      notice,
+      notice: "🐾",
     };
     writeJson(join(directory, "active.json"), { file: ref.file, id: ref.id });
     return ref;

@@ -269,10 +269,7 @@ export class Worker {
               e.customType === "session-notice-delivered",
           )
         ) {
-          const meta = this.options.sessions.metadata(manager);
-          notices.push(
-            `New session (${meta.reason}). Earlier conversation is not included.`,
-          );
+          notices.push("🐾");
         }
         const count = entries.filter((e) => e.type === "compaction").length;
         const previous = [...entries]

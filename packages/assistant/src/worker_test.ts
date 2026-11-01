@@ -185,7 +185,7 @@ test("a media request gets a private group link, persists while waiting and resu
     const delivered = f.messages.filter(
       (message) =>
         message.endpoint !== "/v1/typing" &&
-        !String(message.body.message).startsWith("New session"),
+        !String(message.body.message).startsWith("🐾"),
     );
     assert.equal(delivered[0].body.to, "group");
     assert.equal(delivered[0].body.ephemeral_receiver, "123");
@@ -196,7 +196,7 @@ test("a media request gets a private group link, persists while waiting and resu
       f.messages.filter(
         (message) =>
           message.endpoint !== "/v1/typing" &&
-          !String(message.body.message).startsWith("New session"),
+          !String(message.body.message).startsWith("🐾"),
       ).length,
       1,
     );
@@ -435,7 +435,7 @@ test("fast answers skip the working reaction and fold the session notice into th
       (m) => m.endpoint === "/v1/assistant-replies",
     );
     assert.equal(replies.length, 1);
-    assert.match(replies[0].body.message, /^New session.*\n\nDune/s);
+    assert.match(replies[0].body.message, /^🐾\n\nDune/s);
     assert.equal(
       f.messages.some((m) => m.endpoint === "/v1/reactions"),
       false,
@@ -485,7 +485,7 @@ test("slow answers react once to the incoming message before delivering, even ac
       f.messages.filter((m) => m.endpoint === "/v1/reactions").length,
       1,
     );
-    assert.match(f.messages.at(-1)?.body.message, /^New session.*\n\nDune/s);
+    assert.match(f.messages.at(-1)?.body.message, /^🐾\n\nDune/s);
   } finally {
     f.cleanup();
   }
@@ -536,10 +536,7 @@ test("card delivery resumes after a failure without repeating cards or invoking 
       (m) => m.endpoint === "/v1/assistant-replies",
     );
     assert.equal(replies.length, 2);
-    assert.match(
-      replies[0].body.message,
-      /^New session.*\n\n!\[Film poster\]/s,
-    );
+    assert.match(replies[0].body.message, /^🐾\n\n!\[Film poster\]/s);
     assert.equal(replies[1].body.message, "**Dune (1984)**\nAnother film.");
     assert.equal(replies[0].body.buttons.length, 1);
     assert.equal(replies[1].body.buttons.length, 1);
@@ -608,7 +605,7 @@ test("notification-created sessions announce context on the next answer without 
     assert.equal(f.messages.length, 0);
     f.inbox.enqueue(f.job(95));
     await new Worker(f.options).drain();
-    assert.match(f.messages.at(-1)?.body.message, /^New session.*\n\nDune/s);
+    assert.match(f.messages.at(-1)?.body.message, /^🐾\n\nDune/s);
   } finally {
     f.cleanup();
   }
@@ -702,7 +699,7 @@ test("legacy session notices and explicit resets are not repeated on the next an
     assert.equal(f.messages.at(-1)?.body.message, "Dune (2021), available");
     f.inbox.enqueue({ ...f.job(101), text: "/reset" });
     await new Worker(f.options).drain();
-    assert.match(f.messages.at(-1)?.body.message, /manual reset/);
+    assert.equal(f.messages.at(-1)?.body.message, "🐾");
     f.inbox.enqueue(f.job(102));
     await new Worker(f.options).drain();
     assert.equal(f.messages.at(-1)?.body.message, "Dune (2021), available");
