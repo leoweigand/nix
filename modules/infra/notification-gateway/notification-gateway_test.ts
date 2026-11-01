@@ -645,3 +645,56 @@ test("assistant replies require their secret and preserve message and topic rout
       body.message_thread_id === 4,
   );
 });
+
+test("the startup environment enables forwarding of an untagged private DM", async () => {
+  const values = {
+    TELEGRAM_BOT_TOKEN: "test-token",
+    TELEGRAM_DESTINATIONS: "leo:123",
+    TELEGRAM_WEBHOOK_SECRET: "test-webhook-secret",
+    TELEGRAM_WEBHOOK_URL: "https://webhooks.leolab.party/telegram",
+    TELEGRAM_ASSISTANT_ENABLED: "true",
+  };
+  const saved = new Map(
+    Object.keys(values).map((name) => [name, process.env[name]]),
+  );
+  try {
+    Object.assign(process.env, values);
+    const calls: string[] = [];
+    const handle = createHandler(loadConfig(), {
+      fetch: async (input) => {
+        calls.push(String(input));
+        return new Response(null, { status: 204 });
+      },
+      log: { info: () => {}, warn: () => {}, error: () => {} },
+    });
+    const response = await handle(
+      new Request("http://gateway/v1/telegram-webhook", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-telegram-bot-api-secret-token": "test-webhook-secret",
+        },
+        body: JSON.stringify({
+          update_id: 1234,
+          message: {
+            message_id: 7,
+            from: { id: 123 },
+            chat: { id: 123, type: "private" },
+            text: "Look up Dune (2021)",
+          },
+        }),
+      }),
+    );
+    assert(response.status === 204);
+    assert(
+      calls.length === 1,
+      "the real startup loader must preserve the assistant flag",
+    );
+    assert(calls[0] === "http://127.0.0.1:9090/inbox");
+  } finally {
+    for (const [name, value] of saved) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+});

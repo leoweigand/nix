@@ -63,6 +63,7 @@ function runtimeEnvironment(): Record<string, string | undefined> {
     TELEGRAM_DESTINATIONS: process.env["TELEGRAM_DESTINATIONS"],
     TELEGRAM_WEBHOOK_SECRET: process.env["TELEGRAM_WEBHOOK_SECRET"],
     TELEGRAM_WEBHOOK_URL: process.env["TELEGRAM_WEBHOOK_URL"],
+    TELEGRAM_ASSISTANT_ENABLED: process.env["TELEGRAM_ASSISTANT_ENABLED"],
   };
 }
 
