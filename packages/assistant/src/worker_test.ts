@@ -159,6 +159,15 @@ test("button choices are bound to the owner and chat, expire, and accept only on
       f.inbox.jobs().find((job) => job.id === "choice-21")?.text,
       "Select Dune (2021)",
     );
+    assert(
+      f.messages.some((m) =>
+        String(m.body.message).includes("already been selected"),
+      ),
+    );
+    f.inbox.save({ ...source, buttonsExpireAt: Date.now() - 1 });
+    await press(123, -456, source.buttons[0].token);
+    assert(f.messages.some((m) => String(m.body.message).includes("expired")));
+    assert.equal(f.inbox.jobs().length, 2);
   } finally {
     f.cleanup();
   }

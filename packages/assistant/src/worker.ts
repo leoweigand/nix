@@ -115,7 +115,6 @@ export class Worker {
             (candidate) =>
               candidate.chatId === chatId &&
               candidate.senderId === this.options.policy.ownerId &&
-              (candidate.buttonsExpireAt ?? 0) > Date.now() &&
               candidate.buttons?.some(
                 (button) => button.token === callback.data,
               ),
@@ -124,6 +123,13 @@ export class Worker {
           (item) => item.token === callback.data,
         );
         if (!original || !button) return new Response(null, { status: 204 });
+        if ((original.buttonsExpireAt ?? 0) <= Date.now()) {
+          await this.reply(
+            original,
+            "Those buttons have expired. Ask me again for fresh choices.",
+          );
+          return new Response(null, { status: 204 });
+        }
         const result = this.options.inbox.enqueue({
           id: `choice-${original.id}`,
           chatId,
@@ -137,6 +143,13 @@ export class Worker {
           receivedAt: Date.now(),
         });
         if (result === "full") return new Response(null, { status: 503 });
+        if (result === "duplicate") {
+          await this.reply(
+            original,
+            "A choice has already been selected. Ask me again for fresh choices.",
+          );
+          return new Response(null, { status: 204 });
+        }
         setImmediate(() => void this.drain());
         return new Response(null, { status: 204 });
       }
