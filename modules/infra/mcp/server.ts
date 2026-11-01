@@ -30,7 +30,13 @@ export function createApp(
   const mcp = createMcpHandler(
     ({ authInfo }) => {
       if (!authInfo) throw new Error("Missing authenticated context");
-      const server = new McpServer({ name: "leolab", version: "0.2.0" });
+      const server = new McpServer(
+        { name: "leolab", version: "0.2.0" },
+        {
+          instructions:
+            "These tools download movies and TV seasons to Leo's personal media library. For requests such as 'download the second season of <title>', use search_media to find the title, get_media_details to identify the season, then request_media with that media ID and seasons [2]. Resolve IDs with tools rather than asking the user. Default to HD and request only aired TV episodes. Report already-available titles. Ask for clarification when the title or requested season is ambiguous.",
+        },
+      );
       const annotations = {
         readOnlyHint: true,
         destructiveHint: false,
@@ -137,8 +143,9 @@ export function createApp(
       server.registerTool(
         "search_media",
         {
+          title: "Find movies and TV shows",
           description:
-            "Find movies and TV shows by title and see whether you already have them. Results include titles, years, synopses, and media IDs you can use with get_media_details or request_media.",
+            "Find movies and TV shows to watch or download, and see whether you already have them. Search by title; results include years, synopses, and media IDs for get_media_details or request_media.",
           inputSchema: searchSchema,
           annotations: { ...annotations, openWorldHint: true },
           scopeChallenge: requireScopes("media:read"),
@@ -155,6 +162,7 @@ export function createApp(
       server.registerTool(
         "get_media_details",
         {
+          title: "Check media availability and seasons",
           description:
             "Find out what’s available for a movie or TV show before requesting it. Use a media ID from search_media to see library availability, TV seasons, and quality options.",
           inputSchema: detailsSchema,
@@ -173,8 +181,9 @@ export function createApp(
       server.registerTool(
         "request_media",
         {
+          title: "Download movies and TV seasons",
           description:
-            "Request a movie or selected TV seasons you want added to your library. Use a media ID from search_media and season numbers or a quality profile from get_media_details. Defaults to HD; TV requests cover already-aired episodes.",
+            "Download a movie or selected TV seasons to your media library. Use a media ID from search_media and season numbers or a quality profile from get_media_details. Defaults to HD; TV requests cover already-aired episodes.",
           inputSchema: requestSchema,
           annotations: {
             ...annotations,
