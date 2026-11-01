@@ -12,6 +12,7 @@ import {
 import { messageForJob } from "./telegram.ts";
 import { Sessions } from "./sessions.ts";
 import type { PiAssistant } from "./pi.ts";
+import { decodeJwt } from "jose";
 import { randomBytes } from "node:crypto";
 
 type Gateway = (endpoint: string, body: unknown) => Promise<void>;
@@ -25,6 +26,7 @@ interface Options {
   gateway: Gateway;
   log?: Pick<Console, "info" | "error">;
   reactionDelayMs?: number;
+  stageAttachment?: (job: Job, token: string) => Promise<string>;
 }
 export class Worker {
   options: Options;
@@ -193,7 +195,7 @@ export class Worker {
     this.options.inbox.save(job);
     if (job.authNoticeSent) return;
     const url = await this.options.connections.begin(job.senderId);
-    const message = `Connect your Pocket ID account so I can use media and Home Assistant tools for you:\n${url}\n\nThis link expires in 10 minutes. After you approve, I'll continue your pending request. Send /connect for a new link if it expires.`;
+    const message = `Connect your Pocket ID account so I can use documents, bookmarks, media and Home Assistant tools for you:\n${url}\n\nThis link expires in 10 minutes. After you approve, I'll continue your pending request. Send /connect for a new link if it expires.`;
     // The allowlisted owner's private destination is never selected from model output.
     if (job.chatId === job.senderId) {
       await this.options.gateway("/v1/assistant-replies", {
@@ -331,6 +333,8 @@ export class Worker {
     job.done = true;
     job.text = "";
     delete job.message;
+    delete job.attachment;
+    delete job.attachmentId;
     delete job.reply;
     delete job.replyParts;
     delete job.waitingForAuth;
@@ -378,7 +382,7 @@ export class Worker {
     if (command === "/start" || command === "/help") {
       job.control = true;
       job.reply =
-        "Hi! Ask me to save or find your bookmarks, inspect or control your lights and blinds, look up a film or request a movie or TV season. I'll send you a private Pocket ID link when I need MCP access. /connect connects or renews your account; /reset starts a new conversation; /session shows the current session. Sessions restart after ten conversation messages or ten minutes of inactivity.";
+        "Hi! Ask me to find a document, file a PDF/photo in our private chat, save or find your bookmarks, inspect or control your lights and blinds, look up a film or request a movie or TV season. I'll send you a private Pocket ID link when I need MCP access. /connect connects or renews your account; /reset starts a new conversation; /session shows the current session. Sessions restart after ten conversation messages or ten minutes of inactivity.";
     } else if (job.control) {
       // Deterministic commands do not invoke the model or consume the conversation budget.
     } else if (job.writeAttempted) {
@@ -386,13 +390,14 @@ export class Worker {
       const operation =
         job.writeOperation?.tool === "mcp__leolab__control_home_entities"
           ? `a device command (${job.writeOperation.action ?? "control"}: ${job.writeOperation.entityIds?.join(", ") ?? "unknown target"})`
-          : job.writeOperation?.tool === "mcp__leolab__save_bookmark"
-            ? "a bookmark save"
-            : "a change";
-      job.reply = `I was interrupted after starting ${operation}, so I won't repeat it automatically. Ask me to check the current bookmark, device or library state before trying again.`;
+          : job.writeOperation?.tool === "mcp__leolab__ingest_document"
+            ? "a document upload"
+            : job.writeOperation?.tool === "mcp__leolab__save_bookmark"
+              ? "a bookmark save"
+              : "a change";
+      job.reply = `I was interrupted after starting ${operation}, so I won't repeat it automatically. Ask me to check the current document ingestion, bookmark, device or library state before trying again.`;
     } else {
       this.prepare(job);
-      this.options.sessions.record(job.session!, messageForJob(job));
       const token = await this.options.connections.token(job.senderId);
       if (job.waitingForAuth && !token) {
         await this.connect(job);
@@ -402,6 +407,35 @@ export class Worker {
         delete job.waitingForAuth;
         this.options.inbox.save(job);
       }
+      if (job.attachment && !job.attachmentId) {
+        if (
+          !token ||
+          !["documents:ingest", "groups"].every((scope) => {
+            // Connections verified the token; only consent selection happens here.
+            const payload = decodeJwt(token);
+            return (
+              typeof payload.scope === "string" &&
+              payload.scope.split(" ").includes(scope)
+            );
+          })
+        ) {
+          await this.connect(job);
+          return;
+        }
+        if (!this.options.stageAttachment)
+          throw new Error("Attachment transfer unavailable");
+        try {
+          job.attachmentId = await this.options.stageAttachment(job, token);
+          this.options.inbox.save(job);
+        } catch {
+          job.reply =
+            "I couldn't prepare that attachment for Paperless, so nothing was submitted for filing. Send /connect if document permissions need renewing, then resend a PDF, JPEG, PNG or WebP up to 20 MiB in our private chat.";
+          this.options.inbox.save(job);
+          await this.deliver(job);
+          return;
+        }
+      }
+      this.options.sessions.record(job.session!, messageForJob(job));
       const typing = () =>
         this.options
           .gateway("/v1/typing", { to: job.destination })
@@ -478,7 +512,7 @@ export class Worker {
           JSON.stringify({ event: "assistant_failed", updateId: job.id }),
         );
         job.reply = job.writeAttempted
-          ? "The change's result is uncertain. I won't retry it automatically; ask me to check the current bookmark, device or library state first."
+          ? "The change's result is uncertain. I won't retry it automatically; ask me to check the current document ingestion, bookmark, device or library state first."
           : "I couldn't complete that request. Please try again shortly, or send /connect if my MCP connection needs renewing.";
       } finally {
         settled = true;

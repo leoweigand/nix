@@ -953,6 +953,91 @@ async function handleAssistantReply(
   }
 }
 
+// Only the trusted worker can fetch Telegram bytes; the model never receives bot URLs/tokens.
+async function handleAssistantAttachment(
+  request: Request,
+  config: GatewayConfig,
+  dependencies: GatewayDependencies,
+): Promise<Response> {
+  if (request.method !== "POST") return new Response(null, { status: 405 });
+  if (
+    !config.assistantEnabled ||
+    request.headers.get("x-assistant-secret") !== config.webhookSecret
+  )
+    return new Response(null, { status: 401 });
+  try {
+    const body = await readBody(request, MAX_NOTIFICATION_BODY_BYTES);
+    const value = JSON.parse(body);
+    if (
+      !isRecord(value) ||
+      typeof value.fileId !== "string" ||
+      !/^[a-zA-Z0-9_-]{1,500}$/.test(value.fileId)
+    )
+      return new Response(null, { status: 400 });
+    const response = await dependencies.fetch(
+      `https://api.telegram.org/bot${config.telegramBotToken}/getFile`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ file_id: value.fileId }),
+        redirect: "error",
+        signal: AbortSignal.timeout(15000),
+      },
+    );
+    const info: unknown = await response.json();
+    if (
+      !response.ok ||
+      !isRecord(info) ||
+      info.ok !== true ||
+      !isRecord(info.result)
+    )
+      return new Response(null, { status: 502 });
+    const file = info.result;
+    if (
+      typeof file.file_path !== "string" ||
+      !/^[a-zA-Z0-9_/-]+\.[a-zA-Z0-9]+$/.test(file.file_path) ||
+      file.file_path.split("/").includes("..") ||
+      typeof file.file_size !== "number" ||
+      file.file_size > 20 * 1024 * 1024
+    )
+      return new Response(null, { status: 413 });
+    const download = await dependencies.fetch(
+      `https://api.telegram.org/file/bot${config.telegramBotToken}/${file.file_path}`,
+      { redirect: "error", signal: AbortSignal.timeout(30000) },
+    );
+    if (!download.ok) {
+      await download.body?.cancel();
+      return new Response(null, { status: 502 });
+    }
+    const reader = download.body?.getReader();
+    if (!reader) return new Response(null, { status: 502 });
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > 20 * 1024 * 1024) {
+          await reader.cancel();
+          return new Response(null, { status: 413 });
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    return new Response(Buffer.concat(chunks), {
+      headers: {
+        "content-type": "application/octet-stream",
+        "cache-control": "no-store",
+      },
+    });
+  } catch {
+    return new Response(null, { status: 502 });
+  }
+}
+
 export function createHandler(
   config: GatewayConfig,
   dependencies = defaultDependencies,
@@ -962,6 +1047,8 @@ export function createHandler(
     if (pathname === "/healthz" && request.method === "GET") {
       return new Response(null, { status: 204 });
     }
+    if (pathname === "/v1/assistant-attachments")
+      return handleAssistantAttachment(request, config, dependencies);
     if (pathname === "/v1/assistant-replies") {
       return await handleAssistantReply(request, config, dependencies);
     }

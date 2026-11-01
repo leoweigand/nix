@@ -133,3 +133,64 @@ test("quoted messages are context and group conversation identity does not depen
   assert.equal(job.message?.quote?.author, "Backup service");
   assert.equal(job.message?.conversationId, "123:0");
 });
+
+test("PDF/photo attachments are private, sender-bound, bounded and do not imply filing", () => {
+  const pdf = {
+    file_id: "file_123",
+    file_name: "invoice.pdf",
+    mime_type: "application/pdf",
+    file_size: 120,
+  };
+  const job = eligibleJob(
+    update({ text: undefined, document: pdf, caption: "File this" }),
+    policy,
+  );
+  assert.equal(job?.text, "File this");
+  assert.equal(job?.attachment?.fileId, "file_123");
+  assert.match(
+    eligibleJob(update({ text: undefined, document: pdf }), policy)?.text ?? "",
+    /without filing instructions/,
+  );
+  assert.equal(
+    eligibleJob(
+      update({
+        text: undefined,
+        document: { ...pdf, file_size: 21 * 1024 * 1024 },
+      }),
+      policy,
+    ),
+    undefined,
+  );
+  assert.equal(
+    eligibleJob(
+      update({
+        document: pdf,
+        chat: { id: -456, type: "supergroup" },
+        text: "@lab_bot file this",
+        entities: [{ type: "mention", offset: 0, length: 8 }],
+      }),
+      policy,
+    ),
+    undefined,
+  );
+  assert.equal(
+    eligibleJob(
+      update({
+        text: undefined,
+        photo: [
+          { file_id: "small", file_size: 10 },
+          { file_id: "large", file_size: 100 },
+        ],
+      }),
+      policy,
+    )?.attachment?.fileId,
+    "large",
+  );
+  assert.equal(
+    eligibleJob(
+      update({ text: undefined, document: pdf, from: { id: 999 } }),
+      policy,
+    ),
+    undefined,
+  );
+});

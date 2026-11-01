@@ -14,9 +14,11 @@ export const issuer = "https://auth.leolab.party";
 export const resource = "https://mcp.leolab.party/mcp";
 export const clientId = "leolab-mcp-telegram";
 export const scopes =
-  "openid offline_access lab:read media:read media:request home:read home:control bookmarks:read bookmarks:write";
+  "openid groups offline_access documents:read documents:ingest lab:read media:read media:request home:read home:control bookmarks:read bookmarks:write";
 export const callbackPath = "/assistant/oauth/callback";
 const permissionScopes = [
+  "documents:read",
+  "documents:ingest",
   "lab:read",
   "media:read",
   "media:request",

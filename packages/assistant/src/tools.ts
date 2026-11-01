@@ -1,6 +1,13 @@
 import { decodeJwt } from "jose";
 
 export const toolRegistry = {
+  mcp__leolab__search_documents: { scope: "documents:read", write: false },
+  mcp__leolab__get_document: { scope: "documents:read", write: false },
+  mcp__leolab__ingest_document: { scope: "documents:ingest", write: true },
+  mcp__leolab__get_ingestion_status: {
+    scope: "documents:ingest",
+    write: false,
+  },
   mcp__leolab__search_bookmarks: { scope: "bookmarks:read", write: false },
   mcp__leolab__get_bookmark: { scope: "bookmarks:read", write: false },
   mcp__leolab__save_bookmark: { scope: "bookmarks:write", write: true },
@@ -19,6 +26,7 @@ export interface WriteAttempt {
   action?: string;
   mediaId?: string;
   url?: string;
+  attachmentId?: string;
 }
 export const maxToolCalls = 12;
 // The host verifies this token cryptographically before passing it to Pi.
@@ -36,6 +44,10 @@ export function availableTools(
       ([name]) =>
         audience === "private" ||
         ![
+          "mcp__leolab__search_documents",
+          "mcp__leolab__get_document",
+          "mcp__leolab__ingest_document",
+          "mcp__leolab__get_ingestion_status",
           "mcp__leolab__search_bookmarks",
           "mcp__leolab__get_bookmark",
           "mcp__leolab__save_bookmark",
@@ -62,12 +74,19 @@ export function recordWrite(
             : [],
           action: typeof input.action === "string" ? input.action : undefined,
         }
-      : tool === "mcp__leolab__save_bookmark"
-        ? { url: typeof input.url === "string" ? input.url : undefined }
-        : {
-            mediaId:
-              typeof input.mediaId === "string" ? input.mediaId : undefined,
-          }),
+      : tool === "mcp__leolab__ingest_document"
+        ? {
+            attachmentId:
+              typeof input.attachmentId === "string"
+                ? input.attachmentId
+                : undefined,
+          }
+        : tool === "mcp__leolab__save_bookmark"
+          ? { url: typeof input.url === "string" ? input.url : undefined }
+          : {
+              mediaId:
+                typeof input.mediaId === "string" ? input.mediaId : undefined,
+            }),
   });
 }
 
@@ -129,5 +148,20 @@ export class BookmarkWriteGuard {
       ["saved", "updated", "already_saved"].includes(result.outcome ?? "")
     )
       this.pending.delete(result.bookmark.url);
+  }
+}
+
+export class DocumentWriteGuard {
+  private attempted = new Set<string>();
+  before(tool: string, input: Record<string, unknown>) {
+    if (tool !== "mcp__leolab__ingest_document") return;
+    if (
+      typeof input.attachmentId !== "string" ||
+      this.attempted.has(input.attachmentId)
+    )
+      throw new Error(
+        "Document ingestion already attempted; inspect its receipt instead of retrying",
+      );
+    this.attempted.add(input.attachmentId);
   }
 }

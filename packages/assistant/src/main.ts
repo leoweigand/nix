@@ -1,3 +1,4 @@
+import { stageTelegramAttachment } from "./attachments.ts";
 import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { join } from "node:path";
@@ -52,6 +53,7 @@ const worker = new Worker({
     callbackUrl,
   }),
   assistant,
+  stageAttachment: (job, token) => stageTelegramAttachment(job, token, secret),
   gateway: async (endpoint, body) => {
     const response = await fetch(`http://127.0.0.1:9087${endpoint}`, {
       method: "POST",

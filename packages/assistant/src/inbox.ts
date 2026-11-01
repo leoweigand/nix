@@ -41,6 +41,8 @@ export interface Job {
   done?: boolean;
   waitingForAuth?: boolean;
   authNoticeSent?: boolean;
+  attachment?: { fileId: string; filename: string; size: number };
+  attachmentId?: string;
   writeAttempted?: boolean;
   writeOperation?: WriteAttempt;
 }

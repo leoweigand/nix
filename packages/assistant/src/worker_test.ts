@@ -736,3 +736,74 @@ test("an interrupted home command keeps its target in recovery and never invokes
     f.cleanup();
   }
 });
+
+test("attachment jobs stage once before inference and persist the caller-bound reference in context", async () => {
+  const f = fixture();
+  try {
+    const token = `e30.${Buffer.from(JSON.stringify({ scope: "openid groups documents:ingest documents:read" })).toString("base64url")}.test`;
+    const attachmentId = "7be0ab20-f426-4d86-bff9-2784ce0e879b";
+    let staged = 0;
+    const worker = new Worker({
+      ...f.options,
+      connections: { ...f.options.connections, token: async () => token },
+      stageAttachment: async (job, credential) => {
+        staged++;
+        assert.equal(credential, token);
+        assert.equal(job.attachment?.fileId, "telegram-file");
+        return attachmentId;
+      },
+    });
+    f.inbox.enqueue({
+      ...f.job(90),
+      text: "File this",
+      attachment: {
+        fileId: "telegram-file",
+        filename: "invoice.pdf",
+        size: 100,
+      },
+    });
+    await worker.drain();
+    await worker.drain();
+    assert.equal(staged, 1);
+    assert.equal(f.modelCalls.length, 1);
+    assert.deepEqual(f.modelCalls[0].job.attachment, {
+      attachmentId,
+      filename: "invoice.pdf",
+    });
+    assert.equal(f.inbox.jobs()[0].done, true);
+    assert.equal(f.inbox.jobs()[0].attachment, undefined);
+  } finally {
+    f.cleanup();
+  }
+});
+test("failed attachment staging completes without inference or automatic redownload", async () => {
+  const f = fixture();
+  try {
+    const token = `e30.${Buffer.from(JSON.stringify({ scope: "openid groups documents:ingest" })).toString("base64url")}.test`;
+    let stages = 0;
+    const worker = new Worker({
+      ...f.options,
+      connections: { ...f.options.connections, token: async () => token },
+      stageAttachment: async () => {
+        stages++;
+        throw new Error("download failed");
+      },
+    });
+    f.inbox.enqueue({
+      ...f.job(91),
+      text: "File this",
+      attachment: {
+        fileId: "telegram-file",
+        filename: "invoice.pdf",
+        size: 100,
+      },
+    });
+    await worker.drain();
+    await worker.drain();
+    assert.equal(stages, 1);
+    assert.equal(f.modelCalls.length, 0);
+    assert.equal(f.inbox.jobs()[0].done, true);
+  } finally {
+    f.cleanup();
+  }
+});

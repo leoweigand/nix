@@ -863,3 +863,51 @@ test("operational notifications are recorded as context but private assistant co
   );
   assert(recorded.length === 1);
 });
+
+test("assistant attachment download is secret-gated and does not return Telegram credentials", async () => {
+  const test = handler(config({ assistantEnabled: true }), [
+    Response.json({
+      ok: true,
+      result: { file_path: "documents/file_1.pdf", file_size: 12 },
+    }),
+    new Response("%PDF-1.4"),
+  ]);
+  const request = (secret: string) =>
+    new Request("http://gateway/v1/assistant-attachments", {
+      method: "POST",
+      headers: {
+        "x-assistant-secret": secret,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ fileId: "file_1" }),
+    });
+  assert((await test.handler(request("wrong"))).status === 401);
+  assert(test.calls.length === 0);
+  const response = await test.handler(request("test-webhook-secret"));
+  assert(response.status === 200);
+  assert((await response.text()) === "%PDF-1.4");
+  assert(Number(test.calls.length) === 2);
+  assert(
+    String(test.calls[1].input) ===
+      "https://api.telegram.org/file/bottest-token/documents/file_1.pdf",
+  );
+});
+test("assistant attachment download rejects oversized files and unsafe Telegram paths", async () => {
+  for (const result of [
+    { file_path: "documents/file.pdf", file_size: 21 * 1024 * 1024 },
+    { file_path: "../secret.pdf", file_size: 12 },
+  ]) {
+    const test = handler(config({ assistantEnabled: true }), [
+      Response.json({ ok: true, result }),
+    ]);
+    const response = await test.handler(
+      new Request("http://gateway/v1/assistant-attachments", {
+        method: "POST",
+        headers: { "x-assistant-secret": "test-webhook-secret" },
+        body: JSON.stringify({ fileId: "file_1" }),
+      }),
+    );
+    assert(response.status === 413);
+    assert(test.calls.length === 1);
+  }
+});

@@ -12,15 +12,64 @@ export function eligibleJob(update: unknown, policy: Policy): Job | undefined {
   )
     return;
   const m = update.message;
+  let attachment: Job["attachment"];
+  if (
+    record(m.document) &&
+    typeof m.document.file_id === "string" &&
+    ["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(
+      String(m.document.mime_type),
+    ) &&
+    typeof m.document.file_size === "number"
+  ) {
+    attachment = {
+      fileId: m.document.file_id,
+      filename:
+        typeof m.document.file_name === "string"
+          ? m.document.file_name.slice(0, 200)
+          : "document",
+      size: m.document.file_size,
+    };
+  } else if (Array.isArray(m.photo)) {
+    const photo = m.photo
+      .filter(
+        (p) =>
+          record(p) &&
+          typeof p.file_id === "string" &&
+          typeof p.file_size === "number",
+      )
+      .at(-1);
+    if (photo)
+      attachment = {
+        fileId: photo.file_id,
+        filename: "photo.jpg",
+        size: photo.file_size,
+      };
+  }
+  if (
+    attachment &&
+    (!/^[a-zA-Z0-9_-]{1,500}$/.test(attachment.fileId) ||
+      attachment.size <= 0 ||
+      attachment.size > 20 * 1024 * 1024)
+  )
+    return;
+  // Documents are accepted only in the owner's private conversation.
+  if (attachment && (!record(m.chat) || m.chat.type !== "private")) return;
+  const text =
+    typeof m.text === "string"
+      ? m.text
+      : typeof m.caption === "string"
+        ? m.caption
+        : attachment
+          ? "[Attachment received without filing instructions. Ask what the user wants to do with it.]"
+          : "";
   if (
     !record(m.chat) ||
     !record(m.from) ||
     m.from.is_bot ||
     m.sender_chat ||
     String(m.from.id) !== policy.ownerId ||
-    typeof m.text !== "string" ||
-    !m.text.trim() ||
-    m.text.length > 8000 ||
+    !text.trim() ||
+    text.length > 8000 ||
     !Number.isSafeInteger(m.message_id)
   )
     return;
@@ -54,13 +103,14 @@ export function eligibleJob(update: unknown, policy: Policy): Job | undefined {
     chatId,
     senderId: policy.ownerId,
     destination,
-    text: m.text,
+    text,
+    ...(attachment ? { attachment } : {}),
     receivedAt: Date.now(),
     message: {
       conversationId: `${chatId}:${Number.isSafeInteger(m.message_thread_id) ? m.message_thread_id : 0}`,
       eventId: `human-${update.update_id}`,
       kind: "human",
-      text: m.text,
+      text,
       author:
         [m.from.first_name, m.from.last_name]
           .filter((x) => typeof x === "string")
@@ -93,17 +143,26 @@ export function eligibleJob(update: unknown, policy: Policy): Job | undefined {
 }
 
 export function messageForJob(job: Job): ConversationMessage {
-  return (
-    job.message ?? {
-      conversationId: `${job.chatId}:${job.topicId ?? 0}`,
-      eventId: `human-${job.id}`,
-      kind: "human",
-      text: job.text,
-      author: "Leo",
-      audience: job.chatId === job.senderId ? "private" : "shared",
-      at: job.receivedAt ?? Date.now(),
-    }
-  );
+  const message = job.message ?? {
+    conversationId: `${job.chatId}:${job.topicId ?? 0}`,
+    eventId: `human-${job.id}`,
+    kind: "human",
+    text: job.text,
+    author: "Leo",
+    audience: job.chatId === job.senderId ? "private" : "shared",
+    at: job.receivedAt ?? Date.now(),
+  };
+  return {
+    ...message,
+    ...(job.attachmentId && job.attachment
+      ? {
+          attachment: {
+            attachmentId: job.attachmentId,
+            filename: job.attachment.filename,
+          },
+        }
+      : {}),
+  };
 }
 export function notificationJob(
   value: unknown,

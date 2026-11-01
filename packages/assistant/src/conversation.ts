@@ -12,6 +12,7 @@ export interface ConversationMessage {
   at: number;
   kind: "human" | "notification";
   quote?: Quote;
+  attachment?: { attachmentId: string; filename: string };
 }
 export function messageContent(message: ConversationMessage): string {
   return JSON.stringify({
@@ -23,6 +24,7 @@ export function messageContent(message: ConversationMessage): string {
     time: new Date(message.at).toISOString(),
     audience: message.audience,
     text: message.text,
+    ...(message.attachment ? { attachment: message.attachment } : {}),
     ...(message.quote ? { quoted_message: message.quote } : {}),
   });
 }

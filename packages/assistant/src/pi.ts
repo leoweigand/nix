@@ -17,6 +17,7 @@ import { searchWeb } from "./web-search.ts";
 import {
   HomeWriteGuard,
   BookmarkWriteGuard,
+  DocumentWriteGuard,
   availableTools,
   maxToolCalls,
   recordWrite,
@@ -97,6 +98,7 @@ export class PiAssistant {
       },
     });
     const allowedTools = availableTools(token, message.audience);
+    const documentWriteGuard = new DocumentWriteGuard();
     const homeWriteGuard = new HomeWriteGuard();
     const bookmarkWriteGuard = new BookmarkWriteGuard();
     let toolCalls = 0;
@@ -117,11 +119,11 @@ export class PiAssistant {
       systemPrompt:
         instructions.system +
         (message.audience === "shared"
-          ? "\nPersonal bookmark tools are disabled in shared conversations. Ask the user to continue in a private DM. Never use web search to look up their private bookmarks."
+          ? "\nPersonal document and bookmark tools are disabled in shared conversations. Ask the user to continue in a private DM. Never use web search to look up their private bookmarks."
           : "") +
         (token
-          ? "\nYour MCP connection is authenticated for the current sender. Only tools permitted by the current grant are enabled. Call connect_mcp to request missing home, media or bookmark permissions."
-          : "\nMCP is not connected. For personal bookmark searches, details or saves, or ANY home device discovery, state read or control, media search, library availability, details or download request, call connect_mcp. Do not answer those from memory or claim they are unavailable. You may answer ordinary conversation without connecting. Do not invent a sign-in URL."),
+          ? "\nYour MCP connection is authenticated for the current sender. Only tools permitted by the current grant are enabled. Call connect_mcp to request missing document, home, media or bookmark permissions."
+          : "\nMCP is not connected. For private Paperless document search, reading or filing, personal bookmark searches, details or saves, or ANY home device discovery, state read or control, media search, library availability, details or download request, call connect_mcp. Do not answer those from memory or claim they are unavailable. You may answer ordinary conversation without connecting. Do not invent a sign-in URL."),
       extensionFactories: [
         ...(token
           ? [
@@ -269,7 +271,7 @@ export class PiAssistant {
             name: "connect_mcp",
             label: "Connect LeoLab MCP",
             description:
-              "Connect the requesting user's Pocket ID account. Required for home or media tools when disconnected, and to upgrade a connection missing the needed permissions.",
+              "Connect the requesting user's Pocket ID account. Required for document, bookmark, home or media tools when disconnected, and to upgrade a connection missing the needed permissions.",
             parameters: Type.Object({}),
             execute: async () => {
               needsConnection = true;
@@ -304,6 +306,7 @@ export class PiAssistant {
               };
             {
               try {
+                documentWriteGuard.before(event.toolName, event.input);
                 homeWriteGuard.before(event.toolName, event.input);
                 bookmarkWriteGuard.before(event.toolName, event.input);
                 recordWrite(event.toolName, event.input, onWriteAttempt);
@@ -386,6 +389,7 @@ export class PiAssistant {
             time_zone: "Europe/Berlin",
             audience: message.audience,
             requester: message.author,
+            ...(message.attachment ? { attachment: message.attachment } : {}),
             instruction:
               "Respond to the current human request. If a connection was just established, continue that request using the available tools.",
           }),
