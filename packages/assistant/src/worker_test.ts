@@ -699,7 +699,7 @@ test("legacy session notices and explicit resets are not repeated on the next an
     assert.equal(f.messages.at(-1)?.body.message, "Dune (2021), available");
     f.inbox.enqueue({ ...f.job(101), text: "/reset" });
     await new Worker(f.options).drain();
-    assert.equal(f.messages.at(-1)?.body.message, "🐾");
+    assert.equal(f.messages.at(-1)?.body.message, "Context cleared");
     f.inbox.enqueue(f.job(102));
     await new Worker(f.options).drain();
     assert.equal(f.messages.at(-1)?.body.message, "Dune (2021), available");

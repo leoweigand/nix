@@ -363,7 +363,7 @@ export class Worker {
     } else if (command === "/reset") {
       job.control = true;
       this.prepare(job, true);
-      job.reply = job.session!.notice!;
+      job.reply = "Context cleared";
       job.noticeSent = true;
       this.options.sessions
         .open(job.session!)
