@@ -269,7 +269,12 @@ export class Worker {
               e.customType === "session-notice-delivered",
           )
         ) {
-          notices.push("🐾");
+          notices.push(
+            this.options.sessions.metadata(manager).reason ===
+              "ten-message limit"
+              ? "Context cleared (message limit reached)"
+              : "🐾",
+          );
         }
         const count = entries.filter((e) => e.type === "compaction").length;
         const previous = [...entries]

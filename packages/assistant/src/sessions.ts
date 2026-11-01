@@ -133,7 +133,7 @@ export class Sessions {
       createdAt: at,
     } satisfies Metadata);
     const notice = `New session (${reason}). Earlier conversation is not included.`;
-    // Keep the reset explanation in model context; Telegram gets a quiet marker.
+    // Keep the full reset explanation in model context, separate from the visible notice.
     manager.appendMessage({
       role: "user",
       content: JSON.stringify({ type: "session_notice", text: notice }),
@@ -142,7 +142,10 @@ export class Sessions {
     const ref = {
       file: manager.getSessionFile()!,
       id: manager.getSessionId(),
-      notice: "🐾",
+      notice:
+        reason === "ten-message limit"
+          ? "Context cleared (message limit reached)"
+          : "🐾",
     };
     writeJson(join(directory, "active.json"), { file: ref.file, id: ref.id });
     return ref;

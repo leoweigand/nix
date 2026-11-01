@@ -58,7 +58,7 @@ test("ten visible messages rotate a session without copying history, while tool 
     assert.match(f.sessions.status("chat"), /Messages: 10\/10/);
     const next = f.sessions.select("chat", f.now());
     assert.notEqual(next.id, ref.id);
-    assert.equal(next.notice, "🐾");
+    assert.equal(next.notice, "Context cleared (message limit reached)");
     assert.equal(
       f.sessions.metadata(f.sessions.open(next)).reason,
       "ten-message limit",

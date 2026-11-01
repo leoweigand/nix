@@ -425,6 +425,23 @@ test("notifications and resets proceed while a human request waits for OAuth, wi
   }
 });
 
+test("message-limit resets use a short context-cleared notice", async () => {
+  const f = fixture();
+  try {
+    f.casual();
+    for (let id = 200; id < 206; id++) {
+      f.inbox.enqueue(f.job(id));
+      await new Worker(f.options).drain();
+    }
+    assert.equal(
+      f.messages.at(-1)?.body.message,
+      "Context cleared (message limit reached)\n\nDune (2021), available",
+    );
+  } finally {
+    f.cleanup();
+  }
+});
+
 test("fast answers skip the working reaction and fold the session notice into the answer", async () => {
   const f = fixture();
   try {
