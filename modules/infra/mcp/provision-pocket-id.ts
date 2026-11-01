@@ -42,6 +42,17 @@ if (entry.name !== "LeoLab MCP")
   throw new Error("Resource exists with a different owner name");
 const permissions = [
   {
+    key: "home:read",
+    name: "Read home devices",
+    description:
+      "Read approved Home Assistant devices and their current states",
+  },
+  {
+    key: "home:control",
+    name: "Control home devices",
+    description: "Operate approved Home Assistant lights and blinds",
+  },
+  {
     key: "lab:read",
     name: "Inspect caller identity",
     description: "Read the authenticated caller identity",
@@ -88,7 +99,7 @@ if (!existing) {
     id: clientId,
     name: clientName,
     description: assistant
-      ? "User-bound media lookup and requests through the Telegram assistant"
+      ? "User-bound media and Home Assistant tools through the Telegram assistant"
       : "Codex desktop and CLI access to private LeoLab tools",
     isPublic: true,
     pkceEnabled: true,
@@ -108,7 +119,7 @@ if (assistant && existing) {
   await api(`/oidc/clients/${clientId}`, "PUT", {
     name: clientName,
     description:
-      "User-bound media lookup and requests through the Telegram assistant",
+      "User-bound media and Home Assistant tools through the Telegram assistant",
     isPublic: true,
     pkceEnabled: true,
     isGroupRestricted: true,

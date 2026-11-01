@@ -14,11 +14,11 @@ let
       "MCP_CONFIG"
       "CREDENTIALS_DIRECTORY"
     ];
-    credentialNames = [
+    credentialNames = lib.optional cfg.home.enable "home-token" ++ [
       "sonarr-config"
       "radarr-config"
     ];
-    connectPorts = [
+    connectPorts = lib.optional cfg.home.enable 8123 ++ [
       443
       8989
       7878
@@ -30,6 +30,14 @@ let
       inherit (cfg) port;
       resource = "https://${host}/mcp";
       issuer = cfg.issuer;
+      home =
+        if cfg.home.enable then
+          {
+            url = "http://127.0.0.1:8123";
+            entities = map (entity: lib.filterAttrs (_: value: value != null) entity) cfg.home.entities;
+          }
+        else
+          null;
       media = {
         sonarr = {
           url = "http://127.0.0.1:8989";
@@ -50,6 +58,50 @@ in
       type = lib.types.port;
       default = 9089;
     };
+    home = {
+      enable = lib.mkEnableOption "Home Assistant device tools";
+      tokenReference = lib.mkOption {
+        type = lib.types.str;
+        default = "op://Homelab/MCP Server/HA_TOKEN";
+      };
+      entities = lib.mkOption {
+        type = lib.types.listOf (
+          lib.types.submodule {
+            options = {
+              entityId = lib.mkOption { type = lib.types.str; };
+              name = lib.mkOption {
+                type = lib.types.nullOr lib.types.str;
+                default = null;
+              };
+              room = lib.mkOption {
+                type = lib.types.nullOr lib.types.str;
+                default = null;
+              };
+              aliases = lib.mkOption {
+                type = lib.types.listOf lib.types.str;
+                default = [ ];
+              };
+              actions = lib.mkOption {
+                type = lib.types.listOf (
+                  lib.types.enum [
+                    "turn_on"
+                    "turn_off"
+                    "set_brightness"
+                    "open"
+                    "close"
+                    "stop"
+                    "set_position"
+                  ]
+                );
+                default = [ ];
+              };
+            };
+          }
+        );
+        default = [ ];
+        description = "Explicit readable entities and their permitted controls";
+      };
+    };
     issuer = lib.mkOption {
       type = lib.types.str;
       default = "https://auth.${config.homelab.baseDomain}";
@@ -57,6 +109,10 @@ in
   };
   config = lib.mkIf cfg.enable {
     assertions = [
+      {
+        assertion = !cfg.home.enable || config.homelab.apps.homeassistant.enable;
+        message = "MCP home tools require Home Assistant";
+      }
       {
         assertion =
           config.homelab.infra.edge.enable
@@ -73,11 +129,18 @@ in
         "100.64.0.0/10"
       ];
     };
+    services.onepassword-secrets.secrets = lib.mkIf cfg.home.enable {
+      mcpHomeToken = {
+        reference = cfg.home.tokenReference;
+        services = [ "leolab-mcp" ];
+      };
+    };
     systemd.services.leolab-mcp = {
       description = "Authenticated LeoLab MCP tools";
       wantedBy = [ "multi-user.target" ];
-      after = [ "network-online.target" ];
+      after = [ "network-online.target" ] ++ lib.optional cfg.home.enable "opnix-secrets.service";
       wants = [ "network-online.target" ];
+      requires = lib.optional cfg.home.enable "opnix-secrets.service";
       unitConfig.RequiresMountsFor = [
         config.homelab.apps.sonarr.dataDir
         config.homelab.apps.radarr.dataDir
@@ -87,10 +150,12 @@ in
       };
       serviceConfig = {
         ExecStart = "${launcher}/bin/leolab-mcp";
-        LoadCredential = [
-          "sonarr-config:${config.homelab.apps.sonarr.dataDir}/config.xml"
-          "radarr-config:${config.homelab.apps.radarr.dataDir}/config.xml"
-        ];
+        LoadCredential =
+          lib.optional cfg.home.enable "home-token:${config.services.onepassword-secrets.secretPaths.mcpHomeToken}"
+          ++ [
+            "sonarr-config:${config.homelab.apps.sonarr.dataDir}/config.xml"
+            "radarr-config:${config.homelab.apps.radarr.dataDir}/config.xml"
+          ];
         DynamicUser = true;
         Restart = "on-failure";
         RestartSec = "5s";

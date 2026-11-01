@@ -1,3 +1,4 @@
+import type { WriteAttempt } from "./tools.ts";
 import type { ReplyButton } from "./replies.ts";
 import { timingSafeEqual } from "node:crypto";
 import {
@@ -41,6 +42,7 @@ export interface Job {
   waitingForAuth?: boolean;
   authNoticeSent?: boolean;
   writeAttempted?: boolean;
+  writeOperation?: WriteAttempt;
 }
 export interface Policy {
   ownerId: string;

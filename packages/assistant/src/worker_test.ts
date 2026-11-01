@@ -710,3 +710,29 @@ test("legacy session notices and explicit resets are not repeated on the next an
     f.cleanup();
   }
 });
+
+test("an interrupted home command keeps its target in recovery and never invokes inference", async () => {
+  const f = fixture();
+  try {
+    f.inbox.enqueue({
+      ...f.job(1),
+      writeAttempted: true,
+      writeOperation: {
+        tool: "mcp__leolab__control_home_entities",
+        entityIds: ["light.hall"],
+        action: "turn_on",
+      },
+    });
+    await new Worker(f.options).drain();
+    assert.equal(f.modelCalls.length, 0);
+    assert(
+      f.messages.some(
+        (m) =>
+          String(m.body.message).includes("light.hall") &&
+          String(m.body.message).includes("won't repeat"),
+      ),
+    );
+  } finally {
+    f.cleanup();
+  }
+});

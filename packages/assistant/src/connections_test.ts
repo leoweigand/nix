@@ -179,9 +179,23 @@ test("wrong state and issuer, expired links, replay, and a different Pocket ID c
         callback.searchParams.set("iss", "https://wrong.example");
       if (kind === "expired") f.expire();
       if (kind === "subject") f.setSubject("another-subject");
-      if (kind === "scope") f.setScope("media:read");
+      if (kind === "scope") f.setScope("openid offline_access");
       await assert.rejects(f.connection.complete(callback));
       assert.equal(await f.connection.token("123"), undefined);
+    } finally {
+      f.cleanup();
+    }
+  }
+});
+
+test("partial media and home grants remain usable without forcing an upgrade", async () => {
+  for (const scope of ["media:read", "home:read", "home:control"]) {
+    const f = await fixture();
+    try {
+      const callback = await f.begin();
+      f.setScope(scope);
+      await f.connection.complete(callback);
+      assert(await f.connection.token("123"));
     } finally {
       f.cleanup();
     }

@@ -193,7 +193,7 @@ export class Worker {
     this.options.inbox.save(job);
     if (job.authNoticeSent) return;
     const url = await this.options.connections.begin(job.senderId);
-    const message = `Connect your Pocket ID account so I can search and request media for you:\n${url}\n\nThis link expires in 10 minutes. After you approve, I'll continue your pending request. Send /connect for a new link if it expires.`;
+    const message = `Connect your Pocket ID account so I can use media and Home Assistant tools for you:\n${url}\n\nThis link expires in 10 minutes. After you approve, I'll continue your pending request. Send /connect for a new link if it expires.`;
     // The allowlisted owner's private destination is never selected from model output.
     if (job.chatId === job.senderId) {
       await this.options.gateway("/v1/assistant-replies", {
@@ -336,6 +336,7 @@ export class Worker {
     delete job.waitingForAuth;
     delete job.authNoticeSent;
     delete job.writeAttempted;
+    delete job.writeOperation;
     this.options.inbox.save(job);
     this.log.info(
       JSON.stringify({ event: "assistant_delivered", updateId: job.id }),
@@ -377,13 +378,16 @@ export class Worker {
     if (command === "/start" || command === "/help") {
       job.control = true;
       job.reply =
-        "Hi! Ask me to look up a film or request a movie or TV season. I'll send you a private Pocket ID link when I need MCP access. /connect connects or renews your account; /reset starts a new conversation; /session shows the current session. Sessions restart after ten conversation messages or ten minutes of inactivity.";
+        "Hi! Ask me to inspect or control your lights and blinds, look up a film or request a movie or TV season. I'll send you a private Pocket ID link when I need MCP access. /connect connects or renews your account; /reset starts a new conversation; /session shows the current session. Sessions restart after ten conversation messages or ten minutes of inactivity.";
     } else if (job.control) {
       // Deterministic commands do not invoke the model or consume the conversation budget.
     } else if (job.writeAttempted) {
-      // A restart after a write cannot prove its result. Never replay acquisition automatically.
-      job.reply =
-        "I was interrupted after starting a media request, so I won't repeat it automatically. Ask me to check the title's current library status before trying again.";
+      // A restart after a write cannot prove its result. Never replay device commands or acquisition automatically.
+      const operation =
+        job.writeOperation?.tool === "mcp__leolab__control_home_entities"
+          ? `a device command (${job.writeOperation.action ?? "control"}: ${job.writeOperation.entityIds?.join(", ") ?? "unknown target"})`
+          : "a change";
+      job.reply = `I was interrupted after starting ${operation}, so I won't repeat it automatically. Ask me to check the current device or library state before trying again.`;
     } else {
       this.prepare(job);
       this.options.sessions.record(job.session!, messageForJob(job));
@@ -424,7 +428,8 @@ export class Worker {
           messageForJob(job),
           job.session!,
           token,
-          () => {
+          (attempt) => {
+            job.writeOperation = attempt;
             job.writeAttempted = true;
             this.options.inbox.save(job);
           },
@@ -471,7 +476,7 @@ export class Worker {
           JSON.stringify({ event: "assistant_failed", updateId: job.id }),
         );
         job.reply = job.writeAttempted
-          ? "The media request's result is uncertain. I won't retry it automatically; ask me to check the title's status first."
+          ? "The change's result is uncertain. I won't retry it automatically; ask me to check the current device or library state first."
           : "I couldn't complete that request. Please try again shortly, or send /connect if my MCP connection needs renewing.";
       } finally {
         settled = true;

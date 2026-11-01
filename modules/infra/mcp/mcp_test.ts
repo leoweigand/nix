@@ -5,6 +5,7 @@ import { generateKeyPair, exportJWK, SignJWT } from "jose";
 import { createApp } from "./server.ts";
 import { createVerifier } from "./auth.ts";
 import { MediaService } from "./media.ts";
+import { HomeService, homePolicySchema } from "./home.ts";
 
 const resource = "https://mcp.example.test/mcp";
 const issuer = "https://auth.example.test";
@@ -75,6 +76,24 @@ before(async () => {
       sonarr: { url: upstreamBase, apiKey: "fixture", rootFolder: "/tv" },
       radarr: { url: upstreamBase, apiKey: "fixture", rootFolder: "/movies" },
     }),
+    new HomeService(
+      {
+        url: "http://127.0.0.1:8123",
+        token: "fixture-home",
+        entities: [
+          homePolicySchema.parse({
+            entityId: "light.hall",
+            actions: ["turn_on", "turn_off"],
+          }),
+        ],
+      },
+      async () =>
+        Response.json({
+          entity_id: "light.hall",
+          state: "off",
+          attributes: { supported_color_modes: ["onoff"] },
+        }),
+    ),
   );
   base = await listen(app.server);
 });
@@ -152,7 +171,13 @@ test("OAuth discovery is available and unauthenticated calls receive a challenge
     .get("www-authenticate")!
     .match(/scope="([^"]+)"/)![1]
     .split(" ");
-  assert.deepEqual(scopes, ["lab:read", "media:read", "media:request"]);
+  assert.deepEqual(scopes, [
+    "lab:read",
+    "media:read",
+    "media:request",
+    "home:read",
+    "home:control",
+  ]);
   assert.deepEqual(metadata.scopes_supported, scopes);
 });
 test("rejects invalid, expired, wrong-audience and ID tokens", async () => {
@@ -166,7 +191,7 @@ test("rejects invalid, expired, wrong-audience and ID tokens", async () => {
     assert.equal(response.status, 401);
     assert.match(
       response.headers.get("www-authenticate")!,
-      /scope="lab:read media:read media:request"/,
+      /scope="lab:read media:read media:request home:read home:control"/,
     );
   }
   assert.equal(
@@ -214,8 +239,11 @@ test("authenticated MCP handshake, tool discovery and calls", async () => {
   assert.equal(init.serverInfo.name, "leolab");
   const tools = await rpc("tools/list");
   assert.deepEqual(tools.tools.map((x: { name: string }) => x.name).sort(), [
+    "control_home_entities",
+    "get_home_entity",
     "get_media_details",
     "request_media",
+    "search_home_entities",
     "search_media",
     "whoami",
   ]);
@@ -295,4 +323,59 @@ test("MCP delivers rich structured results matching JSON text and limits action 
     requiredScope: "media:request",
     arguments: { mediaId: "movie:tmdb:100", qualityProfile: "HD" },
   });
+});
+
+test("home scopes, structured state results, tool schema and control enforcement", async () => {
+  const rpc = async (scope: string, method: string, params: unknown) =>
+    request("/mcp", await token({ scope }), {
+      jsonrpc: "2.0",
+      id: 1,
+      method,
+      params,
+    });
+  const parse = async (response: Response) => {
+    const text = await response.text();
+    return text.startsWith("event:")
+      ? JSON.parse(text.split("data: ")[1].split("\n")[0])
+      : JSON.parse(text);
+  };
+  const listed = await parse(await rpc("home:read", "tools/list", {}));
+  const control = listed.result.tools.find(
+    (t: { name: string }) => t.name === "control_home_entities",
+  );
+  assert.equal(control.inputSchema.type, "object");
+  assert(control.inputSchema.properties.entityIds);
+  assert(control.inputSchema.properties.action);
+  assert(control.inputSchema.properties.percent);
+  const read = await rpc("home:read", "tools/call", {
+    name: "get_home_entity",
+    arguments: { entityId: "light.hall" },
+  });
+  assert.equal(read.status, 200);
+  const result = (await parse(read)).result;
+  assert.equal(result.structuredContent.entity.state, "off");
+  assert.deepEqual(result.structuredContent.entity.availableControls, []);
+  assert.deepEqual(
+    JSON.parse(result.content[0].text),
+    result.structuredContent,
+  );
+  const denied = await rpc("home:read", "tools/call", {
+    name: "control_home_entities",
+    arguments: { entityIds: ["light.hall"], action: "turn_off" },
+  });
+  assert.equal(denied.status, 403);
+  const media = await rpc("media:request", "tools/call", {
+    name: "get_home_entity",
+    arguments: { entityId: "light.hall" },
+  });
+  assert.equal(media.status, 403);
+  const accepted = await rpc("home:control", "tools/call", {
+    name: "control_home_entities",
+    arguments: { entityIds: ["light.hall"], action: "turn_off" },
+  });
+  assert.equal(accepted.status, 200);
+  assert.equal(
+    (await parse(accepted)).result.structuredContent.outcome,
+    "already_satisfied",
+  );
 });

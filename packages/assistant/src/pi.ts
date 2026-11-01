@@ -13,12 +13,13 @@ import { Type } from "typebox";
 import type { ConversationMessage } from "./conversation.ts";
 import { Sessions, MODEL_ID, type SessionRef } from "./sessions.ts";
 
-const allowedTools = [
-  "mcp__leolab__whoami",
-  "mcp__leolab__search_media",
-  "mcp__leolab__get_media_details",
-  "mcp__leolab__request_media",
-];
+import {
+  HomeWriteGuard,
+  availableTools,
+  maxToolCalls,
+  recordWrite,
+  type WriteAttempt,
+} from "./tools.ts";
 
 export class PiAssistant {
   stateDir: string;
@@ -38,7 +39,7 @@ export class PiAssistant {
     message: ConversationMessage,
     ref: SessionRef,
     token?: string,
-    onWriteAttempt: () => void = () => {},
+    onWriteAttempt: (attempt?: WriteAttempt) => void = () => {},
     react: (emoji: string) => Promise<void> = async () => {
       throw new Error("Reaction unavailable");
     },
@@ -93,6 +94,8 @@ export class PiAssistant {
         keepRecentTokens: 12000,
       },
     });
+    const allowedTools = availableTools(token);
+    const homeWriteGuard = new HomeWriteGuard();
     let toolCalls = 0;
     let needsConnection = false;
     let cards: ReplyCard[] | undefined;
@@ -110,8 +113,8 @@ export class PiAssistant {
       systemPrompt:
         instructions.system +
         (token
-          ? "\nYour MCP connection is authenticated for the current sender."
-          : "\nMCP is not connected. For ANY media search, library availability, details or download request, call connect_mcp. Do not answer those from memory or claim they are unavailable. You may answer ordinary conversation without connecting. Do not invent a sign-in URL."),
+          ? "\nYour MCP connection is authenticated for the current sender. Only tools permitted by the current grant are enabled. Call connect_mcp to request missing home or media permissions."
+          : "\nMCP is not connected. For ANY home device discovery, state read or control, media search, library availability, details or download request, call connect_mcp. Do not answer those from memory or claim they are unavailable. You may answer ordinary conversation without connecting. Do not invent a sign-in URL."),
       extensionFactories: [
         ...(token
           ? [
@@ -237,54 +240,60 @@ export class PiAssistant {
               };
             },
           });
-          if (!token)
-            pi.registerTool({
-              name: "connect_mcp",
-              label: "Connect LeoLab MCP",
-              description:
-                "Connect the requesting user's Pocket ID account. Required before any film/TV lookup, library inspection or media download request.",
-              parameters: Type.Object({}),
-              execute: async () => {
-                needsConnection = true;
-                return {
-                  content: [
-                    {
-                      type: "text",
-                      text: "The worker will privately send the user a sign-in link and resume this request afterwards. Stop here.",
-                    },
-                  ],
-                  details: { needsConnection: true },
-                };
-              },
-            });
+          pi.registerTool({
+            name: "connect_mcp",
+            label: "Connect LeoLab MCP",
+            description:
+              "Connect the requesting user's Pocket ID account. Required for home or media tools when disconnected, and to upgrade a connection missing the needed permissions.",
+            parameters: Type.Object({}),
+            execute: async () => {
+              needsConnection = true;
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: "The worker will privately send the user a sign-in link and resume this request afterwards. Stop here.",
+                  },
+                ],
+                details: { needsConnection: true },
+              };
+            },
+          });
           pi.on("tool_call", (event) => {
-            if (!token && event.toolName === "connect_mcp") return;
+            if (event.toolName === "connect_mcp") return;
             if (
               event.toolName === "react_to_message" ||
               event.toolName === "telegram_buttons" ||
               event.toolName === "telegram_cards"
             )
               return;
-            if (!allowedTools.includes(event.toolName) || ++toolCalls > 8)
+            if (
+              !allowedTools.includes(event.toolName) ||
+              ++toolCalls > maxToolCalls
+            )
               return {
                 block: true,
                 reason:
-                  "This assistant only supports up to eight media tool calls per message.",
+                  "This assistant supports up to twelve MCP tool calls per message.",
               };
-            if (event.toolName === "mcp__leolab__request_media") {
+            {
               try {
-                onWriteAttempt();
+                homeWriteGuard.before(event.toolName, event.input);
+                recordWrite(event.toolName, event.input, onWriteAttempt);
               } catch {
                 return {
                   block: true,
                   reason:
-                    "The request cannot be submitted because its durable receipt could not be saved. Do not retry this request.",
+                    "The change is blocked because a previous device command is pending/uncertain or its durable receipt could not be saved. Read current state; do not retry this change in this request.",
                 };
               }
             }
           });
+          pi.on("tool_result", (event) => {
+            homeWriteGuard.after(event.toolName, event.structuredContent);
+          });
           pi.on("turn_start", (_event, ctx) => {
-            if (toolCalls > 8) ctx.abort();
+            if (toolCalls > maxToolCalls) ctx.abort();
           });
         },
       ],
@@ -300,6 +309,7 @@ export class PiAssistant {
       tools: token
         ? [
             ...allowedTools,
+            "connect_mcp",
             "react_to_message",
             "telegram_buttons",
             "telegram_cards",
@@ -325,14 +335,14 @@ export class PiAssistant {
       const deadline = Date.now() + 15000;
       while (
         token &&
-        !session.getActiveToolNames().includes("mcp__leolab__search_media") &&
+        !session.getActiveToolNames().includes("mcp__leolab__whoami") &&
         Date.now() < deadline
       ) {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
       if (
         token &&
-        !session.getActiveToolNames().includes("mcp__leolab__search_media")
+        !session.getActiveToolNames().includes("mcp__leolab__whoami")
       )
         throw new Error(
           "MCP lookup tools are unavailable; check the assistant OAuth connection",

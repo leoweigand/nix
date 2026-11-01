@@ -13,9 +13,16 @@ import { readJson, writeJson } from "./storage.ts";
 export const issuer = "https://auth.leolab.party";
 export const resource = "https://mcp.leolab.party/mcp";
 export const clientId = "leolab-mcp-telegram";
-export const scopes = "openid offline_access lab:read media:read media:request";
+export const scopes =
+  "openid offline_access lab:read media:read media:request home:read home:control";
 export const callbackPath = "/assistant/oauth/callback";
-const permissionScopes = ["lab:read", "media:read", "media:request"];
+const permissionScopes = [
+  "lab:read",
+  "media:read",
+  "media:request",
+  "home:read",
+  "home:control",
+];
 interface Pending {
   telegramId: string;
   expiresAt: number;
@@ -85,7 +92,7 @@ export class Connections {
       payload.sub !== this.options.subject ||
       payload.client_id !== clientId ||
       typeof payload.scope !== "string" ||
-      !permissionScopes.every((scope) =>
+      !permissionScopes.some((scope) =>
         payload.scope!.toString().split(" ").includes(scope),
       )
     )

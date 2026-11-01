@@ -116,7 +116,142 @@ in
         apiKeyReference = "op://Homelab/OpenCode Zen/credential";
       };
 
-      mcp.enable = true;
+      mcp = {
+        enable = true;
+        home = {
+          enable = true;
+          tokenReference = "op://Homelab/MCP Server/HA_TOKEN";
+          entities = [
+            {
+              entityId = "light.outlet_1";
+              name = "Bedroom stand lamp";
+              room = "Bedroom";
+              aliases = [ "bedroom floor lamp" ];
+              actions = [
+                "turn_on"
+                "turn_off"
+                "set_brightness"
+              ];
+            }
+            {
+              entityId = "light.outlet_2";
+              name = "Studio stand lamp";
+              room = "Studio";
+              aliases = [ "studio floor lamp" ];
+              actions = [
+                "turn_on"
+                "turn_off"
+                "set_brightness"
+              ];
+            }
+            {
+              entityId = "light.hue_white_color_05";
+              name = "Back hall light";
+              room = "Back Hall";
+              aliases = [ "back hallway" ];
+              actions = [
+                "turn_on"
+                "turn_off"
+                "set_brightness"
+              ];
+            }
+            {
+              entityId = "light.hue_white_06";
+              name = "Bedroom ceiling light";
+              room = "Bedroom";
+              aliases = [ ];
+              actions = [
+                "turn_on"
+                "turn_off"
+                "set_brightness"
+              ];
+            }
+            {
+              entityId = "light.hue_white_07";
+              name = "Entrance hall light";
+              room = "Entrance";
+              aliases = [
+                "entrance hall"
+                "front hall"
+                "hallway entrance"
+              ];
+              actions = [
+                "turn_on"
+                "turn_off"
+                "set_brightness"
+              ];
+            }
+            {
+              entityId = "light.hue_white_08";
+              name = "Studio ceiling light";
+              room = "Studio";
+              aliases = [ ];
+              actions = [
+                "turn_on"
+                "turn_off"
+                "set_brightness"
+              ];
+            }
+            {
+              entityId = "light.dining_light_group";
+              name = "Dining lights";
+              room = "Living Room";
+              aliases = [ "dining room" ];
+              actions = [
+                "turn_on"
+                "turn_off"
+                "set_brightness"
+              ];
+            }
+            {
+              entityId = "light.ambient_light_pair";
+              name = "Ambient lights";
+              room = "Living Room";
+              aliases = [ ];
+              actions = [
+                "turn_on"
+                "turn_off"
+                "set_brightness"
+              ];
+            }
+            {
+              entityId = "light.leo_desk_lamp_light";
+              name = "Desk lamp";
+              room = "Studio";
+              aliases = [ "Leo desk lamp" ];
+              actions = [
+                "turn_on"
+                "turn_off"
+                "set_brightness"
+              ];
+            }
+            {
+              entityId = "cover.ikea_blind_block_out_01";
+              name = "Bedroom blind";
+              room = "Bedroom";
+              aliases = [ "blackout blind" ];
+              actions = [
+                "open"
+                "close"
+                "stop"
+                "set_position"
+              ];
+            }
+            {
+              entityId = "cover.ikea_blind_see_through_02";
+              name = "Studio blind";
+              room = "Studio";
+              aliases = [ ];
+              actions = [
+                "open"
+                "close"
+                "stop"
+                "set_position"
+              ];
+            }
+          ];
+        };
+      };
       assistant = {
         enable = true;
         botUsername = "purrmeister_bot";
