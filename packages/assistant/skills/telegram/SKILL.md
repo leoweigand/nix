@@ -67,6 +67,6 @@ Map the content selected under the system's media guidance into these fields:
 
 - `poster`: the supplied `images.poster.url`, when present.
 - `text`: the title and year in bold, followed by the concise description, useful facts and library/request status. Do not repeat the poster URL in the text.
-- `buttons`: the individual actions to offer for this result. A choice button sends its visible label as the next user message, so the label must fully describe the action and identify the film, for example `Request Dune (2021)`.
+- `buttons`: the individual actions to offer for this result. A choice button sends its visible label as the next user message, so the label must fully describe the action and identify the film, for example `Download Dune (2021)`.
 
 Use `telegram_buttons` to attach choices or HTTPS links to an ordinary text reply. Buttons appear below that reply's text. Use `telegram_cards` for per-card buttons rather than combining it with `telegram_buttons`.
