@@ -756,6 +756,8 @@ test("assistant ephemeral replies are restricted to the owner in a different cha
         to,
         message: "private",
         ephemeral_receiver: receiver,
+        message_id: 17,
+        message_thread_id: 9,
       }),
     });
   assert((await t.handler(request("group", "999"))).status === 400);
@@ -765,7 +767,9 @@ test("assistant ephemeral replies are restricted to the owner in a different cha
   const body = JSON.parse(String(t.calls[0].init?.body));
   assert(
     body.chat_id === "-456" &&
-      body.ephemeral_message_parameters.receiver_user_id === 123,
+      body.ephemeral_message_parameters.receiver_user_id === 123 &&
+      body.reply_parameters === undefined &&
+      body.message_thread_id === 9,
   );
 });
 

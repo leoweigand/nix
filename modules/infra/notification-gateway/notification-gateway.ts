@@ -927,7 +927,8 @@ async function handleAssistantReply(
                     receiver_user_id: Number(value.ephemeral_receiver),
                   },
                 }),
-            ...(value.message_id === undefined
+            ...(value.message_id === undefined ||
+            value.ephemeral_receiver !== undefined
               ? {}
               : {
                   reply_parameters: {
