@@ -46,7 +46,9 @@ in
     chatModels = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [
+        "beam-free"
         "glm-5.3"
+        "glm-5.3-flash"
         "deepseek-v4.1-flash"
         "kimi-k3"
         "deepseek-v4-pro"
