@@ -40,19 +40,26 @@ isolation, atomic writes and TCP denial on Linux.
 
 ## MCP tools
 
-`homelab.infra.mcp` runs private, authenticated MCP tools on Picard at
-`https://mcp.leolab.party/mcp`. Pocket ID issues user-delegated access tokens
-for this resource; every MCP request requires `lab:read`, including Tailscale
-requests. The Codex client is restricted to the `admins` group and uses PKCE.
+`homelab.infra.mcp` runs private MCP tools at `https://mcp.leolab.party/mcp`.
+Pocket ID authenticates every request. `media:read` grants catalog search and
+media details; `media:request` grants acquisition requests. The Codex client
+requires PKCE and the `admins` group. `lab:read` remains for identity diagnostics.
 
-`modules/infra/mcp/` provides `whoami` and `get_lab_status`, using the official
-TypeScript MCP SDK v2, the existing locked Node automation package, and the
-Landlock launcher. The fixed health checks cover Pocket ID discovery and the
-AI/notification gateway process health endpoints, with no notifications or model
-calls. No application secrets or persistent state are required. The private
-Caddy route allows LAN, Tailscale and loopback clients; the backend binds only to
-loopback. See the [MCP runbook](../homelab/docs/mcp.md) for client setup,
-authentication details, provisioning and verification.
+`modules/infra/mcp/` provides `whoami`, `search_media`, `get_media_details` and
+`request_media` using the official TypeScript MCP SDK v2. Media tools talk to
+Sonarr and Radarr over fixed loopback APIs. HD is the default; other configured
+profile names can be selected explicitly. TV requests monitor only aired
+episodes in explicit seasons, with future monitoring disabled for new shows.
+Existing quality profiles and monitoring outside the selection are preserved.
+These requests bypass Seerr's request history and approval workflow.
+
+The existing locked Node automation package and Landlock launcher restrict file
+access and TCP ports. Arr API keys come from systemd credential copies of their
+existing XML configurations, never from the Nix store. No persistent request
+database or media filesystem access is needed. The private Caddy route permits
+LAN, Tailscale and loopback callers; the backend binds only to loopback. See the
+[MCP runbook](../homelab/docs/mcp.md) for schemas, scope provisioning, limitations,
+client setup and verification.
 
 ## Machines
 - **picard (NixOS VM on laforge)**: Runs the homelab edge (reverse proxy, DNS), plus apps (Immich, Paperless-ngx, etc.). Laforge is the Unraid host with the storage array and SSD cache drives.
