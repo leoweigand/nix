@@ -231,6 +231,8 @@ in
       })
       (lib.mkIf llmEnabled {
         environment = llmEnv;
+        # Node's JIT, TypeScript loader and HTTP parser require executable memory.
+        serviceConfig.MemoryDenyWriteExecute = lib.mkForce false;
         # The post-consume Node process uses V8's memory-protection keys.
         serviceConfig.SystemCallFilter = lib.mkAfter [
           "pkey_alloc"
@@ -249,6 +251,8 @@ in
       })
       (lib.mkIf llmEnabled {
         environment = llmEnv;
+        # Node's JIT, TypeScript loader and HTTP parser require executable memory.
+        serviceConfig.MemoryDenyWriteExecute = lib.mkForce false;
         # The post-consume Node process uses V8's memory-protection keys.
         serviceConfig.SystemCallFilter = lib.mkAfter [
           "pkey_alloc"

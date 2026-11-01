@@ -26,7 +26,7 @@ writeShellApplication {
     # Landlock also constrains SQLite and children, without changing the worker's namespaces.
     policy=(
       --rox /nix/store --ro /etc/resolv.conf --ro /etc/nsswitch.conf
-      --ro /etc/hosts --ro /dev/urandom --ro /proc/self --ro /proc/meminfo --ro /proc/cpuinfo
+      --ro /etc/hosts --ro /dev/urandom --ro /proc/self
       --env SSL_CERT_FILE=${cacert}/etc/ssl/certs/ca-bundle.crt
       ${lib.concatMapStringsSep "\n" (flag "--ro") readPaths}
       ${lib.concatMapStringsSep "\n" (flag "--rw") writePaths}
@@ -34,6 +34,12 @@ writeShellApplication {
       ${lib.concatMapStringsSep "\n" (flag "--connect-tcp") connectPorts}
       ${lib.concatMapStringsSep "\n" (flag "--bind-tcp") bindPorts}
     )
+    # ProcSubset=pid (e.g. Paperless) omits machine-wide proc files entirely.
+    for proc_file in /proc/meminfo /proc/cpuinfo; do
+      if [[ -e "$proc_file" ]]; then
+        policy+=(--ro "$proc_file")
+      fi
+    done
     ${lib.concatMapStringsSep "\n" (credential: ''
       policy+=(--ro "''${CREDENTIALS_DIRECTORY:?}/${credential}")
     '') credentialNames}
