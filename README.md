@@ -101,6 +101,16 @@ selected presentation skill is `packages/assistant/skills/telegram/SKILL.md`.
 After committing edits, `node packages/assistant/scripts/sync-instructions.ts`
 updates the runtime bundle without a rebuild; new sessions load the new version.
 
+The source supports one result card per film through `telegram_cards`, with
+public MCP artwork, concise metadata and independent request choices. Delivery
+progress is persisted per card; retries resume at the first unconfirmed card.
+Choices are single-use per card, allowing different films from one search to be
+requested individually. New-session and compaction notices are prepended to the
+answer, including when a notification opened the session. A delayed 👀 reaction
+acknowledges answers taking more than two seconds; fast answers skip it.
+These presentation changes are awaiting instruction review and deployment;
+the live worker and synced instruction bundle have not been updated.
+
 Landlock and systemd restrict the worker to its state directory, read-only
 instruction bundle and declared network ports. Its process never receives the Telegram bot token. The inbox,
 private OAuth credentials and transcripts live under
