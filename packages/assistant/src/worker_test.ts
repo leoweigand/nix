@@ -28,6 +28,7 @@ function fixture() {
   const modelCalls: { job: ConversationMessage; token?: string }[] = [];
   let needsConnection = true;
   let writes = false;
+  let react = false;
   const options = {
     secret: "test-secret",
     sessions,
@@ -52,9 +53,11 @@ function fixture() {
         _ref: SessionRef,
         credential?: string,
         onWrite?: () => void,
+        onReact?: (emoji: string) => Promise<void>,
       ) => {
         modelCalls.push({ job: { ...job }, token: credential });
         if (writes) onWrite?.();
+        if (react) await onReact?.("👍");
         return {
           text: "Dune (2021), available",
           needsConnection: !credential && needsConnection,
@@ -91,10 +94,32 @@ function fixture() {
     write: () => {
       writes = true;
     },
+    react: () => {
+      react = true;
+    },
     cleanup: () => rmSync(directory, { recursive: true, force: true }),
   };
 }
-test("a media request gets a DM link, persists while waiting and resumes in its original group topic", async () => {
+test("the reaction tool is bound to the incoming message and conversation", async () => {
+  const f = fixture();
+  try {
+    f.casual();
+    f.react();
+    f.inbox.enqueue(f.job(7, true));
+    await new Worker(f.options).drain();
+    assert.deepEqual(
+      f.messages.find((m) => m.endpoint === "/v1/reactions")?.body,
+      {
+        to: "group",
+        message_id: 7,
+        emoji: "👍",
+      },
+    );
+  } finally {
+    f.cleanup();
+  }
+});
+test("a media request gets a private group link, persists while waiting and resumes in its original group topic", async () => {
   const f = fixture();
   try {
     f.inbox.enqueue(f.job(1, true));
@@ -105,10 +130,9 @@ test("a media request gets a DM link, persists while waiting and resumes in its 
         message.endpoint !== "/v1/typing" &&
         !String(message.body.message).startsWith("New session"),
     );
-    assert.equal(delivered[0].body.to, "leo");
+    assert.equal(delivered[0].body.to, "group");
+    assert.equal(delivered[0].body.ephemeral_receiver, "123");
     assert.match(delivered[0].body.message, /state=private/);
-    assert.equal(delivered[1].body.to, "group");
-    assert.doesNotMatch(delivered[1].body.message, /state=private/);
     await new Worker(f.options).drain();
     assert.equal(f.modelCalls.length, 1);
     assert.equal(
@@ -117,7 +141,7 @@ test("a media request gets a DM link, persists while waiting and resumes in its 
           message.endpoint !== "/v1/typing" &&
           !String(message.body.message).startsWith("New session"),
       ).length,
-      2,
+      1,
     );
     const worker = new Worker(f.options);
     assert.equal(
@@ -162,7 +186,13 @@ test("ordinary conversation needs no OAuth and explicit /connect sends a private
       f.messages
         .filter((m) => String(m.body.message).includes("state=private"))
         .at(-1)?.body.to,
-      "leo",
+      "group",
+    );
+    assert.equal(
+      f.messages
+        .filter((m) => String(m.body.message).includes("state=private"))
+        .at(-1)?.body.ephemeral_receiver,
+      "123",
     );
   } finally {
     f.cleanup();

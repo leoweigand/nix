@@ -646,6 +646,37 @@ test("assistant replies require their secret and preserve message and topic rout
   );
 });
 
+test("assistant ephemeral replies are restricted to the owner in a different chat", async () => {
+  const t = handler(
+    config({
+      assistantEnabled: true,
+      destinations: new Map([
+        ["leo", "123"],
+        ["group", "-456"],
+      ]),
+    }),
+  );
+  const request = (to: string, receiver: string) =>
+    new Request("http://gateway/v1/assistant-replies", {
+      method: "POST",
+      body: JSON.stringify({
+        secret: "test-webhook-secret",
+        to,
+        message: "private",
+        ephemeral_receiver: receiver,
+      }),
+    });
+  assert((await t.handler(request("group", "999"))).status === 400);
+  assert((await t.handler(request("leo", "123"))).status === 400);
+  assert(t.calls.length === 0);
+  assert((await t.handler(request("group", "123"))).status === 204);
+  const body = JSON.parse(String(t.calls[0].init?.body));
+  assert(
+    body.chat_id === "-456" &&
+      body.ephemeral_message_parameters.receiver_user_id === 123,
+  );
+});
+
 test("the startup environment enables forwarding of an untagged private DM", async () => {
   const values = {
     TELEGRAM_BOT_TOKEN: "test-token",

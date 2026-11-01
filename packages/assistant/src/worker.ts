@@ -145,14 +145,18 @@ export class Worker {
     // The allowlisted owner's private destination is never selected from model output.
     await this.options.gateway("/v1/assistant-replies", {
       secret: this.options.secret,
-      to: "leo",
+      to: job.chatId === job.senderId ? "leo" : job.destination,
       message: `Connect your Pocket ID account so I can search and request media for you:\n${url}\n\nThis link expires in 10 minutes. After you approve, I'll continue your pending request. Send /connect for a new link if it expires.`,
+      ...(job.chatId === job.senderId
+        ? {}
+        : {
+            ephemeral_receiver: job.senderId,
+            message_id: job.messageId,
+            ...(job.topicId === undefined
+              ? {}
+              : { message_thread_id: job.topicId }),
+          }),
     });
-    if (job.chatId !== job.senderId)
-      await this.reply(
-        job,
-        "I've sent you a private sign-in link. I'll continue this request here after you connect.",
-      );
     job.authNoticeSent = true;
     this.options.inbox.save(job);
   }
@@ -281,6 +285,12 @@ export class Worker {
             job.writeAttempted = true;
             this.options.inbox.save(job);
           },
+          async (emoji) =>
+            this.options.gateway("/v1/reactions", {
+              to: job.destination,
+              message_id: job.messageId,
+              emoji,
+            }),
         );
         needsConnection = result.needsConnection;
         if (!needsConnection) {

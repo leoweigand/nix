@@ -38,6 +38,9 @@ export class PiAssistant {
     ref: SessionRef,
     token?: string,
     onWriteAttempt: () => void = () => {},
+    react: (emoji: string) => Promise<void> = async () => {
+      throw new Error("Reaction unavailable");
+    },
   ): Promise<{ text: string; needsConnection: boolean; compacted?: boolean }> {
     const agentDir = join(this.stateDir, "agents", "runtime");
     const cwd = join(this.stateDir, "workspace");
@@ -127,6 +130,22 @@ export class PiAssistant {
             ]
           : []),
         (pi) => {
+          pi.registerTool({
+            name: "react_to_message",
+            label: "React to message",
+            description:
+              "Set one Telegram emoji reaction on the current user's message. Provide the emoji as text.",
+            parameters: Type.Object({
+              emoji: Type.String({ minLength: 1, maxLength: 32 }),
+            }),
+            execute: async (_id, args) => {
+              await react(args.emoji);
+              return {
+                content: [{ type: "text", text: "Reaction sent." }],
+                details: {},
+              };
+            },
+          });
           if (!token)
             pi.registerTool({
               name: "connect_mcp",
@@ -149,6 +168,7 @@ export class PiAssistant {
             });
           pi.on("tool_call", (event) => {
             if (!token && event.toolName === "connect_mcp") return;
+            if (event.toolName === "react_to_message") return;
             if (!allowedTools.includes(event.toolName) || ++toolCalls > 8)
               return {
                 block: true,
@@ -181,7 +201,9 @@ export class PiAssistant {
       modelRuntime,
       model,
       thinkingLevel: "off",
-      tools: token ? allowedTools : ["connect_mcp"],
+      tools: token
+        ? [...allowedTools, "react_to_message"]
+        : ["connect_mcp", "react_to_message"],
       resourceLoader: loader,
       sessionManager,
       settingsManager,

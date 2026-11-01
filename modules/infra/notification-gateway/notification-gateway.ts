@@ -797,7 +797,14 @@ async function handleAssistantReply(
         (!Number.isSafeInteger(value.message_id) ||
           (value.message_id as number) < 1)) ||
       (value.message_thread_id !== undefined &&
-        !Number.isSafeInteger(value.message_thread_id))
+        !Number.isSafeInteger(value.message_thread_id)) ||
+      (value.ephemeral_receiver !== undefined &&
+        (typeof value.ephemeral_receiver !== "string" ||
+          value.ephemeral_receiver !== config.destinations.get("leo") ||
+          !/^\d+$/.test(value.ephemeral_receiver) ||
+          !/^-\d+$/.test(chatId) ||
+          chatId === value.ephemeral_receiver ||
+          !Number.isSafeInteger(Number(value.ephemeral_receiver))))
     )
       return new Response(null, { status: 400 });
     const characters = Array.from(value.message);
@@ -810,6 +817,13 @@ async function handleAssistantReply(
           body: JSON.stringify({
             chat_id: chatId,
             text: characters.slice(offset, offset + 3500).join(""),
+            ...(value.ephemeral_receiver === undefined
+              ? {}
+              : {
+                  ephemeral_message_parameters: {
+                    receiver_user_id: Number(value.ephemeral_receiver),
+                  },
+                }),
             ...(value.message_id === undefined
               ? {}
               : {
