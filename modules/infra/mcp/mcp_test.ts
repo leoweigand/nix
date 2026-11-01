@@ -4,7 +4,7 @@ import { createServer, request as httpRequest, type Server } from "node:http";
 import { generateKeyPair, exportJWK, SignJWT } from "jose";
 import { createApp } from "./server.ts";
 import { createVerifier } from "./auth.ts";
-import { getLabStatus } from "./status.ts";
+import { MediaService } from "./media.ts";
 
 const resource = "https://mcp.example.test/mcp";
 const issuer = "https://auth.example.test";
@@ -45,16 +45,12 @@ before(async () => {
     {
       resource,
       issuer,
-      checks: [
-        {
-          name: "gateway",
-          url: `${upstreamBase}/health`,
-          expectedStatus: 204,
-          verifies: "process health",
-        },
-      ],
     },
     createVerifier(issuer, resource, `${upstreamBase}/jwks`),
+    new MediaService({
+      sonarr: { url: upstreamBase, apiKey: "fixture", rootFolder: "/tv" },
+      radarr: { url: upstreamBase, apiKey: "fixture", rootFolder: "/movies" },
+    }),
   );
   base = await listen(app.server);
 });
@@ -183,64 +179,37 @@ test("authenticated MCP handshake, tool discovery and calls", async () => {
   assert.equal(init.serverInfo.name, "leolab");
   const tools = await rpc("tools/list");
   assert.deepEqual(tools.tools.map((x: { name: string }) => x.name).sort(), [
-    "get_lab_status",
+    "get_media_details",
+    "request_media",
+    "search_media",
     "whoami",
   ]);
   const identity = await rpc("tools/call", { name: "whoami", arguments: {} });
   assert.equal(identity.structuredContent.subject, "leo-id");
   assert.equal(identity.structuredContent.clientId, "codex");
   assert(!JSON.stringify(identity).includes(accessToken));
-  const status = await rpc("tools/call", {
-    name: "get_lab_status",
-    arguments: {},
+  const denied = await request("/mcp", accessToken, {
+    jsonrpc: "2.0",
+    id: 2,
+    method: "tools/call",
+    params: { name: "request_media", arguments: { mediaId: "movie:tmdb:100" } },
   });
-  assert.equal(status.structuredContent.healthy, true);
-  const bad = await rpc("tools/call", {
-    name: "get_lab_status",
-    arguments: { url: "http://evil.test" },
+  assert.equal(denied.status, 403);
+  assert.match(denied.headers.get("www-authenticate")!, /media:request/);
+  const reader = await token({ scope: "media:read" });
+  const readOnly = await request("/mcp", reader, {
+    jsonrpc: "2.0",
+    id: 3,
+    method: "tools/call",
+    params: { name: "request_media", arguments: { mediaId: "movie:tmdb:100" } },
   });
-  assert.equal(bad.isError, true);
-});
-test("health checks distinguish HTTP failure, redirects, timeout and bad discovery", async () => {
-  const result = await getLabStatus(
-    [
-      {
-        name: "ok",
-        url: `${upstreamBase}/health`,
-        expectedStatus: 204,
-        verifies: "process",
-      },
-      {
-        name: "failed",
-        url: `${upstreamBase}/failed`,
-        expectedStatus: 204,
-        verifies: "process",
-      },
-      {
-        name: "redirect",
-        url: `${upstreamBase}/redirect`,
-        expectedStatus: 204,
-        verifies: "process",
-      },
-      {
-        name: "slow",
-        url: `${upstreamBase}/slow`,
-        expectedStatus: 204,
-        verifies: "process",
-      },
-      {
-        name: "bad-discovery",
-        url: `${upstreamBase}/jwks`,
-        expectedStatus: 200,
-        verifies: "discovery",
-        issuer,
-      },
-    ],
-    100,
-  );
-  assert.deepEqual(
-    result.services.map((x) => x.status),
-    ["healthy", "unhealthy", "unhealthy", "unreachable", "unhealthy"],
-  );
-  assert.equal(result.services[3].reason, "timeout");
+  assert.equal(readOnly.status, 403);
+  const bad = await request("/mcp", await token({ scope: "media:request" }), {
+    jsonrpc: "2.0",
+    id: 4,
+    method: "tools/call",
+    params: { name: "request_media", arguments: { mediaId: "tv:tvdb:200" } },
+  });
+  assert.equal(bad.status, 200);
+  assert.match(await bad.text(), /isError/);
 });

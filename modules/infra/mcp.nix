@@ -10,7 +10,19 @@ let
   launcher = pkgs.callPackage ../../packages/automation/launcher.nix { } {
     name = "leolab-mcp";
     script = "modules/infra/mcp/main.ts";
-    environmentNames = [ "MCP_CONFIG" ];
+    environmentNames = [
+      "MCP_CONFIG"
+      "CREDENTIALS_DIRECTORY"
+    ];
+    credentialNames = [
+      "sonarr-config"
+      "radarr-config"
+    ];
+    connectPorts = [
+      443
+      8989
+      7878
+    ];
     bindPorts = [ cfg.port ];
   };
   policy = pkgs.writeText "leolab-mcp.json" (
@@ -18,27 +30,16 @@ let
       inherit (cfg) port;
       resource = "https://${host}/mcp";
       issuer = cfg.issuer;
-      checks = [
-        {
-          name = "pocket-id";
-          url = "${cfg.issuer}/.well-known/openid-configuration";
-          expectedStatus = 200;
-          issuer = cfg.issuer;
-          verifies = "OIDC discovery document; does not test passkey sign-in";
-        }
-        {
-          name = "ai-gateway";
-          url = "https://ai.internal.${config.homelab.baseDomain}/healthz";
-          expectedStatus = 204;
-          verifies = "HTTP process health; does not invoke an upstream model";
-        }
-        {
-          name = "notification-gateway";
-          url = "https://notifications.${config.homelab.baseDomain}/healthz";
-          expectedStatus = 204;
-          verifies = "HTTP process health; does not test Telegram delivery";
-        }
-      ];
+      media = {
+        sonarr = {
+          url = "http://127.0.0.1:8989";
+          rootFolder = "/media/library/tv";
+        };
+        radarr = {
+          url = "http://127.0.0.1:7878";
+          rootFolder = "/media/library/films";
+        };
+      };
     }
   );
 in
@@ -57,8 +58,11 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
-        assertion = config.homelab.infra.edge.enable;
-        message = "LeoLab MCP requires the HTTPS edge";
+        assertion =
+          config.homelab.infra.edge.enable
+          && config.homelab.apps.sonarr.enable
+          && config.homelab.apps.radarr.enable;
+        message = "LeoLab MCP requires the HTTPS edge, Sonarr and Radarr";
       }
     ];
     homelab.infra.edge.privateProxies.mcp = {
@@ -74,11 +78,19 @@ in
       wantedBy = [ "multi-user.target" ];
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
+      unitConfig.RequiresMountsFor = [
+        config.homelab.apps.sonarr.dataDir
+        config.homelab.apps.radarr.dataDir
+      ];
       environment = {
         MCP_CONFIG = toString policy;
       };
       serviceConfig = {
         ExecStart = "${launcher}/bin/leolab-mcp";
+        LoadCredential = [
+          "sonarr-config:${config.homelab.apps.sonarr.dataDir}/config.xml"
+          "radarr-config:${config.homelab.apps.radarr.dataDir}/config.xml"
+        ];
         DynamicUser = true;
         Restart = "on-failure";
         RestartSec = "5s";

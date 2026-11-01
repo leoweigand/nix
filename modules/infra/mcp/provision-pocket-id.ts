@@ -4,8 +4,9 @@ import { execFileSync } from "node:child_process";
 const key = execFileSync(
   "op",
   [
-    "--account",
-    "my.1password.eu",
+    ...(process.env.OP_SERVICE_ACCOUNT_TOKEN
+      ? []
+      : ["--account", "my.1password.eu"]),
     "read",
     "op://Homelab/Pocket ID API Key/credential",
   ],
@@ -32,28 +33,44 @@ if (!entry)
   entry = await api("/apis", "POST", { name: "LeoLab MCP", resource });
 if (entry.name !== "LeoLab MCP")
   throw new Error("Resource exists with a different owner name");
-if (!entry.permissions.some((p: { key: string }) => p.key === "lab:read")) {
-  entry = await api(`/apis/${entry.id}/permissions`, "PUT", {
-    permissions: [
-      ...entry.permissions.map(
-        (p: { key: string; name: string; description?: string }) => ({
-          key: p.key,
-          name: p.name,
-          description: p.description ?? null,
-        }),
-      ),
-      {
-        key: "lab:read",
-        name: "Read lab status",
-        description:
-          "Inspect caller identity and HTTP health of fixed lab services",
-      },
-    ],
-  });
-}
-const permissionId = entry.permissions.find(
-  (p: { key: string }) => p.key === "lab:read",
-).id;
+const permissions = [
+  {
+    key: "lab:read",
+    name: "Inspect caller identity",
+    description: "Read the authenticated caller identity",
+  },
+  {
+    key: "media:read",
+    name: "Search and inspect media",
+    description: "Search movies and TV shows and inspect library status",
+  },
+  {
+    key: "media:request",
+    name: "Request media",
+    description:
+      "Add movies and aired TV episodes, monitor them and start download searches",
+  },
+];
+entry = await api(`/apis/${entry.id}/permissions`, "PUT", {
+  permissions: [
+    ...entry.permissions
+      .filter(
+        (p: { key: string }) =>
+          !permissions.some((permission) => permission.key === p.key),
+      )
+      .map((p: { key: string; name: string; description?: string }) => ({
+        key: p.key,
+        name: p.name,
+        description: p.description ?? null,
+      })),
+    ...permissions,
+  ],
+});
+const permissionIds = entry.permissions
+  .filter((p: { key: string }) =>
+    permissions.some((permission) => permission.key === p.key),
+  )
+  .map((p: { id: string }) => p.id);
 const clientId = "leolab-mcp-codex";
 const clients = await api("/oidc/clients?pagination%5Blimit%5D=100");
 const existing = clients.data.find(
@@ -89,7 +106,7 @@ await api(`/oidc/clients/${clientId}/allowed-user-groups`, "PUT", {
 await api(`/apis/${entry.id}/clients/${clientId}`, "PUT", {
   userDelegatedAccess: true,
   clientAccess: false,
-  userDelegatedPermissionIds: [permissionId],
+  userDelegatedPermissionIds: permissionIds,
   clientPermissionIds: [],
 });
 console.log(
@@ -97,7 +114,7 @@ console.log(
     resource,
     apiId: entry.id,
     clientId,
-    permission: "lab:read",
+    permissions: permissions.map((p) => p.key),
     callback: "http://127.0.0.1:47831/callback",
   }),
 );

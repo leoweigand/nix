@@ -2,28 +2,35 @@ import { createServer, type IncomingMessage } from "node:http";
 import {
   createMcpHandler,
   McpServer,
+  requireScopes,
   type AuthInfo,
 } from "@modelcontextprotocol/server";
 import { toNodeHandler } from "@modelcontextprotocol/node";
 import { z } from "zod";
-import { getLabStatus, type Check } from "./status.ts";
+import {
+  MediaService,
+  MediaError,
+  searchSchema,
+  detailsSchema,
+  requestSchema,
+} from "./media.ts";
 
 export interface Config {
   resource: string;
   issuer: string;
-  checks: Check[];
 }
 
 export function createApp(
   config: Config,
   verify: (token: string) => Promise<AuthInfo>,
+  media: MediaService,
 ) {
   const canonical = new URL(config.resource);
   const metadataUrl = `${canonical.origin}/.well-known/oauth-protected-resource${canonical.pathname}`;
   const mcp = createMcpHandler(
     ({ authInfo }) => {
       if (!authInfo) throw new Error("Missing authenticated context");
-      const server = new McpServer({ name: "leolab", version: "0.1.0" });
+      const server = new McpServer({ name: "leolab", version: "0.2.0" });
       const annotations = {
         readOnlyHint: true,
         destructiveHint: false,
@@ -46,7 +53,7 @@ export function createApp(
         "whoami",
         {
           description:
-            "Show the verified OAuth subject, client, and granted scopes. No credentials are returned.",
+            "Return the authenticated caller’s OAuth subject, client ID, issuer, and granted permissions. Does not expose credentials or change any state.",
           inputSchema: z.object({}).strict(),
           annotations,
         },
@@ -64,27 +71,126 @@ export function createApp(
           };
         },
       );
-      server.registerTool(
-        "get_lab_status",
-        {
-          description:
-            "Check fixed Picard service endpoints. Reports process/HTTP health, not end-to-end inference or notification delivery. No input is required.",
-          inputSchema: z.object({}).strict(),
-          annotations,
-        },
-        async () => {
-          const started = performance.now();
-          const output = await getLabStatus(config.checks);
-          audit(
-            "get_lab_status",
-            started,
-            output.healthy ? "healthy" : "degraded",
+      const run = async (
+        tool: string,
+        scope: string,
+        operation: (signal: AbortSignal) => Promise<Record<string, unknown>>,
+        info: Record<string, unknown> = {},
+        cancelled?: AbortSignal,
+      ) => {
+        const started = performance.now();
+        if (!authInfo.scopes.includes(scope))
+          return {
+            isError: true,
+            content: [
+              { type: "text" as const, text: `Missing permission: ${scope}` },
+            ],
+          };
+        try {
+          const output = await operation(
+            AbortSignal.any([
+              AbortSignal.timeout(45_000),
+              ...(cancelled ? [cancelled] : []),
+            ]),
+          );
+          console.log(
+            JSON.stringify({
+              event: "tool_call",
+              tool,
+              subject: authInfo.extra?.subject,
+              clientId: authInfo.clientId,
+              durationMs: Math.round(performance.now() - started),
+              outcome: output.outcome ?? "success",
+              ...info,
+              ...(tool === "request_media"
+                ? {
+                    libraryChanged: output.libraryChanged,
+                    searchStarted: output.searchStarted,
+                    commandId: output.commandId,
+                  }
+                : {}),
+            }),
           );
           return {
-            content: [{ type: "text", text: JSON.stringify(output) }],
+            content: [{ type: "text" as const, text: JSON.stringify(output) }],
             structuredContent: output,
+            ...(["failed", "partial_failure"].includes(String(output.outcome))
+              ? { isError: true }
+              : {}),
           };
+        } catch (error) {
+          audit(tool, started, "failed");
+          return {
+            isError: true,
+            content: [
+              {
+                type: "text" as const,
+                text:
+                  error instanceof MediaError
+                    ? error.code
+                    : "invalid_backend_response",
+              },
+            ],
+          };
+        }
+      };
+      server.registerTool(
+        "search_media",
+        {
+          description:
+            "Search the movie and TV catalog by title. Returns matching titles with stable media IDs, release years, synopses, and current library status. Use these IDs with get_media_details or request_media. This searches for titles, not downloadable releases, and does not change the library.",
+          inputSchema: searchSchema,
+          annotations: { ...annotations, openWorldHint: true },
+          scopeChallenge: requireScopes("media:read"),
         },
+        async (input, ctx) =>
+          run(
+            "search_media",
+            "media:read",
+            (signal) => media.search(input, signal),
+            {},
+            ctx.mcpReq.signal,
+          ),
+      );
+      server.registerTool(
+        "get_media_details",
+        {
+          description:
+            "Get details for a movie or TV show using a media ID returned by search_media. Returns library and monitoring status, available quality profiles, and—for TV—season numbers with aired, available, and missing episode counts. Use this before requesting media to resolve ambiguity and choose TV seasons. Does not change the library.",
+          inputSchema: detailsSchema,
+          annotations: { ...annotations, openWorldHint: true },
+          scopeChallenge: requireScopes("media:read"),
+        },
+        async (input, ctx) =>
+          run(
+            "get_media_details",
+            "media:read",
+            (signal) => media.details(input.mediaId, signal),
+            {},
+            ctx.mcpReq.signal,
+          ),
+      );
+      server.registerTool(
+        "request_media",
+        {
+          description:
+            "Request a movie or explicitly selected TV seasons through Radarr or Sonarr. Uses the HD quality profile unless another profile returned by get_media_details is specified. For TV, monitors and searches only episodes already aired in the selected seasons; does not enable future-episode monitoring. Preserves monitoring outside the selection and does not silently change an existing title’s quality profile. Repeated requests return the existing state or request missing selections. Reports whether changes were accepted and a download search started; acceptance does not mean media is downloading or available. May initiate downloads.",
+          inputSchema: requestSchema,
+          annotations: {
+            ...annotations,
+            readOnlyHint: false,
+            openWorldHint: true,
+          },
+          scopeChallenge: requireScopes("media:request"),
+        },
+        async (input, ctx) =>
+          run(
+            "request_media",
+            "media:request",
+            (signal) => media.request(input, signal),
+            input,
+            ctx.mcpReq.signal,
+          ),
       );
       return server;
     },
@@ -128,7 +234,7 @@ export function createApp(
         json(200, {
           resource: config.resource,
           authorization_servers: [config.issuer],
-          scopes_supported: ["lab:read"],
+          scopes_supported: ["lab:read", "media:read", "media:request"],
           bearer_methods_supported: ["header"],
           resource_name: "LeoLab MCP",
         });
@@ -158,7 +264,11 @@ export function createApp(
         json(401, { error: "invalid_token" });
         return;
       }
-      if (!req.auth.scopes.includes("lab:read")) {
+      if (
+        !["lab:read", "media:read", "media:request"].some((scope) =>
+          req.auth!.scopes.includes(scope),
+        )
+      ) {
         res.setHeader(
           "WWW-Authenticate",
           `Bearer error="insufficient_scope", scope="lab:read", resource_metadata="${metadataUrl}"`,
@@ -172,7 +282,7 @@ export function createApp(
         return;
       }
       active++;
-      const deadline = setTimeout(() => res.destroy(), 15_000);
+      const deadline = setTimeout(() => res.destroy(), 60_000);
       res.once("close", () => {
         clearTimeout(deadline);
         active--;
