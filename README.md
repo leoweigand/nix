@@ -94,6 +94,12 @@ conversation works without OAuth; a request needing MCP triggers a private
 Pocket ID sign-in link and resumes after authorization. `/connect` renews or
 resends the link. The public callback is on Picard, so no Mac helper is required.
 
+The worker also has an Exa Lite web search tool, available without MCP sign-in.
+It sends queries to Exa, asks for up to five results with highlights, and limits
+each message to three searches. Opnix loads the Exa API key from
+`op://Homelab/MCP Server/EXA_API_KEY`; systemd passes it as a credential rather
+than embedding it in the Nix store. Search usage is billed against Exa credits.
+
 The dedicated Pocket ID public PKCE client has `lab:read`, `media:read` and
 `media:request`, `home:read` and `home:control` delegated permissions. Its callback verifies the token's issuer,
 audience, client ID, scopes and configured immutable owner subject before saving

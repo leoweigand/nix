@@ -24,6 +24,8 @@ let
         --ro /etc/hosts --ro /dev/urandom --ro /proc/self --ro /proc/meminfo --ro /proc/cpuinfo \
         --rw ${lib.escapeShellArg cfg.stateDir} \
         --ro ${instructionsDir} \
+        --ro "$CREDENTIALS_DIRECTORY" \
+        --env CREDENTIALS_DIRECTORY \
         --env ASSISTANT_INSTRUCTIONS_FILE=${instructionsDir}/current.json \
         --env SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt \
         --env HOME=${lib.escapeShellArg cfg.stateDir} \
@@ -73,6 +75,13 @@ in
       }
     ];
     users.groups.leolab-assistant = { };
+    services.onepassword-secrets.secrets.assistantExaApiKey = {
+      reference = "op://Homelab/MCP Server/EXA_API_KEY";
+      owner = "root";
+      group = "root";
+      mode = "0400";
+      services = [ "leolab-assistant" ];
+    };
     users.users.leolab-assistant = {
       isSystemUser = true;
       group = "leolab-assistant";
@@ -99,6 +108,7 @@ in
         User = "leolab-assistant";
         Group = "leolab-assistant";
         EnvironmentFile = config.services.onepassword-secrets.secretPaths.notificationGatewayEnv;
+        LoadCredential = [ "exa-api-key:${config.services.onepassword-secrets.secretPaths.assistantExaApiKey}" ];
         WorkingDirectory = cfg.stateDir;
         ReadWritePaths = [ cfg.stateDir ];
         Restart = "on-failure";
