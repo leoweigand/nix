@@ -15,6 +15,7 @@ let
     appdata = [
       "${mounts.fast}/appdata"
       "/var/lib/private/cloudflare-publication" # DynamicUser's persistent route ownership state
+      "/var/lib/private/leolab-mcp" # Private document ingestion receipts and expiring uploads
       "/var/lib/private/notification-gateway" # Delivered alerts waiting to enter assistant context
       "/var/lib/leolab-assistant-instructions"
     ];
@@ -118,6 +119,7 @@ in
 
       mcp = {
         enable = true;
+        documents.enable = true;
         bookmarks = {
           enable = true;
           ownerSubject = "10bca0fd-70f4-4bec-ac14-365ce6d29454";

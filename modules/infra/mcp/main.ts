@@ -1,3 +1,4 @@
+import { DocumentService } from "./documents.ts";
 import { readFileSync } from "node:fs";
 import { isElement, isText, parse } from "@std/xml";
 import { MediaService, type MediaConfig } from "./media.ts";
@@ -11,6 +12,7 @@ const config = JSON.parse(
   readFileSync(process.env.MCP_CONFIG!, "utf8"),
 ) as Config & {
   port: number;
+  documents?: { url: string; publicUrl: string; stateDir: string };
   media: MediaConfig;
   home?: HomeConfig;
   transfer?: TransferConfig;
@@ -64,6 +66,19 @@ if (config.transfer) {
     /* Missing credentials leave transfer status unknown without breaking other tools. */
   }
 }
+const documents = config.documents
+  ? new DocumentService({
+      ...config.documents,
+      token: readFileSync(
+        `${process.env.CREDENTIALS_DIRECTORY!}/paperless-token`,
+        "utf8",
+      ).trim(),
+    })
+  : undefined;
+if (documents) {
+  documents.prune();
+  setInterval(() => documents.prune(), 60_000).unref();
+}
 const media = new MediaService(config.media, { transfer });
 const app = createApp(
   config,
@@ -98,6 +113,7 @@ const app = createApp(
         ).trim(),
       })
     : undefined,
+  documents,
 );
 app.server.listen(config.port, "127.0.0.1", () =>
   console.log(JSON.stringify({ event: "listening", port: config.port })),

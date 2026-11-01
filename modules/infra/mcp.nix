@@ -7,6 +7,7 @@
 let
   cfg = config.homelab.infra.mcp;
   transferEnabled = config.homelab.apps.syncthing.enable;
+  documentEnabled = cfg.documents.enable;
   bookmarkEnabled = cfg.bookmarks.enable;
   host = "mcp.${config.homelab.baseDomain}";
   launcher = pkgs.callPackage ../../packages/automation/launcher.nix { } {
@@ -17,15 +18,18 @@ let
       "CREDENTIALS_DIRECTORY"
     ];
     credentialNames =
-      lib.optional bookmarkEnabled "linkding-token"
+      lib.optional documentEnabled "paperless-token"
+      ++ lib.optional bookmarkEnabled "linkding-token"
       ++ lib.optional cfg.home.enable "home-token"
       ++ lib.optional transferEnabled "syncthing-config"
       ++ [
         "sonarr-config"
         "radarr-config"
       ];
+    writePaths = lib.optional documentEnabled "/var/lib/leolab-mcp";
     connectPorts =
-      lib.optional bookmarkEnabled config.homelab.apps.linkding.port
+      lib.optional documentEnabled config.services.paperless.port
+      ++ lib.optional bookmarkEnabled config.homelab.apps.linkding.port
       ++ lib.optional cfg.home.enable 8123
       ++ lib.optional transferEnabled 8384
       ++ [
@@ -40,6 +44,15 @@ let
       inherit (cfg) port;
       resource = "https://${host}/mcp";
       issuer = cfg.issuer;
+      documents =
+        if documentEnabled then
+          {
+            url = "http://127.0.0.1:${toString config.services.paperless.port}";
+            publicUrl = "https://${config.homelab.apps.paperless.subdomain}.${config.homelab.baseDomain}";
+            stateDir = "/var/lib/leolab-mcp";
+          }
+        else
+          null;
       bookmarks =
         if bookmarkEnabled then
           {
@@ -83,6 +96,14 @@ in
     port = lib.mkOption {
       type = lib.types.port;
       default = 9089;
+    };
+    documents = {
+      enable = lib.mkEnableOption "admins-only Paperless document tools";
+      tokenReference = lib.mkOption {
+        type = lib.types.str;
+        default = "op://Homelab/MCP Server/LEO_PAPERLESS_TOKEN";
+        description = "Paperless API token, supplied only to MCP as a systemd credential";
+      };
     };
     bookmarks = {
       enable = lib.mkEnableOption "owner-only Linkding bookmark tools";
@@ -149,6 +170,11 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
+        assertion = !documentEnabled || config.homelab.apps.paperless.enable;
+        message = "MCP documents require Paperless";
+      }
+
+      {
         assertion =
           !bookmarkEnabled || (config.homelab.apps.linkding.enable && cfg.bookmarks.ownerSubject != "");
         message = "MCP bookmarks require Linkding and an explicit owner subject";
@@ -181,6 +207,12 @@ in
           services = [ "leolab-mcp" ];
         };
       }
+      // lib.optionalAttrs documentEnabled {
+        mcpPaperlessToken = {
+          reference = cfg.documents.tokenReference;
+          services = [ "leolab-mcp" ];
+        };
+      }
       // lib.optionalAttrs cfg.home.enable {
         mcpHomeToken = {
           reference = cfg.home.tokenReference;
@@ -193,9 +225,11 @@ in
       after = [
         "network-online.target"
       ]
-      ++ lib.optional (cfg.home.enable || bookmarkEnabled) "opnix-secrets.service";
+      ++ lib.optional (cfg.home.enable || bookmarkEnabled || documentEnabled) "opnix-secrets.service";
       wants = [ "network-online.target" ];
-      requires = lib.optional (cfg.home.enable || bookmarkEnabled) "opnix-secrets.service";
+      requires = lib.optional (
+        cfg.home.enable || bookmarkEnabled || documentEnabled
+      ) "opnix-secrets.service";
       unitConfig.RequiresMountsFor = [
         config.homelab.apps.sonarr.dataDir
         config.homelab.apps.radarr.dataDir
@@ -206,13 +240,16 @@ in
       serviceConfig = {
         ExecStart = "${launcher}/bin/leolab-mcp";
         LoadCredential =
-          lib.optional bookmarkEnabled "linkding-token:${config.services.onepassword-secrets.secretPaths.mcpLinkdingToken}"
+          lib.optional documentEnabled "paperless-token:${config.services.onepassword-secrets.secretPaths.mcpPaperlessToken}"
+          ++ lib.optional bookmarkEnabled "linkding-token:${config.services.onepassword-secrets.secretPaths.mcpLinkdingToken}"
           ++ lib.optional cfg.home.enable "home-token:${config.services.onepassword-secrets.secretPaths.mcpHomeToken}"
           ++ lib.optional transferEnabled "syncthing-config:${config.homelab.apps.syncthing.dataDir}/config.xml"
           ++ [
             "sonarr-config:${config.homelab.apps.sonarr.dataDir}/config.xml"
             "radarr-config:${config.homelab.apps.radarr.dataDir}/config.xml"
           ];
+        StateDirectory = lib.optional documentEnabled "leolab-mcp";
+        StateDirectoryMode = "0700";
         DynamicUser = true;
         Restart = "on-failure";
         RestartSec = "5s";
@@ -237,7 +274,7 @@ in
         SystemCallArchitectures = "native";
         CapabilityBoundingSet = "";
         UMask = "0077";
-        MemoryMax = "256M";
+        MemoryMax = if documentEnabled then "512M" else "256M";
         TasksMax = 64;
       };
     };

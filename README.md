@@ -98,6 +98,21 @@ credential mapping or default-account fallback exists. Results contain bookmark
 metadata and notes, not article bodies. The Telegram assistant exposes these tools
 only in private conversations and records durable receipts before saves.
 
+
+`homelab.infra.mcp.documents.enable` adds Paperless search, bounded OCR text reads,
+PDF/photo ingestion and ingestion status. Document operations require their
+`documents:read` or `documents:ingest` scope plus current `admins` membership,
+resolved from Pocket ID UserInfo using the caller's token and matching subject.
+Clients must request `openid groups`; MCP needs no Pocket ID administrative key.
+The Paperless token comes from `op://Homelab/MCP Server/LEO_PAPERLESS_TOKEN`
+through opnix/systemd credentials. A separate authenticated `/attachments` upload
+endpoint accepts at most 20 MiB and returns caller-bound opaque references.
+Private staging expires after 24 hours; durable receipts prevent upload replay
+across restarts. State lives in `/var/lib/private/leolab-mcp`, included in Picard's
+appdata backup. Telegram receives PDFs/photos only in Leo's private DM and never
+passes file bytes or Telegram credentials to the model. This implementation is
+prepared but has not yet been activated on Picard.
+
 ## Telegram assistant
 
 `homelab.infra.assistant` runs Pi 1.4.0 as a separate worker behind the existing

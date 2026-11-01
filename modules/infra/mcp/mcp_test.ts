@@ -207,6 +207,10 @@ test("OAuth discovery is available and unauthenticated calls receive a challenge
     .match(/scope="([^"]+)"/)![1]
     .split(" ");
   assert.deepEqual(scopes, [
+    "openid",
+    "groups",
+    "documents:read",
+    "documents:ingest",
     "lab:read",
     "media:read",
     "media:request",
@@ -228,7 +232,7 @@ test("rejects invalid, expired, wrong-audience and ID tokens", async () => {
     assert.equal(response.status, 401);
     assert.match(
       response.headers.get("www-authenticate")!,
-      /scope="lab:read media:read media:request home:read home:control bookmarks:read bookmarks:write"/,
+      /scope="openid groups documents:read documents:ingest lab:read media:read media:request home:read home:control bookmarks:read bookmarks:write"/,
     );
   }
   assert.equal(

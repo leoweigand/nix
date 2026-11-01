@@ -42,6 +42,18 @@ if (entry.name !== "LeoLab MCP")
   throw new Error("Resource exists with a different owner name");
 const permissions = [
   {
+    key: "documents:read",
+    name: "Read private documents",
+    description:
+      "Search and read Paperless documents; MCP also requires admins membership",
+  },
+  {
+    key: "documents:ingest",
+    name: "File private documents",
+    description:
+      "Upload PDFs/photos and inspect ingestion status; MCP also requires admins membership",
+  },
+  {
     key: "bookmarks:read",
     name: "Read personal bookmarks",
     description: "Search and inspect your own Linkding bookmarks",
