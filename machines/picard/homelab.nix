@@ -266,11 +266,23 @@ in
 
       edgeDns = {
         enable = true;
-        serial = 2026110101; # Bump whenever DNS names or values change
+        serial = 2026110201; # Bump whenever DNS names or values change
         lanListenAddress = "192.168.2.4";
         lanAnswerAddress = "192.168.2.4";
         tailnetListenAddress = "100.104.119.103";
         tailnetAnswerAddress = "100.104.119.103";
+        extraRecords = {
+          elephant = {
+            type = "A";
+            value = "192.168.2.6";
+            tailnetValue = "100.70.11.110";
+          };
+          "*.elephant" = {
+            type = "A";
+            value = "192.168.2.6";
+            tailnetValue = "100.70.11.110";
+          };
+        };
         upstreamResolvers = [
           "192.168.2.1"
         ];

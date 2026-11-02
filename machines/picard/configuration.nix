@@ -17,6 +17,7 @@ in
     ../../modules/default.nix # load shared machine and homelab modules
     ./homelab.nix
     ./rex.nix
+    ./dax.nix
   ];
 
   networking = {
