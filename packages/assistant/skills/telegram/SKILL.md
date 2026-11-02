@@ -61,12 +61,12 @@ Localized date and time: `![17 March 2022, 15:45 UTC](tg://time?unix=1647531900&
 
 Ordinary text output is delivered as one reply after the agent run finishes; intermediate assistant text is not sent to Telegram. The host prepends session/context notices to the answer and reacts with 👀 if answering takes more than three seconds. Do not duplicate those notices in your answer or send a working reaction yourself. Use `react_to_message` when a reaction is itself an appropriate response to what the user said.
 
-For film search results, use `telegram_cards` with one card per film. Each card becomes a separate Telegram message with its own buttons below it. The card list replaces ordinary text delivery; final assistant text is not sent as an additional message. Put all result content in the cards, without a separate introduction card, closing card, or explanation of where the buttons are. Calling this tool prepares the answer without sending it immediately; calling again replaces the entire list. After preparing the complete card list, finish the turn.
+For film and series search results, use `telegram_cards` with one card per title. Each card becomes a separate Telegram message with its own buttons below it. The card list replaces ordinary text delivery; final assistant text is not sent as an additional message. Put all result content in the cards, without a separate introduction card, closing card, or explanation of where the buttons are. Calling this tool prepares the answer without sending it immediately; calling again replaces the entire list. After preparing the complete card list, finish the turn.
 
 Map the content selected under the system's media guidance into these fields:
 
 - `poster`: the supplied `images.poster.url`, when present.
 - `text`: the title and year in bold, followed by the concise description, useful facts and library/request status. Do not repeat the poster URL in the text.
-- `buttons`: the individual actions to offer for this result. A choice button sends its visible label as the next user message, so the label must fully describe the action and identify the film, for example `Download Dune (2021)`.
+- `buttons`: the individual actions to offer for this result. A choice button sends its visible label as the next user message, so the label must fully describe the action and identify the title and, for a series, the season, for example `Download Dune (2021)` or `Download The Bear (2022) season 2`. Offer separate eligible season choices on the series card.
 
 Use `telegram_buttons` to attach choices or HTTPS links to an ordinary text reply. Buttons appear below that reply's text. Use `telegram_cards` for per-card buttons rather than combining it with `telegram_buttons`.
