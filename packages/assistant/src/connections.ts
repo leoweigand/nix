@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
@@ -34,6 +35,7 @@ interface Pending {
   oauth: McpOAuthState;
 }
 interface Connection {
+  revision?: string;
   telegramId: string;
   subject: string;
   oauth: McpOAuthState;
@@ -48,6 +50,17 @@ interface Options {
   now?: () => number;
 }
 export class ConnectionRequired extends Error {}
+
+// Consent changes the grant identity; routine refreshes keep it stable. Legacy
+// grants acquire a new identity on their next successful consent.
+export function connectionRevision(stateDir: string, telegramId: string) {
+  if (!/^\d+$/.test(telegramId)) throw new Error("Invalid Telegram identity");
+  return (
+    readJson<Connection>(
+      join(stateDir, "connections", telegramId, "connection.json"),
+    )?.revision ?? "legacy"
+  );
+}
 
 // One allowlisted Telegram/Pocket ID binding; the storage is already keyed by sender.
 export class Connections {
@@ -222,6 +235,7 @@ export class Connections {
         telegramId: this.options.telegramId,
         subject: this.options.subject,
         oauth: pending.oauth,
+        revision: randomUUID(),
       } satisfies Connection);
     });
   }

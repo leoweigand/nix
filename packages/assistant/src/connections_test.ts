@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
 import {
   Connections,
+  connectionRevision,
   clientId,
   issuer,
   resource,
@@ -148,12 +149,18 @@ test("OAuth binds the verified identity, persists across restarts, refreshes and
       await f.connection.begin("123"),
     );
     await f.connection.complete(callback);
+    const revision = connectionRevision(f.directory, "123");
+    assert.notEqual(revision, "legacy");
     assert.ok(await new Connections(f.options).token("123"));
+    assert.equal(connectionRevision(f.directory, "123"), revision);
     await assert.rejects(f.connection.complete(callback));
     await assert.rejects(f.connection.token("999"));
     f.advance();
     assert.ok(await f.connection.token("123"));
     assert.equal(f.refreshCalls(), 1);
+    assert.equal(connectionRevision(f.directory, "123"), revision);
+    await f.connection.complete(await f.begin());
+    assert.notEqual(connectionRevision(f.directory, "123"), revision);
     const stored = JSON.parse(
       readFileSync(
         join(f.directory, "connections/123/connection.json"),

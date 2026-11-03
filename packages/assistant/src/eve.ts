@@ -3,6 +3,7 @@ import { decodeJwt } from "jose";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { ConversationMessage } from "./conversation.ts";
+import { connectionRevision } from "./connections.ts";
 import { cardMarkdown, type ReplyCard } from "./replies.ts";
 import type { Sessions, SessionRef } from "./sessions.ts";
 import type { WriteAttempt } from "./tools.ts";
@@ -63,16 +64,22 @@ export class EveAssistant {
           (entry.details as { kind?: string })?.kind === "notification",
       )
       .map((entry) => (entry.type === "custom_message" ? entry.content : ""));
-    const grant = _token ? decodeJwt(_token) : undefined;
-    const authRevision = createHash("sha256")
-      .update(JSON.stringify([grant?.sub, grant?.scope]))
-      .digest("hex")
-      .slice(0, 12);
     const senderId = (process.env.TELEGRAM_DESTINATIONS ?? "")
       .split(",")
       .find((entry) => entry.startsWith("leo:"))
       ?.slice(4);
     if (!senderId) throw new Error("Missing Telegram sender binding");
+    const grant = _token ? decodeJwt(_token) : undefined;
+    const authRevision = createHash("sha256")
+      .update(
+        JSON.stringify([
+          grant?.sub,
+          grant?.scope,
+          _token ? connectionRevision(this.stateDir, senderId) : "disconnected",
+        ]),
+      )
+      .digest("hex")
+      .slice(0, 12);
     writeJson(join(directory, "request.json"), {
       message,
       ref,
