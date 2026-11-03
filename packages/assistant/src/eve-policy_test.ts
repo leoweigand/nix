@@ -45,3 +45,41 @@ test("a confirmed MCP result releases the home target but ingestion stays single
     "denied",
   );
 });
+
+test("Eve send waits only for an explicitly retryable unready inbox", async () => {
+  const { sendWhenReady } = await import("../agent/lib/session-ready.ts");
+  let attempts = 0;
+  const receipt = { deliveryId: "persisted-delivery" };
+  assert.equal(
+    await sendWhenReady(async () => {
+      if (++attempts < 3)
+        throw Object.assign(new Error("starting"), {
+          code: "session_not_ready",
+          retryable: true,
+        });
+      return receipt;
+    }),
+    receipt,
+  );
+  assert.equal(attempts, 3);
+  for (const error of [
+    new Error("uncertain transport failure"),
+    Object.assign(new Error("inactive"), {
+      code: "session_not_active",
+      retryable: false,
+    }),
+    Object.assign(new Error("unready without retry contract"), {
+      code: "session_not_ready",
+    }),
+  ]) {
+    let calls = 0;
+    await assert.rejects(
+      sendWhenReady(async () => {
+        calls++;
+        throw error;
+      }),
+      (candidate) => candidate === error,
+    );
+    assert.equal(calls, 1);
+  }
+});

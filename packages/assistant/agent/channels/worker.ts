@@ -1,6 +1,7 @@
 import { defineChannel, POST, GET } from "eve/channels";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { sendWhenReady } from "../lib/session-ready.ts";
 import { messageContent } from "../../src/conversation.ts";
 import { authorized } from "../../src/inbox.ts";
 import { readJson, writeJson } from "../../src/storage.ts";
@@ -64,7 +65,9 @@ export default defineChannel({
         idempotencyKey: `${eventId}:${input.authRevision ?? "initial"}`,
         context: input.context ? [JSON.stringify(input.context)] : [],
       };
-      const delivery = await session.send(messageContent(message), sendOptions);
+      const delivery = await sendWhenReady(() =>
+        session.send(messageContent(message), sendOptions),
+      );
       console.info(
         JSON.stringify({
           event: "eve_delivery_accepted",
