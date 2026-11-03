@@ -32,21 +32,32 @@ let
         --env PI_CODING_AGENT_DIR=${lib.escapeShellArg "${cfg.stateDir}/agent"} \
         --env ASSISTANT_POCKET_ID_SUBJECT=${lib.escapeShellArg cfg.pocketIdSubject} \
         --env ASSISTANT_OAUTH_CALLBACK_URL=${lib.escapeShellArg "https://webhooks.${config.homelab.baseDomain}/assistant/oauth/callback"} \
+        --env ASSISTANT_RUNTIME=${cfg.runtime} \
         --env ASSISTANT_STATE_DIR=${lib.escapeShellArg cfg.stateDir} \
         --env TELEGRAM_WEBHOOK_SECRET --env TELEGRAM_DESTINATIONS \
         --env ASSISTANT_BOT_USERNAME=${lib.escapeShellArg cfg.botUsername} \
-        --connect-tcp 443 --connect-tcp 9087 --bind-tcp 9090 \
+        --connect-tcp 443 --connect-tcp 9087 --bind-tcp 9090 ${
+          lib.optionalString (cfg.runtime == "eve") "--connect-tcp 9091 --bind-tcp 9091"
+        } \
         -- ${assistant.nodejs}/bin/node ${assistant}/lib/leolab-assistant/src/main.ts
     '';
   };
 in
 {
   options.homelab.infra.assistant = {
-    enable = lib.mkEnableOption "Pi Telegram assistant with user-bound LeoLab MCP tools";
+    enable = lib.mkEnableOption "Telegram assistant with user-bound LeoLab MCP tools";
+    runtime = lib.mkOption {
+      type = lib.types.enum [
+        "pi"
+        "eve"
+      ];
+      default = "pi";
+      description = "Agent engine; Eve is experimental pending crash-recovery validation";
+    };
     stateDir = lib.mkOption {
       type = lib.types.str;
       default = "/mnt/fast/appdata/leolab-assistant";
-      description = "Persistent inbox, Pi sessions and private OAuth credentials";
+      description = "Persistent inbox, Eve workflows, conversation ledger and private OAuth credentials";
     };
     pocketIdSubject = lib.mkOption {
       type = lib.types.str;
@@ -92,7 +103,7 @@ in
       "C ${instructionsDir}/current.json 0640 root leolab-assistant - ${instructionBundle}"
     ];
     systemd.services.leolab-assistant = {
-      description = "Pi Telegram assistant";
+      description = "Telegram assistant (${cfg.runtime})";
       wantedBy = [ "multi-user.target" ];
       after = [
         "network-online.target"
@@ -108,13 +119,15 @@ in
         User = "leolab-assistant";
         Group = "leolab-assistant";
         EnvironmentFile = config.services.onepassword-secrets.secretPaths.notificationGatewayEnv;
-        LoadCredential = [ "exa-api-key:${config.services.onepassword-secrets.secretPaths.assistantExaApiKey}" ];
+        LoadCredential = [
+          "exa-api-key:${config.services.onepassword-secrets.secretPaths.assistantExaApiKey}"
+        ];
         WorkingDirectory = cfg.stateDir;
         ReadWritePaths = [ cfg.stateDir ];
         Restart = "on-failure";
         RestartSec = "5s";
         TimeoutStopSec = "20s";
-        MemoryMax = "768M";
+        MemoryMax = if cfg.runtime == "eve" then "1024M" else "768M";
         TasksMax = 64;
         UMask = "0077";
         NoNewPrivileges = true;

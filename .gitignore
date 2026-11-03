@@ -1,3 +1,7 @@
 result
 
 node_modules/
+
+# Eve build artefacts are regenerated from the pinned assistant source.
+packages/assistant/.eve/
+packages/assistant/.output/

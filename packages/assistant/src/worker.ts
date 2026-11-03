@@ -10,8 +10,8 @@ import {
   type Policy,
 } from "./inbox.ts";
 import { messageForJob } from "./telegram.ts";
-import { Sessions } from "./sessions.ts";
-import type { PiAssistant } from "./pi.ts";
+import { Sessions, isCompaction } from "./sessions.ts";
+import type { EveAssistant } from "./eve.ts";
 import { decodeJwt } from "jose";
 import { randomBytes } from "node:crypto";
 
@@ -22,7 +22,8 @@ interface Options {
   policy: Policy;
   inbox: Inbox;
   connections: Pick<Connections, "begin" | "complete" | "token">;
-  assistant: Pick<PiAssistant, "answer">;
+  assistant: Pick<EveAssistant, "answer"> &
+    Partial<Pick<EveAssistant, "writeAttempt">>;
   gateway: Gateway;
   log?: Pick<Console, "info" | "error">;
   reactionDelayMs?: number;
@@ -276,7 +277,7 @@ export class Worker {
               : "🐾",
           );
         }
-        const count = entries.filter((e) => e.type === "compaction").length;
+        const count = entries.filter(isCompaction).length;
         const previous = [...entries]
           .reverse()
           .find(
@@ -313,8 +314,7 @@ export class Worker {
       const manager = this.options.sessions.open(job.session);
       manager.appendCustomEntry("session-notice-delivered", {});
       manager.appendCustomEntry("compaction-notice", {
-        count: manager.getEntries().filter((e) => e.type === "compaction")
-          .length,
+        count: manager.getEntries().filter(isCompaction).length,
       });
     }
     this.finish(job);
@@ -352,6 +352,14 @@ export class Worker {
     if (job.reply) {
       await this.deliver(job);
       return;
+    }
+    const interruptedWrite = this.options.assistant.writeAttempt?.(
+      messageForJob(job),
+    );
+    if (interruptedWrite && !job.writeAttempted) {
+      job.writeAttempted = true;
+      job.writeOperation = interruptedWrite;
+      this.options.inbox.save(job);
     }
     const command = this.command(job);
     if (job.kind === "notification") {

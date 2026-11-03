@@ -167,6 +167,40 @@ private OAuth credentials and transcripts live under
 [assistant runbook](../homelab/docs/telegram-assistant.md) for setup, grant renewal,
 limitations and verification status.
 
+## Experimental Eve assistant engine
+
+`homelab.infra.assistant.runtime` defaults to `"pi"`. Setting it to `"eve"`
+selects the packaged Eve 1.0.0-rc.2 candidate. The live runtime is not changed
+merely by building the package. Rollout is held while immediate crash recovery
+is investigated; see the [migration plan](../homelab/plans/eve-assistant-migration.md).
+
+Eve definitions live under `packages/assistant/agent/`: the root `agent.ts`
+uses Haiku (`claude-haiku-5-5`); `subagents/coder/agent.ts` uses DeepSeek Flash
+(`deepseek-v4.1-flash`). Both use the lab AI gateway. Eve provides native
+subagent tasks and follow-up messaging. Both agents disable default tools and
+use a provider that rejects filesystem and process operations. The coder has
+its own instructions and no inherited lab connection; until Now tools exist,
+it returns code inline.
+
+The existing worker retains Telegram ingress, private sign-in, attachments,
+notification context, presentation and write-recovery guards. In Eve mode it
+supervises the built engine on loopback port 9091; ingress remains on port 9090.
+The engine's default HTTP session API is disabled and its internal turn route
+requires the worker secret. `agent/connections/leolab.ts` obtains the caller's
+existing Pocket ID grant, filters by scopes and audience, and journals writes
+before execution. Eve workflow data lives under the persistent service state
+in `.eve/.workflow-data`. Pi remains the ledger/OAuth compatibility dependency.
+No separate Now MCP service is introduced.
+
+The package build compiles Eve before running the tests. For local development,
+run `npx --no-install eve build` in `packages/assistant`, then
+`node --test src/*_test.ts`. The built-server check exercises model delegation,
+tool restrictions, completed-delivery deduplication and an idle restart followed
+by another message. `EVE_LIVE_TEST=1 node --test src/eve-integration_test.ts`
+uses both real models with synthetic prompts and sends no Telegram messages.
+`EVE_CRASH_TEST=1 node --test src/eve-integration_test.ts` reproduces the known
+publication/checkpoint restart regression; this check currently fails.
+
 ## Machines
 - **picard (NixOS VM on laforge)**: Runs the homelab edge (reverse proxy, DNS), plus apps (Immich, Paperless-ngx, etc.). Laforge is the Unraid host with the storage array and SSD cache drives.
 - **crusher (macOS)**: Includes `rainfrog` and `rainfrog-prod`. The latter connects
