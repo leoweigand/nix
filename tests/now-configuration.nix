@@ -1,6 +1,13 @@
 { pkgs, picard }:
 let
-  enabled = picard.extendModules { modules = [ { homelab.infra.now.enable = true; } ]; };
+  enabled = picard.extendModules {
+    modules = [
+      {
+        homelab.infra.now.enable = true;
+        homelab.infra.assistant.runtime = "eve";
+      }
+    ];
+  };
   cfg = enabled.config;
   services = cfg.systemd.services;
   domain = cfg.homelab.baseDomain;
@@ -33,6 +40,7 @@ pkgs.linkFarm "now-configuration-check" (
       "leolab-now-store"
       "leolab-now-keys"
       "leolab-mcp"
+      "leolab-assistant"
       "restic-backups-now"
     ]
 )
