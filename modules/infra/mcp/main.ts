@@ -1,4 +1,5 @@
 import { DocumentService } from "./documents.ts";
+import { NowClient } from "./now.ts";
 import { readFileSync } from "node:fs";
 import { isElement, isText, parse } from "@std/xml";
 import { MediaService, type MediaConfig } from "./media.ts";
@@ -12,6 +13,7 @@ const config = JSON.parse(
   readFileSync(process.env.MCP_CONFIG!, "utf8"),
 ) as Config & {
   port: number;
+  now?: { url: string };
   documents?: { url: string; publicUrl: string; stateDir: string };
   media: MediaConfig;
   home?: HomeConfig;
@@ -114,6 +116,16 @@ const app = createApp(
       })
     : undefined,
   documents,
+  undefined,
+  config.now
+    ? new NowClient({
+        ...config.now,
+        token: readFileSync(
+          `${process.env.CREDENTIALS_DIRECTORY!}/now-token`,
+          "utf8",
+        ).trim(),
+      })
+    : undefined,
 );
 app.server.listen(config.port, "127.0.0.1", () =>
   console.log(JSON.stringify({ event: "listening", port: config.port })),

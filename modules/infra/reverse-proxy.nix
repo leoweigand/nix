@@ -22,6 +22,11 @@ let
         default = false;
         description = "Forward the authenticated Remote-User header to upstream";
       };
+      passSubject = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Forward verified OIDC subject as X-Now-Subject, stripping any client value";
+      };
       bypassPaths = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         default = [ ];
@@ -77,12 +82,13 @@ let
           {
             enable = proxyCfg.auth;
             passUser = false;
+            passSubject = false;
             bypassPaths = [ ];
           }
         else
           {
             enable = true;
-            inherit (proxyCfg.auth) passUser bypassPaths;
+            inherit (proxyCfg.auth) passUser passSubject bypassPaths;
           };
       needsAuth = authCfg.enable;
       authGate = ''
@@ -100,6 +106,7 @@ let
               include Set-Cookie
             }
             ${lib.optionalString authCfg.passUser "request_header Remote-User {rp.header.X-Auth-Request-Preferred-Username}"}
+            ${lib.optionalString authCfg.passSubject "request_header X-Now-Subject {rp.header.X-Auth-Request-User}"}
           }
         }
       '';
@@ -114,6 +121,7 @@ let
       protectedProxy = ''
         route {
           request_header -Remote-User
+          request_header -X-Now-Subject
           ${authGate}
           ${reverseProxy}
         }

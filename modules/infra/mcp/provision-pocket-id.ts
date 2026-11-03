@@ -42,6 +42,18 @@ if (entry.name !== "LeoLab MCP")
   throw new Error("Resource exists with a different owner name");
 const permissions = [
   {
+    key: "now:read",
+    name: "Read your Now apps",
+    description:
+      "Discover your apps and inspect source, builds, releases and request logs",
+  },
+  {
+    key: "now:write",
+    name: "Publish and manage your Now apps",
+    description:
+      "Create, edit, build, deploy, test, roll back and explicitly destroy apps you own",
+  },
+  {
     key: "documents:read",
     name: "Read private documents",
     description:

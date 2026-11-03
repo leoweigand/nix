@@ -77,6 +77,8 @@ class Backend(Handler):
             "user": self.headers.get("Remote-User"),
         }
         backend_requests.append(result)
+        if self.headers.get("X-Now-Subject") is not None:
+            result["subject"] = self.headers["X-Now-Subject"]
         self.send(200, json.dumps(result).encode())
 
     do_POST = do_GET
@@ -88,6 +90,7 @@ class Authoriser(Handler):
         assert self.path == "/", self.path
         self.send(auth_state["status"], headers=[
             ("X-Auth-Request-Preferred-Username", "leo"),
+            ("X-Auth-Request-User", "subject-leo-123"),
             ("Set-Cookie", "renewed=one; Secure; HttpOnly; Path=/"),
             ("Set-Cookie", "second=two; Secure; HttpOnly; Path=/"),
         ])
@@ -126,7 +129,7 @@ class IdP(Handler):
             })
             self.send(302, headers=[("Location", callback)])
         elif url.path == "/userinfo":
-            self.json({"sub": "leo", "email": "leo@leolab.party", "email_verified": True})
+            self.json({"sub": "subject-leo-123", "email": "leo@leolab.party", "email_verified": True})
         else:
             self.send(404)
 
@@ -137,7 +140,7 @@ class IdP(Handler):
         challenge = b64(hashlib.sha256(query["code_verifier"][0].encode()).digest())
         assert challenge == code["query"]["code_challenge"][0]
         claims = {
-            "iss": issuer, "aud": "test-client", "sub": "leo", "iat": int(time.time()),
+            "iss": issuer, "aud": "test-client", "sub": "subject-leo-123", "iat": int(time.time()),
             "exp": int(time.time()) + 7200, "email": "leo@leolab.party", "email_verified": True,
             "preferred_username": "leo", "groups": code["groups"],
         }
@@ -223,9 +226,9 @@ def stop(process):
     process.wait(timeout=10)
 
 
-def login(caddy_port, idp_port, original):
+def login(caddy_port, idp_port, original, host="notes.leolab.party"):
     cookies = {}
-    url = "https://notes.leolab.party" + original
+    url = "https://" + host + original
     for _ in range(12):
         parsed = urllib.parse.urlsplit(url)
         port = idp_port if parsed.hostname == "127.0.0.1" else caddy_port
@@ -275,6 +278,8 @@ with tempfile.TemporaryDirectory() as temp:
         assert auth_requests[-1]["X-Forwarded-Method"] == "POST"
         assert len([value for name, value in headers if name.lower() == "set-cookie"]) == 2
         assert json.loads(request(caddy_port, "identity.leolab.party", "/", headers={"Remote-User": "attacker"})[2])["user"] == "leo"
+        received = json.loads(request(caddy_port, "autumn-monstera.now.leolab.party", "/", headers={"X-Now-Subject": "attacker"})[2])
+        assert received["subject"] == "subject-leo-123", received
         auth_state["status"] = 503
         before = len(backend_requests)
         assert request(caddy_port, "notes.leolab.party", "/private")[0] == 503
@@ -316,6 +321,10 @@ with tempfile.TemporaryDirectory() as temp:
             assert json.loads(body)["path"] == original
             assert "__Secure-leolab_gateway" in cookies
             websocket(caddy_port, cookies)
+            status, body, _, url = login(caddy_port, idp.server_port, "/", "autumn-monstera.now.leolab.party")
+            assert status == 200, (status, body)
+            assert url == "https://autumn-monstera.now.leolab.party/", url
+            assert json.loads(body)["subject"] == "subject-leo-123", body
             oidc_state["groups"] = ["outsiders"]
             before = len(backend_requests)
             status, _, _, _ = login(caddy_port, idp.server_port, "/private")

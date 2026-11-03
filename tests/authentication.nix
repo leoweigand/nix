@@ -9,6 +9,11 @@ let
         homelab.infra.edge.proxies.identity = {
           upstream = "http://127.0.0.1:3000";
           auth.passUser = true;
+          auth.passSubject = true;
+        };
+        homelab.infra.edge.proxies."*.now" = {
+          upstream = "http://127.0.0.1:3000";
+          auth.passSubject = true;
         };
       }
     ];
@@ -25,7 +30,7 @@ let
   };
   fixture = pkgs.writeText "authentication-fixture.json" (
     builtins.toJSON {
-      sites = lib.genAttrs [ "notes" "prowlarr" "identity" "login" ] (
+      sites = lib.genAttrs [ "notes" "prowlarr" "identity" "login" "*.now" ] (
         name: cfg.services.caddy.virtualHosts."${name}.leolab.party".extraConfig
       );
       oauthCommand = cfg.systemd.services.oauth2-proxy.serviceConfig.ExecStart;

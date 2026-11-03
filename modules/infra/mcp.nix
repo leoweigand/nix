@@ -18,7 +18,8 @@ let
       "CREDENTIALS_DIRECTORY"
     ];
     credentialNames =
-      lib.optional documentEnabled "paperless-token"
+      lib.optional config.homelab.infra.now.enable "now-token"
+      ++ lib.optional documentEnabled "paperless-token"
       ++ lib.optional bookmarkEnabled "linkding-token"
       ++ lib.optional cfg.home.enable "home-token"
       ++ lib.optional transferEnabled "syncthing-config"
@@ -28,7 +29,8 @@ let
       ];
     writePaths = lib.optional documentEnabled "/var/lib/leolab-mcp";
     connectPorts =
-      lib.optional documentEnabled config.services.paperless.port
+      lib.optional config.homelab.infra.now.enable config.homelab.infra.now.port
+      ++ lib.optional documentEnabled config.services.paperless.port
       ++ lib.optional bookmarkEnabled config.homelab.apps.linkding.port
       ++ lib.optional cfg.home.enable 8123
       ++ lib.optional transferEnabled 8384
@@ -44,6 +46,11 @@ let
       inherit (cfg) port;
       resource = "https://${host}/mcp";
       issuer = cfg.issuer;
+      now =
+        if config.homelab.infra.now.enable then
+          { url = "http://127.0.0.1:${toString config.homelab.infra.now.port}"; }
+        else
+          null;
       documents =
         if documentEnabled then
           {

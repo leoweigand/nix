@@ -47,10 +47,20 @@
       packages = nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-darwin" ] (system: {
         assistant = nixpkgs.legacyPackages.${system}.callPackage ./packages/assistant { };
         automation = nixpkgs.legacyPackages.${system}.callPackage ./packages/automation/default.nix { };
+        now = nixpkgs.legacyPackages.${system}.callPackage ./packages/now { };
       });
 
       checks.x86_64-linux.assistant = self.packages.x86_64-linux.assistant;
       checks.x86_64-linux.automation = self.packages.x86_64-linux.automation;
+      checks.x86_64-linux.now = self.packages.x86_64-linux.now;
+      checks.x86_64-linux.now-runtime = import ./tests/now-runtime.nix {
+        pkgs = nixpkgs.legacyPackages.x86_64-linux;
+        package = self.packages.x86_64-linux.now;
+      };
+      checks.x86_64-linux.now-configuration = import ./tests/now-configuration.nix {
+        pkgs = nixpkgs.legacyPackages.x86_64-linux;
+        picard = self.nixosConfigurations.picard;
+      };
       checks.x86_64-linux.automation-sandbox = import ./tests/automation-sandbox.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
       };

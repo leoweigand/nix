@@ -34,6 +34,7 @@ let
         --env ASSISTANT_POCKET_ID_SUBJECT=${lib.escapeShellArg cfg.pocketIdSubject} \
         --env ASSISTANT_OAUTH_CALLBACK_URL=${lib.escapeShellArg "https://webhooks.${config.homelab.baseDomain}/assistant/oauth/callback"} \
         --env ASSISTANT_RUNTIME=${cfg.runtime} \
+        --env ASSISTANT_NOW_ENABLED=${lib.boolToString config.homelab.infra.now.enable} \
         ${lib.optionalString (cfg.runtime == "eve") "--env ASSISTANT_EVE_STATE_DIR=${cfg.eveStateDir}"} \
         --env ASSISTANT_STATE_DIR=${lib.escapeShellArg cfg.stateDir} \
         --env TELEGRAM_WEBHOOK_SECRET --env TELEGRAM_DESTINATIONS \
