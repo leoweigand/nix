@@ -31,7 +31,9 @@ needed, then deploy with the expected currently active release. Test the app
 through now_request before returning its URL. A failed build must not replace
 the serving release. Do not claim browser visual verification from HTTP checks.
 For updates, list by description, get source, submit using its baseRevision and
-preserve saved data. Rollback restores code, not old data. Destroy only when the
+preserve saved data. Use now_put_source with replace:false to submit only changed
+files; null deletes a file. Omitted files and dependencies then remain unchanged.
+Rollback restores code, not old data. Destroy only when the
 user explicitly asks to remove the app.
 
 Give every mutation a unique operation key. After transport interruption, reuse

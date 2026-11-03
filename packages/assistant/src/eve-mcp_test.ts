@@ -2,7 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import {
+  mkdtempSync,
+  rmSync,
+  readFileSync,
+  mkdirSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,9 +42,12 @@ const preload = fileURLToPath(
 );
 type Step = { name: string; arguments: Record<string, unknown> } | string;
 
+const liveAuthoring = process.env.EVE_LIVE_AUTHORING_TEST === "1";
 test(
-  "built Eve uses authenticated MCP, renewed grants, audience filters and durable uncertain-write guards",
-  { timeout: 120_000 },
+  liveAuthoring
+    ? "live Haiku delegates Now authoring to DeepSeek through authenticated isolated MCP"
+    : "built Eve uses authenticated MCP, renewed grants, audience filters and durable uncertain-write guards",
+  { timeout: liveAuthoring ? 20 * 60_000 : 120_000 },
   async () => {
     const directory = mkdtempSync(join(tmpdir(), "eve-mcp-"));
     const engineDirectory = mkdtempSync(
@@ -50,15 +59,39 @@ test(
       kid: "fixture",
       alg: "RS256",
     };
-    const keys = createLocalJWKSet({ keys: [jwk] });
+    const suppliedAuth = liveAuthoring
+      ? JSON.parse(readFileSync(process.env.EVE_SMOKE_AUTH_FILE!, "utf8"))
+      : undefined;
+    const jwks = suppliedAuth?.jwks ?? { keys: [jwk] };
+    const subject = suppliedAuth?.subject ?? "fixture-owner";
+    const externalMcp = liveAuthoring
+      ? new URL(process.env.EVE_SMOKE_MCP_URL!)
+      : undefined;
+    if (externalMcp) {
+      assert.equal(externalMcp.protocol, "http:");
+      assert.ok(
+        ["127.0.0.1", "localhost", "[::1]"].includes(externalMcp.hostname),
+        "Authoring smoke must use an isolated loopback MCP endpoint",
+      );
+      assert.ok(
+        suppliedAuth.tokensExpireAt - Date.now() > 30 * 60_000,
+        "Use a synthetic grant valid for over thirty minutes",
+      );
+    }
+    const keys = createLocalJWKSet(jwks);
+
     let granted = scopes;
     let refreshRejected = false;
     let refreshCalls = 0;
     let issued = 0;
     let rejectedToken: string | undefined;
     let authRejections = 0;
-    const requests: Array<{ method: string; tool?: string; token: string }> =
-      [];
+    const requests: Array<{
+      method: string;
+      tool?: string;
+      token: string;
+      input?: unknown;
+    }> = [];
     const modelCalls: unknown[] = [];
     const steps: Step[] = [];
     const coderSteps: Step[] = [];
@@ -84,6 +117,45 @@ test(
       },
     }));
     let fixtureUrl = "";
+    async function forward(
+      url: string | URL,
+      request: import("node:http").IncomingMessage,
+      response: import("node:http").ServerResponse,
+      raw: string,
+    ) {
+      const headers = new Headers();
+      for (const [name, value] of Object.entries(request.headers)) {
+        if (
+          value !== undefined &&
+          !["host", "connection", "content-length"].includes(name)
+        )
+          headers.set(name, Array.isArray(value) ? value.join(", ") : value);
+      }
+      const controller = new AbortController();
+      response.once("close", () => controller.abort());
+      const upstream = await fetch(url, {
+        method: request.method,
+        headers,
+        body: ["GET", "HEAD"].includes(request.method!) ? undefined : raw,
+        redirect: "error",
+        signal: controller.signal,
+      });
+      const returned = Object.fromEntries(
+        [...upstream.headers].filter(
+          ([name]) =>
+            ![
+              "content-length",
+              "content-encoding",
+              "transfer-encoding",
+              "connection",
+            ].includes(name),
+        ),
+      );
+      response.writeHead(upstream.status, returned);
+      if (upstream.body)
+        for await (const chunk of upstream.body) response.write(chunk);
+      response.end();
+    }
     const server = createServer(async (request, response) => {
       try {
         let raw = "";
@@ -93,7 +165,7 @@ test(
           response.writeHead(status, { "content-type": "application/json" });
           response.end(JSON.stringify(data));
         };
-        if (url.includes("jwks")) return json({ keys: [jwk] });
+        if (url.includes("jwks")) return json(jwks);
         if (url.includes("oauth-protected-resource"))
           return json({
             resource,
@@ -145,6 +217,13 @@ test(
         if (url === "/v1/chat/completions") {
           const body = JSON.parse(raw);
           modelCalls.push(body);
+          if (liveAuthoring)
+            return await forward(
+              "https://ai.internal.leolab.party/v1/chat/completions",
+              request,
+              response,
+              raw,
+            );
           let step =
             body.model === "deepseek-v4.1-flash"
               ? coderSteps.shift()
@@ -202,7 +281,21 @@ test(
             issuer,
             audience: resource,
           });
-          assert.equal(payload.sub, "fixture-owner");
+          assert.equal(payload.sub, subject);
+          if (externalMcp) {
+            if (request.method === "POST") {
+              const body = JSON.parse(raw);
+              requests.push({
+                method: body.method,
+                tool: body.params?.name,
+                input: body.params?.arguments,
+                token,
+              });
+              if (body.params?.name)
+                console.info(`Live MCP call: ${body.params.name}`);
+            }
+            return await forward(externalMcp, request, response, raw);
+          }
           if (request.method === "GET") return json({}, 405);
           if (request.method === "DELETE") return response.writeHead(204).end();
           const body = JSON.parse(raw);
@@ -256,7 +349,11 @@ test(
         }
         json({}, 404);
       } catch (error) {
-        response.writeHead(500).end(String(error));
+        if (response.headersSent)
+          response.destroy(
+            error instanceof Error ? error : new Error(String(error)),
+          );
+        else response.writeHead(500).end(String(error));
       }
     });
     server.listen(0, "127.0.0.1");
@@ -279,7 +376,7 @@ test(
     const connection = new Connections({
       stateDir: directory,
       telegramId: "123",
-      subject: "fixture-owner",
+      subject,
       callbackUrl: "https://example.org/callback",
       keys,
       fetch: (input, init) => {
@@ -295,6 +392,35 @@ test(
           `https://example.org/callback?code=fixture&iss=${encodeURIComponent(issuer)}&state=${url.searchParams.get("state")}`,
         ),
       );
+    }
+    if (suppliedAuth)
+      writeJson(connectionPath, {
+        telegramId: "123",
+        subject,
+        revision: "isolated-authoring-fixture",
+        oauth: {
+          serverUrl: resource,
+          tokens: suppliedAuth.tokens,
+          tokensExpireAt: suppliedAuth.tokensExpireAt,
+        },
+      });
+    function saveSmokeArtifacts(result?: unknown) {
+      if (!liveAuthoring || !process.env.EVE_SMOKE_ARTIFACT_DIR) return;
+      const destination = process.env.EVE_SMOKE_ARTIFACT_DIR;
+      mkdirSync(destination, { recursive: true, mode: 0o700 });
+      writeJson(join(destination, "model-calls.json"), modelCalls);
+      writeJson(
+        join(destination, "mcp-calls.json"),
+        requests.map(({ token: _token, ...request }) => request),
+      );
+      writeJson(
+        join(destination, "tool-journal.json"),
+        readJson(join(directory, "eve-requests/live-authoring/tools.json")) ??
+          {},
+      );
+      if (result !== undefined)
+        writeJson(join(destination, "result.json"), result);
+      writeFileSync(join(destination, "engine.log"), logs, { mode: 0o600 });
     }
     function expire() {
       const state = readJson<any>(connectionPath)!;
@@ -324,7 +450,7 @@ test(
           ASSISTANT_STATE_DIR: directory,
           ASSISTANT_EVE_STATE_DIR: engineDirectory,
           ASSISTANT_INSTRUCTIONS_FILE: instructionPath,
-          ASSISTANT_POCKET_ID_SUBJECT: "fixture-owner",
+          ASSISTANT_POCKET_ID_SUBJECT: subject,
           ASSISTANT_OAUTH_CALLBACK_URL: "https://example.org/callback",
           EVE_FIXTURE_URL: fixtureUrl,
         },
@@ -405,6 +531,101 @@ test(
     }
     try {
       await start();
+      if (liveAuthoring) {
+        const prompt = readFileSync(process.env.EVE_SMOKE_PROMPT_FILE!, "utf8");
+        const input = { ...message("live-authoring"), text: prompt };
+        const result = await assistant.answer(
+          input,
+          ref,
+          await connection.token("123"),
+        );
+        saveSmokeArtifacts(result);
+        assert.equal(result.needsConnection, false);
+        const models = modelCalls.map((call: any) => call.model);
+        assert.ok(
+          models.includes("claude-haiku-5-5"),
+          "Root Haiku must perform the authoring request",
+        );
+        assert.ok(
+          models.includes("deepseek-v4.1-flash"),
+          "Root must delegate substantive authoring to DeepSeek",
+        );
+        for (const name of [
+          "now_put_source",
+          "now_build",
+          "now_deploy",
+          "now_request",
+        ])
+          assert.ok(count(name) > 0, `Live task must use ${name}`);
+        assert.ok(
+          !JSON.stringify(modelCalls).includes(
+            suppliedAuth.tokens.access_token,
+          ),
+          "Bearer tokens must not enter model context",
+        );
+        const journal = readJson<ToolJournal>(
+          join(directory, "eve-requests/live-authoring/tools.json"),
+        );
+        assert.ok(journal);
+        const confirmed = (tool: string, check: (result: any) => boolean) =>
+          journal.entries.some(
+            (entry) =>
+              entry.tool === `mcp__leolab__${tool}` &&
+              entry.result !== undefined &&
+              check(entry.result),
+          );
+        assert.ok(
+          confirmed(
+            "now_put_source",
+            (result) => typeof result?.revision === "string",
+          ),
+          "Source revision must be accepted",
+        );
+        assert.ok(
+          confirmed(
+            "now_get_build",
+            (result) => result?.release?.state === "ready",
+          ),
+          "A real build must reach ready",
+        );
+        assert.ok(
+          confirmed(
+            "now_deploy",
+            (result) => typeof result?.app?.active === "string",
+          ),
+          "A release must become active",
+        );
+        assert.ok(
+          confirmed(
+            "now_request",
+            (result) => result?.status >= 200 && result?.status < 300,
+          ),
+          "The app must return a successful HTTP response",
+        );
+        const before = modelCalls.length;
+        await stop();
+        await start();
+        assert.deepEqual(
+          await assistant.answer(input, ref, await connection.token("123")),
+          result,
+        );
+        assert.equal(
+          modelCalls.length,
+          before,
+          "A completed live request must survive restart without model replay",
+        );
+        console.info(
+          JSON.stringify({
+            models,
+            tools: requests
+              .filter((request) => request.tool)
+              .map((request) => request.tool),
+            reply: result.text,
+          }),
+        );
+        return;
+      }
+
       steps.push(search, { name: "connect_mcp", arguments: {} });
       assert.equal((await answer("missing")).needsConnection, true);
       assert.equal(requests.length, 0, "A missing grant must not reach MCP");
@@ -656,6 +877,9 @@ test(
       assert.equal(count("control_home_entities"), 3);
       assert.equal(steps.length, 0);
     } catch (error) {
+      saveSmokeArtifacts({
+        error: error instanceof Error ? error.message : String(error),
+      });
       console.error(
         logs,
         JSON.stringify(
