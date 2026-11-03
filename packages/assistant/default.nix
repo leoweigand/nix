@@ -18,13 +18,14 @@ buildNpmPackage {
       ./instructions
       ./skills
       ./scripts
+      ./patches
     ];
   };
-  npmDepsHash = "sha256-/Ov2pIkh3MKcnfUhxQUWEThnMw/eMwlY3CN3beYBrzs=";
+  npmDepsHash = "sha256-PoHYKzQziIGJnde79MjN7HRxstWGccRL9oN5Q1Pn0r8=";
   npmFlags = [ "--ignore-scripts" ];
   buildPhase = ''
     runHook preBuild
-    npx --no-install eve build
+    npm run build
     runHook postBuild
   '';
   doCheck = true;
@@ -32,14 +33,14 @@ buildNpmPackage {
     runHook preCheck
     npx --no-install tsc --noEmit
     node --test src/*_test.ts
-    npx --no-install prettier --check src agent scripts package.json tsconfig.json
+    npx --no-install prettier --check src agent scripts patches package.json tsconfig.json
     runHook postCheck
   '';
   installPhase = ''
     runHook preInstall
     npm prune --omit=dev --ignore-scripts
     mkdir -p "$out/lib/leolab-assistant"
-    cp -r src agent instructions skills scripts node_modules package.json "$out/lib/leolab-assistant/"
+    cp -r src agent instructions skills scripts patches node_modules package.json "$out/lib/leolab-assistant/"
     cp -rL .output "$out/lib/leolab-assistant/.output"
     runHook postInstall
   '';

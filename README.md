@@ -171,8 +171,8 @@ limitations and verification status.
 
 `homelab.infra.assistant.runtime` defaults to `"pi"`. Setting it to `"eve"`
 selects the packaged Eve 1.0.0-rc.2 candidate. The live runtime is not changed
-merely by building the package. Rollout is held while immediate crash recovery
-is investigated; see the [migration plan](../homelab/plans/eve-assistant-migration.md).
+merely by building the package. Remaining rollout checks are tracked in the
+[migration plan](../homelab/plans/eve-assistant-migration.md).
 
 Eve definitions live under `packages/assistant/agent/`: the root `agent.ts`
 uses Haiku (`claude-haiku-5-5`); `subagents/coder/agent.ts` uses DeepSeek Flash
@@ -192,20 +192,21 @@ before execution. Eve workflow data lives under the persistent service state
 in `.eve/.workflow-data`. Pi remains the ledger/OAuth compatibility dependency.
 No separate Now MCP service is introduced.
 
-The package build compiles Eve before running the tests. For local development,
-run `npx --no-install eve build` in `packages/assistant`, then
-`node --test src/*_test.ts`. The built-server check exercises model delegation,
-tool restrictions, completed-delivery deduplication and an idle restart followed
-by another message. `EVE_LIVE_TEST=1 node --test src/eve-integration_test.ts`
-uses both real models with synthetic prompts and sends no Telegram messages.
-`EVE_CRASH_TEST=1 node --test src/eve-integration_test.ts` reproduces the known
-publication/checkpoint restart regression; this check currently fails.
-`EVE_STORAGE_CRASH_TEST=1 node --test src/eve-local-world_test.ts` isolates its
-upstream cause without a build or model: the bundled local world claims a terminal
-step marker before committing the checkpoint and completion event. Interruption
-can permanently prevent completion retries. This opt-in regression currently
-fails too; normal checks do not establish crash safety. See the migration plan
-for the evidence and rollout gate.
+The package build applies a version/hash-guarded local-world recovery patch before
+compiling Eve. Terminal step and run transitions use durable redo records;
+startup finishes interrupted commits before re-enqueuing work. The worker saves
+and reuses each delivery ID so an interrupted request follows its original result.
+The one-process engine disables dead invocation ownership leases for prompt
+recovery. See the [patch notes](packages/assistant/patches/README.md) for the
+implementation, exact scope and handling of old corrupted state.
+
+For local development, run `npm ci` and `npm run build` in `packages/assistant`,
+then `node --test src/*_test.ts`. The same build command applies the patch after
+`npm ci --ignore-scripts`. Normal checks cover terminal persistence with SIGKILL,
+repeated recovery, immediate restart after a reply, and interrupted root/coder
+inference. Settled replies do not replay inference; unfinished inference may retry.
+`EVE_LIVE_TEST=1 node --test src/eve-integration_test.ts` uses both real models with
+synthetic prompts and sends no Telegram messages.
 
 ## Machines
 - **picard (NixOS VM on laforge)**: Runs the homelab edge (reverse proxy, DNS), plus apps (Immich, Paperless-ngx, etc.). Laforge is the Unraid host with the storage array and SSD cache drives.

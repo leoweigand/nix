@@ -58,6 +58,9 @@ const engine = useEve
           NITRO_HOST: "127.0.0.1",
           NITRO_PORT: "9091",
           WORKFLOW_LOCAL_BASE_URL: "http://127.0.0.1:9091",
+          // One engine owns this local world. Dead invocation leases must not
+          // defer recovery; in-process step single-flight still prevents overlap.
+          WORKFLOW_INLINE_OWNERSHIP: "0",
         },
         stdio: "inherit",
       },

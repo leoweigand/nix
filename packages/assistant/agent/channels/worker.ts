@@ -1,5 +1,6 @@
 import { defineChannel, POST, GET } from "eve/channels";
 import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 import { messageContent } from "../../src/conversation.ts";
 import { authorized } from "../../src/inbox.ts";
 import { readJson, writeJson } from "../../src/storage.ts";
@@ -9,7 +10,7 @@ export default defineChannel({
   turnPolicy: "queue",
   routes: [
     GET("/internal/healthz", async () => new Response(null, { status: 204 })),
-    POST("/internal/turn", async (request, { from }) => {
+    POST("/internal/turn", async (request, { from, attachSession }) => {
       if (
         !authorized(
           request.headers.get("x-assistant-secret"),
@@ -38,12 +39,32 @@ export default defineChannel({
         attributes: { eventId },
       };
       console.info(JSON.stringify({ event: "eve_delivery_start", eventId }));
-      const { session } = await from(ref.id).create({ auth });
-      const delivery = await session.send(messageContent(message), {
+      const receiptPath = join(
+        requestDirectory(eventId),
+        `delivery-${input.authRevision ?? "initial"}.json`,
+      );
+      const saved = readJson<{ sessionId: string; deliveryId: string }>(
+        receiptPath,
+      );
+      const session = saved
+        ? attachSession(saved.sessionId)
+        : (await from(ref.id).create({ auth })).session;
+      const receipt = saved ?? {
+        sessionId: session.id,
+        deliveryId: randomUUID(),
+      };
+      if (!saved) writeJson(receiptPath, receipt);
+      // Eve deduplicates work by idempotencyKey but otherwise creates a new,
+      // ignored delivery on retry. Its pinned session implementation accepts a
+      // deliveryId; preserve it before dispatch so recovery follows the original
+      // result even if the process dies before send() returns.
+      const sendOptions = {
         auth,
+        deliveryId: receipt.deliveryId,
         idempotencyKey: `${eventId}:${input.authRevision ?? "initial"}`,
         context: input.context ? [JSON.stringify(input.context)] : [],
-      });
+      };
+      const delivery = await session.send(messageContent(message), sendOptions);
       console.info(
         JSON.stringify({
           event: "eve_delivery_accepted",

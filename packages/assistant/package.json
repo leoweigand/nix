@@ -21,5 +21,9 @@
   "overrides": {
     "undici": "8.12.3",
     "minimatch": "11.0.3"
+  },
+  "scripts": {
+    "postinstall": "node scripts/patch-eve.ts",
+    "build": "node scripts/patch-eve.ts && eve build"
   }
 }
