@@ -56,6 +56,7 @@ test(
     let refreshCalls = 0;
     let issued = 0;
     let rejectedToken: string | undefined;
+    let authRejections = 0;
     const requests: Array<{ method: string; tool?: string; token: string }> =
       [];
     const modelCalls: unknown[] = [];
@@ -169,8 +170,10 @@ test(
         if (url.startsWith("/mcp")) {
           const token =
             request.headers.authorization?.replace(/^Bearer /, "") ?? "";
-          if (!token || token === rejectedToken)
+          if (!token || token === rejectedToken) {
+            authRejections++;
             return json({ error: "unauthorised" }, 401);
+          }
           await jwtVerify(token, keys, { issuer, audience: resource });
           if (request.method === "GET") return json({}, 405);
           if (request.method === "DELETE") return response.writeHead(204).end();
@@ -355,6 +358,11 @@ test(
       steps.push(search, { name: "connect_mcp", arguments: {} });
       assert.equal((await answer("missing")).needsConnection, true);
       assert.equal(requests.length, 0, "A missing grant must not reach MCP");
+      assert.equal(
+        authRejections,
+        0,
+        "Missing grants must not make anonymous MCP requests",
+      );
       await consent();
       const revision = connectionRevision(directory, "123");
       steps.push(search, call("whoami"), "CONNECTED");
@@ -382,6 +390,14 @@ test(
       rejectedToken = refreshed;
       steps.push(search, { name: "connect_mcp", arguments: {} });
       assert.equal((await answer("revoked")).needsConnection, true);
+      assert.ok(
+        authRejections > 0,
+        "The actual MCP transport must observe the revoked grant's HTTP 401",
+      );
+      const rejectedDiscovery = (modelCalls.at(-1) as any).messages
+        .filter((entry: any) => entry.role === "tool")
+        .at(-1).content;
+      assert.match(rejectedDiscovery, /unavailable|authorization/i);
       const beforeReconsent = count("whoami");
       await consent();
       assert.notEqual(connectionRevision(directory, "123"), revision);
