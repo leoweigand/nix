@@ -22,6 +22,9 @@ for (const interruption of process.env.EVE_LIVE_TEST === "1"
     { timeout: 90_000 },
     async () => {
       const directory = mkdtempSync(join(tmpdir(), "eve-integration-"));
+      const engineDirectory = mkdtempSync(
+        join(process.env.EVE_TEST_ENGINE_TMPDIR ?? tmpdir(), "eve-engine-"),
+      );
       const calls: Array<{
         model: string;
         tools: string[];
@@ -160,7 +163,7 @@ for (const interruption of process.env.EVE_LIVE_TEST === "1"
       let logs = "";
       async function start() {
         engine = spawn(process.execPath, [output], {
-          cwd: directory,
+          cwd: engineDirectory,
           env: {
             ...process.env,
             PORT: String(port),
@@ -171,6 +174,7 @@ for (const interruption of process.env.EVE_LIVE_TEST === "1"
             WORKFLOW_INLINE_OWNERSHIP: "0",
             ASSISTANT_AI_URL: `http://127.0.0.1:${modelPort}/v1`,
             ASSISTANT_STATE_DIR: directory,
+            ASSISTANT_EVE_STATE_DIR: engineDirectory,
             ASSISTANT_INSTRUCTIONS_FILE: instructionPath,
             TELEGRAM_WEBHOOK_SECRET: "fixture-secret",
             TELEGRAM_DESTINATIONS: "leo:123",
@@ -308,7 +312,7 @@ for (const interruption of process.env.EVE_LIVE_TEST === "1"
         console.error(
           logs,
           JSON.stringify(calls.map(({ model, tools }) => ({ model, tools }))),
-          directory,
+          { directory, engineDirectory },
         );
         throw error;
       } finally {
@@ -318,8 +322,10 @@ for (const interruption of process.env.EVE_LIVE_TEST === "1"
           await once(engine, "exit");
         }
         await new Promise<void>((resolve) => model.close(() => resolve()));
-        if (!process.env.EVE_KEEP_FIXTURE)
+        if (!process.env.EVE_KEEP_FIXTURE) {
           rmSync(directory, { recursive: true, force: true });
+          rmSync(engineDirectory, { recursive: true, force: true });
+        }
       }
     },
   );

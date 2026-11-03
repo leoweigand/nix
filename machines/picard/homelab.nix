@@ -18,6 +18,7 @@ let
       "/var/lib/private/leolab-mcp" # Private document ingestion receipts and expiring uploads
       "/var/lib/private/notification-gateway" # Delivered alerts waiting to enter assistant context
       "/var/lib/leolab-assistant-instructions"
+      config.homelab.infra.assistant.eveStateDir # Native filesystem; virtiofs cannot safely unlink hard-link staging files
     ];
     paperless = [
       "${mounts.fast}/documents/paperless/library"

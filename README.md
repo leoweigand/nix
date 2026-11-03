@@ -188,8 +188,13 @@ supervises the built engine on loopback port 9091; ingress remains on port 9090.
 The engine's default HTTP session API is disabled and its internal turn route
 requires the worker secret. `agent/connections/leolab.ts` obtains the caller's
 existing Pocket ID grant, filters by scopes and audience, and journals writes
-before execution. Eve workflow data lives under the persistent service state
-in `.eve/.workflow-data`. Pi remains the ledger/OAuth compatibility dependency.
+before execution. Eve's runtime state lives on Picard's native filesystem at
+`/var/lib/leolab-assistant-eve`, with workflows under `.eve/.workflow-data`.
+Systemd creates the private directory; Landlock grants Eve access, and Picard's
+appdata backup includes it even after switching back to Pi. Telegram inbox/grants
+remain under `/mnt/fast/appdata/leolab-assistant`. The virtiofs share returns
+`ESTALE` after hard-link staging files are unlinked, so it cannot hold Eve's local
+world. Pi remains the ledger/OAuth compatibility dependency.
 No separate Now MCP service is introduced.
 
 The package build applies a version/hash-guarded local-world recovery patch before

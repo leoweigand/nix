@@ -8,6 +8,7 @@ let
   cfg = config.homelab.infra.assistant;
   assistant = pkgs.callPackage ../../../packages/assistant { };
   sandbox = pkgs.callPackage ../../../packages/automation/sandbox.nix { };
+  eveStateName = "leolab-assistant-eve";
   instructionsDir = "/var/lib/leolab-assistant-instructions";
   instructionBundle = pkgs.writeText "assistant-instructions.json" (
     builtins.toJSON {
@@ -22,7 +23,7 @@ let
       exec ${sandbox}/bin/landrun \
         --rox /nix/store --ro /etc/resolv.conf --ro /etc/nsswitch.conf \
         --ro /etc/hosts --ro /dev/urandom --ro /proc/self --ro /proc/meminfo --ro /proc/cpuinfo \
-        --rw ${lib.escapeShellArg cfg.stateDir} \
+        --rw ${lib.escapeShellArg cfg.stateDir} ${lib.optionalString (cfg.runtime == "eve") "--rw ${cfg.eveStateDir}"} \
         --ro ${instructionsDir} \
         --ro "$CREDENTIALS_DIRECTORY" \
         --env CREDENTIALS_DIRECTORY \
@@ -33,6 +34,7 @@ let
         --env ASSISTANT_POCKET_ID_SUBJECT=${lib.escapeShellArg cfg.pocketIdSubject} \
         --env ASSISTANT_OAUTH_CALLBACK_URL=${lib.escapeShellArg "https://webhooks.${config.homelab.baseDomain}/assistant/oauth/callback"} \
         --env ASSISTANT_RUNTIME=${cfg.runtime} \
+        ${lib.optionalString (cfg.runtime == "eve") "--env ASSISTANT_EVE_STATE_DIR=${cfg.eveStateDir}"} \
         --env ASSISTANT_STATE_DIR=${lib.escapeShellArg cfg.stateDir} \
         --env TELEGRAM_WEBHOOK_SECRET --env TELEGRAM_DESTINATIONS \
         --env ASSISTANT_BOT_USERNAME=${lib.escapeShellArg cfg.botUsername} \
@@ -52,12 +54,18 @@ in
         "eve"
       ];
       default = "pi";
-      description = "Agent engine; Eve is experimental pending crash-recovery validation";
+      description = "Agent engine; Pi is the default and Eve requires an explicit rollout";
     };
     stateDir = lib.mkOption {
       type = lib.types.str;
       default = "/mnt/fast/appdata/leolab-assistant";
-      description = "Persistent inbox, Eve workflows, conversation ledger and private OAuth credentials";
+      description = "Persistent inbox, conversation ledger and private OAuth credentials";
+    };
+    eveStateDir = lib.mkOption {
+      type = lib.types.str;
+      default = "/var/lib/${eveStateName}";
+      readOnly = true;
+      description = "Native-filesystem Eve runtime and workflow state; separate from the shared inbox/grants";
     };
     pocketIdSubject = lib.mkOption {
       type = lib.types.str;
@@ -123,7 +131,9 @@ in
           "exa-api-key:${config.services.onepassword-secrets.secretPaths.assistantExaApiKey}"
         ];
         WorkingDirectory = cfg.stateDir;
-        ReadWritePaths = [ cfg.stateDir ];
+        StateDirectory = eveStateName;
+        StateDirectoryMode = "0700";
+        ReadWritePaths = [ cfg.stateDir ] ++ lib.optional (cfg.runtime == "eve") cfg.eveStateDir;
         Restart = "on-failure";
         RestartSec = "5s";
         TimeoutStopSec = "20s";

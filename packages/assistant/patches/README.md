@@ -52,3 +52,12 @@ This is a terminal-transition repair, not a general transactional replacement fo
 the local world or proof against every filesystem/power-loss failure. Review and
 remove or update the patch when changing Eve. Old corrupted state with an empty
 marker has no trustworthy redo payload and cannot be repaired automatically.
+
+Picard keeps the engine working directory on its native filesystem at
+`/var/lib/leolab-assistant-eve`. Its systemd StateDirectory is private and included
+in the appdata backup, including while Pi is selected. The existing Telegram
+inbox, grants and delivery receipts remain on `/mnt/fast/appdata/leolab-assistant`.
+The virtiofs export reproducibly returns `ESTALE` for `link(a, b); unlink(a);
+read(b)`, a primitive used throughout the upstream local world. The shared mount
+is unchanged. The supervisor requires `ASSISTANT_EVE_STATE_DIR` explicitly, and
+the launcher grants that path only to Eve.

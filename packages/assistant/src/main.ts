@@ -45,12 +45,15 @@ const sessions = new Sessions(
 );
 // The built engine is immutable; only its workflow data lives in the state directory.
 const useEve = process.env.ASSISTANT_RUNTIME === "eve";
+const engineStateDir = process.env.ASSISTANT_EVE_STATE_DIR;
+if (useEve && !engineStateDir)
+  throw new Error("Missing native-filesystem Eve state directory");
 const engine = useEve
   ? spawn(
       process.execPath,
       [fileURLToPath(new URL("../.output/server/index.mjs", import.meta.url))],
       {
-        cwd: stateDir,
+        cwd: engineStateDir,
         env: {
           ...process.env,
           PORT: "9091",
