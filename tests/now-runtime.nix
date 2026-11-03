@@ -34,6 +34,7 @@ pkgs.runCommand "now-runtime-check"
     export AWS_ACCESS_KEY_ID=fixture AWS_SECRET_ACCESS_KEY=fixture-secret AWS_REGION=us-east-1
     export CELLD_BUCKET=s3://now S3_ENDPOINT=http://127.0.0.1:18333
     export CELLD_WATCH="$PWD/runtime" CELLD_NODE=fixture CELLD_IDLE_EVICT_S=2
+    export CELLD_MAX_RESIDENT_CELLS=8 CELLD_MAX_RSS_MB=384 CELLD_V8_HEAP_LIMIT_MB=64
     export ESBUILD_BINARY_PATH=${pkgs.esbuild}/bin/esbuild
     export NOW_TEST_COMPILE_SANDBOX=${builder.compile}
     ready=false
@@ -67,6 +68,12 @@ pkgs.runCommand "now-runtime-check"
     start_runtime
     export NOW_TEST_RUNTIME_URL=http://127.0.0.1:18970 NOW_TEST_RUNTIME_TOKEN=fixture-only NOW_TEST_IDLE_WAIT_MS=3500
     node --test ${package}/lib/leolab-now/src/runtime_test.ts || { cat celld.log weed.log; exit 1; }
+    python3 - "$store_pid" "$runtime_pid" <<'PY'
+    import json,pathlib,sys
+    for component,pid in zip(('object-store','celld'),sys.argv[1:]):
+        fields=dict(line.split(':',1) for line in pathlib.Path(f'/proc/{pid}/status').read_text().splitlines() if ':' in line)
+        print(json.dumps({'component':component,'rssKiB':int(fields['VmRSS'].split()[0]),'peakKiB':int(fields['VmHWM'].split()[0])}))
+    PY
     export NOW_RECOVERY_DIR="$PWD/recovery"
     node ${package}/lib/leolab-now/src/recovery-fixture.ts seed
     kill -KILL "$runtime_pid"
