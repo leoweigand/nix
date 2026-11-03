@@ -64,8 +64,8 @@ function install(
         PATH: process.env.PATH!,
         HOME: directory,
         npm_config_cache: path.join(directory, ".cache"),
-        npm_config_userconfig: "/dev/null",
-        npm_config_globalconfig: "/dev/null",
+        npm_config_userconfig: path.join(directory, ".npm-user"),
+        npm_config_globalconfig: path.join(directory, ".npm-global"),
         ...(process.env.SSL_CERT_FILE
           ? { SSL_CERT_FILE: process.env.SSL_CERT_FILE }
           : {}),
@@ -112,8 +112,11 @@ export async function bundle(
         dependencies: source.dependencies ?? {},
       }),
     );
-    if (Object.keys(source.dependencies ?? {}).length)
+    if (Object.keys(source.dependencies ?? {}).length) {
+      await writeFile(path.join(directory, ".npm-user"), "");
+      await writeFile(path.join(directory, ".npm-global"), "");
       await install(directory, options.npm ?? "npm", options.sandbox);
+    }
     const code = options.compileSandbox
       ? await isolatedCompile(directory, options.compileSandbox)
       : await compile(directory);
