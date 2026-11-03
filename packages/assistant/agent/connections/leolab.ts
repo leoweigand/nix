@@ -3,7 +3,10 @@ import { connectionStore, runtimeContext } from "../lib/context.ts";
 import { availableTools } from "../../src/tools.ts";
 import { labApproval } from "../lib/policy.ts";
 
-export default defineDynamic(async (ctx) => {
+export async function labConnection(
+  ctx: Parameters<typeof runtimeContext>[0],
+  onlyNow = false,
+) {
   const { message, senderId } = runtimeContext(ctx);
   const token = await connectionStore().token(senderId);
   if (!token) return null;
@@ -21,10 +24,11 @@ export default defineDynamic(async (ctx) => {
       },
     },
     tools: {
-      allow: availableTools(token, message.audience).map((name) =>
-        name.replace("mcp__leolab__", ""),
-      ),
+      allow: availableTools(token, message.audience)
+        .filter((name) => !onlyNow || name.startsWith("mcp__leolab__now_"))
+        .map((name) => name.replace("mcp__leolab__", "")),
     },
     approval: labApproval,
   });
-});
+}
+export default defineDynamic((ctx) => labConnection(ctx));

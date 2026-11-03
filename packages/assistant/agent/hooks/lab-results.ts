@@ -1,5 +1,6 @@
 import { defineHook } from "eve/hooks";
-import { runtimeContext, loadJournal, saveJournal } from "../lib/context.ts";
+import { runtimeContext } from "../lib/context.ts";
+import { recordLabResult } from "../lib/lab-results.ts";
 
 export default defineHook({
   events: {
@@ -24,19 +25,6 @@ export default defineHook({
         ledger.appendCustomEntry("eve-compaction", { id: event.data.changeId });
       }
     },
-    "call.settled": (event, ctx) => {
-      const { directory } = runtimeContext(ctx);
-      const journal = loadJournal(directory);
-      const entry = journal.entries.find(
-        (entry) => entry.callId === event.data.callId,
-      );
-      if (!entry || event.data.outcome !== "completed") return;
-      const output = event.data.output;
-      entry.result =
-        output && typeof output === "object" && "structuredContent" in output
-          ? output.structuredContent
-          : output;
-      saveJournal(directory, journal);
-    },
+    "call.settled": recordLabResult,
   },
 });

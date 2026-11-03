@@ -1,6 +1,17 @@
 import { decodeJwt } from "jose";
 
 export const toolRegistry = {
+  mcp__leolab__now_create: { scope: "now:write", write: true },
+  mcp__leolab__now_list: { scope: "now:read", write: false },
+  mcp__leolab__now_get: { scope: "now:read", write: false },
+  mcp__leolab__now_put_source: { scope: "now:write", write: true },
+  mcp__leolab__now_build: { scope: "now:write", write: true },
+  mcp__leolab__now_get_build: { scope: "now:read", write: false },
+  mcp__leolab__now_deploy: { scope: "now:write", write: true },
+  mcp__leolab__now_rollback: { scope: "now:write", write: true },
+  mcp__leolab__now_request: { scope: "now:write", write: true },
+  mcp__leolab__now_logs: { scope: "now:read", write: false },
+  mcp__leolab__now_destroy: { scope: "now:write", write: true },
   mcp__leolab__search_documents: { scope: "documents:read", write: false },
   mcp__leolab__get_document: { scope: "documents:read", write: false },
   mcp__leolab__ingest_document: { scope: "documents:ingest", write: true },
@@ -28,7 +39,7 @@ export interface WriteAttempt {
   url?: string;
   attachmentId?: string;
 }
-export const maxToolCalls = 12;
+export const maxToolCalls = 64;
 // The host verifies this token cryptographically before passing it to Pi.
 // This decoding only controls presentation; MCP independently enforces scopes.
 export function availableTools(
@@ -43,15 +54,16 @@ export function availableTools(
     .filter(
       ([name]) =>
         audience === "private" ||
-        ![
-          "mcp__leolab__search_documents",
-          "mcp__leolab__get_document",
-          "mcp__leolab__ingest_document",
-          "mcp__leolab__get_ingestion_status",
-          "mcp__leolab__search_bookmarks",
-          "mcp__leolab__get_bookmark",
-          "mcp__leolab__save_bookmark",
-        ].includes(name),
+        (!name.startsWith("mcp__leolab__now_") &&
+          ![
+            "mcp__leolab__search_documents",
+            "mcp__leolab__get_document",
+            "mcp__leolab__ingest_document",
+            "mcp__leolab__get_ingestion_status",
+            "mcp__leolab__search_bookmarks",
+            "mcp__leolab__get_bookmark",
+            "mcp__leolab__save_bookmark",
+          ].includes(name)),
     )
     .map(([name]) => name);
 }
