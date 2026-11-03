@@ -71,3 +71,11 @@ application-specific acceptance checks; generic HTTP success is not proof that
 every app feature works. Private artifacts contain model requests,
 MCP operation inputs without bearer tokens, the journal, engine log and final
 response. The live mode is never enabled by the normal package test suite.
+
+For a fresh-conversation frontend update, set `EVE_SMOKE_UPDATE_TEST=1` and
+`EVE_SMOKE_PRESERVED_VALUES` to a JSON array of seeded strings expected in the
+app's response after deployment. That mode also requires list/get discovery,
+partial source updates containing only `public/*` files, the previous active
+release as the deploy precondition, and no app creation or destruction. Each
+invocation starts with fresh assistant conversation/workflow state; the
+isolated Now fixture retains the existing app and user data.

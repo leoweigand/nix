@@ -80,7 +80,9 @@ test(
     }
     const keys = createLocalJWKSet(jwks);
 
-    let granted = scopes;
+    const granted = [
+      ...new Set([...scopes.split(" "), "now:read", "now:write"]),
+    ].join(" ");
     let refreshRejected = false;
     let refreshCalls = 0;
     let issued = 0;
@@ -602,6 +604,63 @@ test(
           ),
           "The app must return a successful HTTP response",
         );
+        if (process.env.EVE_SMOKE_UPDATE_TEST === "1") {
+          assert.ok(
+            count("now_list") > 0 && count("now_get") > 0,
+            "A fresh conversation must discover and read the existing app",
+          );
+          assert.equal(count("now_create"), 0);
+          assert.equal(count("now_destroy"), 0);
+          const previous = journal.entries.find(
+            (entry) => entry.tool === "mcp__leolab__now_get",
+          )?.result as any;
+          assert.ok(
+            previous?.app?.active,
+            "Update fixture must already have a deployed release",
+          );
+          for (const entry of journal.entries.filter(
+            (entry) => entry.tool === "mcp__leolab__now_put_source",
+          )) {
+            assert.equal(
+              entry.input.replace,
+              false,
+              "Use the partial-source update contract",
+            );
+            assert.ok(
+              Object.keys(entry.input.files as object).every((path) =>
+                path.startsWith("public/"),
+              ),
+              "This frontend update must not resubmit or change the backend",
+            );
+          }
+          const deployed = journal.entries.findIndex(
+            (entry) => entry.tool === "mcp__leolab__now_deploy",
+          );
+          assert.equal(
+            journal.entries[deployed].input.expectedRelease,
+            previous.app.active,
+          );
+          const retained: string[] = JSON.parse(
+            process.env.EVE_SMOKE_PRESERVED_VALUES ?? "[]",
+          );
+          assert.ok(
+            retained.length > 0,
+            "Specify seeded values to verify after the update",
+          );
+          assert.ok(
+            journal.entries.slice(deployed + 1).some((entry) => {
+              const result = entry.result as any;
+              return (
+                entry.tool === "mcp__leolab__now_request" &&
+                result?.status === 200 &&
+                retained.every((value) =>
+                  JSON.stringify(result.body).includes(value),
+                )
+              );
+            }),
+            "The seeded data must still be returned after deploying the update",
+          );
+        }
         const before = modelCalls.length;
         await stop();
         await start();
