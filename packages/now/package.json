@@ -1,0 +1,12 @@
+{
+  "name": "leolab-now",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "esbuild": "0.27.2"
+  },
+  "scripts": {
+    "test": "node --test src/*_test.ts"
+  }
+}
