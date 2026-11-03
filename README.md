@@ -200,6 +200,12 @@ by another message. `EVE_LIVE_TEST=1 node --test src/eve-integration_test.ts`
 uses both real models with synthetic prompts and sends no Telegram messages.
 `EVE_CRASH_TEST=1 node --test src/eve-integration_test.ts` reproduces the known
 publication/checkpoint restart regression; this check currently fails.
+`EVE_STORAGE_CRASH_TEST=1 node --test src/eve-local-world_test.ts` isolates its
+upstream cause without a build or model: the bundled local world claims a terminal
+step marker before committing the checkpoint and completion event. Interruption
+can permanently prevent completion retries. This opt-in regression currently
+fails too; normal checks do not establish crash safety. See the migration plan
+for the evidence and rollout gate.
 
 ## Machines
 - **picard (NixOS VM on laforge)**: Runs the homelab edge (reverse proxy, DNS), plus apps (Immich, Paperless-ngx, etc.). Laforge is the Unraid host with the storage array and SSD cache drives.
