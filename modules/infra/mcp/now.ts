@@ -133,7 +133,8 @@ export class NowClient {
       error:
         !response.ok ||
         output.outcome === "error" ||
-        output.outcome === "uncertain",
+        output.outcome === "uncertain" ||
+        output.outcome === "destroyed",
     };
   }
 }

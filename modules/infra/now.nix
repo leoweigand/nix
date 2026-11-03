@@ -261,5 +261,10 @@ in
         '';
       };
     };
+    services.restic.backups = lib.mkIf config.homelab.infra.backup.enable {
+      now.backupCleanupCommand = ''
+        ${pkgs.systemd}/bin/systemctl start leolab-now-store leolab-now-runtime leolab-now
+      '';
+    };
   };
 }

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Control, identity } from "./control.ts";
@@ -110,6 +110,12 @@ test("ownership, retry receipts, stale edits and destroyed builds", async () => 
     );
     await Promise.all(control.jobs);
     assert.equal(control.app(id).state, "destroyed");
+    const oldCreate = await control.operation(owner, "create", {
+      key: "create-app-1",
+      description: "Save named QR codes.",
+    });
+    assert.equal(oldCreate.outcome, "destroyed");
+    assert.equal(control.all("SELECT * FROM apps").length, 1);
     assert.equal(
       control.all("SELECT * FROM releases WHERE app=?", id).length,
       0,
@@ -126,8 +132,8 @@ test("ownership, retry receipts, stale edits and destroyed builds", async () => 
           releaseId: build.releaseId,
           expectedRelease: null,
         })
-      ).status,
-      410,
+      ).outcome,
+      "destroyed",
     );
   } finally {
     control.db.close();
@@ -218,3 +224,48 @@ test("an interrupted receipt is reported as uncertain without repeating a write"
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test(
+  "cancelling a build kills the entire compiler process group",
+  { timeout: 5000 },
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "now-cancel-"));
+    const compiler = join(directory, "compiler.mjs"),
+      ready = join(directory, "ready.json");
+    await writeFile(
+      compiler,
+      `#!${process.execPath}\nimport {spawn} from 'node:child_process';import{writeFileSync}from'node:fs';const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'inherit'});writeFileSync(${JSON.stringify(ready)},JSON.stringify({parent:process.pid,child:child.pid}));setInterval(()=>{},1000);`,
+      { mode: 0o700 },
+    );
+    const controller = new AbortController();
+    const job = bundle(source, directory, {
+      compileSandbox: compiler,
+      signal: controller.signal,
+    });
+    void job.catch(() => {});
+    let pids: { parent: number; child: number } | undefined;
+    try {
+      for (let i = 0; i < 200 && !pids; i++) {
+        try {
+          pids = JSON.parse(await readFile(ready, "utf8"));
+        } catch {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+      }
+      assert.ok(pids, "Compiler fixture did not start");
+      controller.abort(new Error("App destroyed"));
+      await assert.rejects(job, /App destroyed/);
+      // The grandchild inherits stdout. A surviving grandchild would keep the
+      // compiler's close event (and thus this rejection) pending indefinitely.
+    } finally {
+      controller.abort();
+      if (pids)
+        for (const pid of [-pids.parent, pids.child])
+          try {
+            process.kill(pid, "SIGKILL");
+          } catch {}
+      await job.catch(() => {});
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);

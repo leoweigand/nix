@@ -7,7 +7,7 @@ import {
   realpath,
   rm,
 } from "node:fs/promises";
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import path from "node:path";
 
 export interface Source {
@@ -42,10 +42,45 @@ export function validateSource(source: Source) {
       );
 }
 
+function killJob(child: ChildProcess) {
+  try {
+    if (child.pid && process.platform !== "win32")
+      process.kill(-child.pid, "SIGKILL");
+    else child.kill("SIGKILL");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+  }
+}
+function watchJob(
+  child: ChildProcess,
+  signal: AbortSignal | undefined,
+  timeout: number,
+  failed: (error: Error) => void,
+) {
+  const abort = () => {
+    failed(
+      signal?.reason instanceof Error
+        ? signal.reason
+        : new Error("Build cancelled"),
+    );
+    killJob(child);
+  };
+  const timer = setTimeout(() => {
+    failed(new Error("Build timed out"));
+    killJob(child);
+  }, timeout);
+  signal?.addEventListener("abort", abort, { once: true });
+  if (signal?.aborted) abort();
+  child.once("close", () => {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", abort);
+  });
+}
 function install(
   directory: string,
   npm: string,
   sandbox?: string,
+  signal?: AbortSignal,
 ): Promise<void> {
   // No submitted package.json, scripts, npmrc, environment or lifecycle hooks.
   const args = [
@@ -71,21 +106,28 @@ function install(
           : {}),
       },
       stdio: ["ignore", "pipe", "pipe"],
-      timeout: 120_000,
+      detached: process.platform !== "win32",
     });
     let diagnostics = "";
     for (const stream of [child.stdout, child.stderr])
       stream.on("data", (b) => {
         diagnostics = (diagnostics + b).slice(-12000);
       });
-    child.on("error", reject);
+    let failure: Error | undefined;
+    watchJob(child, signal, 120_000, (error) => {
+      failure = error;
+    });
+    child.on("error", (error) => {
+      failure = error;
+    });
     child.on("close", (code) =>
-      code === 0
+      code === 0 && !failure
         ? resolve()
         : reject(
-            new Error(
-              `Dependency installation failed (${code}): ${diagnostics}`,
-            ),
+            failure ??
+              new Error(
+                `Dependency installation failed (${code}): ${diagnostics}`,
+              ),
           ),
     );
   });
@@ -94,8 +136,14 @@ function install(
 export async function bundle(
   source: Source,
   scratch: string,
-  options: { npm?: string; sandbox?: string; compileSandbox?: string } = {},
+  options: {
+    npm?: string;
+    sandbox?: string;
+    compileSandbox?: string;
+    signal?: AbortSignal;
+  } = {},
 ) {
+  options.signal?.throwIfAborted();
   validateSource(source);
   await mkdir(scratch, { recursive: true });
   const directory = await mkdtemp(path.join(scratch, "build-"));
@@ -115,11 +163,18 @@ export async function bundle(
     if (Object.keys(source.dependencies ?? {}).length) {
       await writeFile(path.join(directory, ".npm-user"), "");
       await writeFile(path.join(directory, ".npm-global"), "");
-      await install(directory, options.npm ?? "npm", options.sandbox);
+      await install(
+        directory,
+        options.npm ?? "npm",
+        options.sandbox,
+        options.signal,
+      );
     }
+    options.signal?.throwIfAborted();
     const code = options.compileSandbox
-      ? await isolatedCompile(directory, options.compileSandbox)
+      ? await isolatedCompile(directory, options.compileSandbox, options.signal)
       : await compile(directory);
+    options.signal?.throwIfAborted();
     return {
       code,
       lock: Object.keys(source.dependencies ?? {}).length
@@ -182,28 +237,38 @@ export async function compile(directory: string): Promise<string> {
   return code;
 }
 
-function isolatedCompile(directory: string, sandbox: string): Promise<string> {
+function isolatedCompile(
+  directory: string,
+  sandbox: string,
+  signal?: AbortSignal,
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(sandbox, [directory], {
       cwd: directory,
       env: { ESBUILD_BINARY_PATH: process.env.ESBUILD_BINARY_PATH ?? "" },
       stdio: ["ignore", "pipe", "pipe"],
-      timeout: 30_000,
+      detached: process.platform !== "win32",
     });
     let code = "",
       diagnostics = "";
     child.stdout.on("data", (b) => {
       code += b;
-      if (Buffer.byteLength(code) > 3 * 1024 * 1024) child.kill("SIGKILL");
+      if (Buffer.byteLength(code) > 3 * 1024 * 1024) killJob(child);
     });
     child.stderr.on("data", (b) => {
       diagnostics = (diagnostics + b).slice(-12000);
     });
-    child.on("error", reject);
+    let failure: Error | undefined;
+    watchJob(child, signal, 30_000, (error) => {
+      failure = error;
+    });
+    child.on("error", (error) => {
+      failure = error;
+    });
     child.on("close", (status) =>
-      status === 0
+      status === 0 && !failure
         ? resolve(code)
-        : reject(new Error(`Compile failed: ${diagnostics}`)),
+        : reject(failure ?? new Error(`Compile failed: ${diagnostics}`)),
     );
   });
 }

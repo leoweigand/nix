@@ -31,8 +31,10 @@ The frontend rejects missing identity and cross-origin writes. Lab MCP uses a
 separate service-authenticated request bridge with its verified caller subject;
 MCP tokens are never treated as browser cookies.
 
-Destroy first withdraws routing, then deletes each tracked user/probe facet and
-live source/releases. Retired supervisor roots retain a small tombstone, so old
+Destroy first withdraws routing, cancels complete builder process groups, then
+deletes each tracked user/probe facet, live source/releases and cached app
+responses. Receipt hashes remain to prevent replay. Retired supervisor roots
+retain a small tombstone, so old
 code cannot reopen them. Generated hostnames are never reused. Existing backups
 expire normally; destroy is not secure erasure.
 
@@ -41,6 +43,8 @@ with separate credentials loaded by systemd. The backup job briefly stops the
 control plane, runtime and store to take a coherent private staging copy, then
 resumes them before restic uploads it. Build scratch and celld's reconstructible
 local cache are excluded from that snapshot.
+Build scratch uses a private 256 MiB tmpfs. The initial platform limits are
+24 live apps globally and 40 source revisions/releases per app.
 
 `npm test` exercises control-plane ownership, source conflicts, deletion races,
 operation recovery, import boundaries and authenticated ingress. The Linux

@@ -30,6 +30,10 @@ export class Control {
   db: DatabaseSync;
   locks = new Map<string, Promise<unknown>>();
   jobs = new Set<Promise<unknown>>();
+  builds = new Map<
+    string,
+    { appId: string; controller: AbortController; job?: Promise<void> }
+  >();
   config: {
     database: string;
     scratch: string;
@@ -49,10 +53,16 @@ export class Control {
       CREATE TABLE IF NOT EXISTS revisions(id TEXT PRIMARY KEY, app TEXT, source TEXT);
       CREATE TABLE IF NOT EXISTS releases(id TEXT PRIMARY KEY, app TEXT, revision TEXT, state TEXT, code TEXT, lock TEXT, error TEXT);
       CREATE TABLE IF NOT EXISTS roots(app TEXT, root TEXT, PRIMARY KEY(app,root));
-      CREATE TABLE IF NOT EXISTS receipts(owner TEXT, key TEXT, hash TEXT, state TEXT, result TEXT, PRIMARY KEY(owner,key));
+      CREATE TABLE IF NOT EXISTS receipts(owner TEXT, key TEXT, hash TEXT, state TEXT, result TEXT, app TEXT, PRIMARY KEY(owner,key));
       CREATE TABLE IF NOT EXISTS logs(id TEXT PRIMARY KEY, app TEXT, release TEXT, at TEXT, method TEXT, path TEXT, status INTEGER, error TEXT);
       UPDATE releases SET state='failed', error='Build interrupted; submit a new build' WHERE state='building';
       UPDATE receipts SET state='uncertain' WHERE state='pending';`);
+    if (
+      !this.all("PRAGMA table_info(receipts)").some(
+        (column) => column.name === "app",
+      )
+    )
+      this.db.exec("ALTER TABLE receipts ADD COLUMN app TEXT");
   }
   one(sql: string, ...params: any[]): Row | undefined {
     return this.db.prepare(sql).get(...params) as Row | undefined;
@@ -122,26 +132,51 @@ export class Control {
         return JSON.parse(previous.result);
       }
       this.run(
-        "INSERT INTO receipts VALUES(?,?,?,'pending',NULL)",
+        "INSERT INTO receipts(owner,key,hash,state,result,app) VALUES(?,?,?,'pending',NULL,?)",
         owner,
         input.key,
         hash,
+        typeof input.appId === "string" ? input.appId : null,
       );
       try {
-        const result = await this.execute(owner, action, input);
+        let result = await this.execute(owner, action, input);
+        const appId =
+          typeof input.appId === "string"
+            ? input.appId
+            : (result.app?.id ?? null);
+        if (
+          appId &&
+          action !== "destroy" &&
+          this.one(
+            "SELECT state FROM apps WHERE id=? AND owner=?",
+            appId,
+            owner,
+          )?.state === "destroyed"
+        )
+          result = { outcome: "destroyed", appId };
         this.run(
-          "UPDATE receipts SET state='done',result=? WHERE owner=? AND key=?",
+          "UPDATE receipts SET state='done',result=?,app=? WHERE owner=? AND key=?",
           JSON.stringify(result),
+          appId,
           owner,
           input.key,
         );
         return result;
       } catch (error) {
-        const result = {
+        let result: Row = {
           outcome: "error",
           status: error instanceof NowError ? error.status : 500,
           message: error instanceof Error ? error.message : "Operation failed",
         };
+        if (
+          typeof input.appId === "string" &&
+          this.one(
+            "SELECT state FROM apps WHERE id=? AND owner=?",
+            input.appId,
+            owner,
+          )?.state === "destroyed"
+        )
+          result = { outcome: "destroyed", appId: input.appId };
         this.run(
           "UPDATE receipts SET state='done',result=? WHERE owner=? AND key=?",
           JSON.stringify(result),
@@ -248,8 +283,20 @@ export class Control {
           app.id,
         ),
       };
-    if (action === "destroy")
+    if (action === "destroy") {
+      if (app.state !== "destroyed")
+        this.run(
+          "UPDATE apps SET state='deleting',active=NULL WHERE id=?",
+          app.id,
+        );
+      const builds = [...this.builds.values()].filter(
+        (build) => build.appId === app.id,
+      );
+      for (const build of builds)
+        build.controller.abort(new Error("App destroyed"));
+      await Promise.allSettled(builds.map((build) => build.job));
       return this.serial(app.id, () => this.destroy(app.id, owner));
+    }
     this.live(app.id, owner);
     if (action === "put_source") {
       if (input.baseRevision !== app.head)
@@ -330,9 +377,24 @@ export class Control {
         app.id,
         input.revision,
       );
-      const job = this.build(id, app.id, JSON.parse(revision.source));
+      const tracked: {
+        appId: string;
+        controller: AbortController;
+        job?: Promise<void>;
+      } = { appId: app.id, controller: new AbortController() };
+      this.builds.set(id, tracked);
+      const job = this.build(
+        id,
+        app.id,
+        JSON.parse(revision.source),
+        tracked.controller.signal,
+      );
+      tracked.job = job;
       this.jobs.add(job);
-      void job.finally(() => this.jobs.delete(job));
+      void job.finally(() => {
+        this.jobs.delete(job);
+        this.builds.delete(id);
+      });
       return { releaseId: id, state: "building" };
     }
     if (["deploy", "rollback"].includes(action))
@@ -383,10 +445,13 @@ export class Control {
     }
     throw new NowError(404, "Unknown operation");
   }
-  async build(id: string, appId: string, source: Source) {
+  async build(id: string, appId: string, source: Source, signal?: AbortSignal) {
     const root = `${appId}:probe:${id}`;
     try {
-      const built = await bundle(source, this.config.scratch, this.config);
+      const built = await bundle(source, this.config.scratch, {
+        ...this.config,
+        signal,
+      });
       await this.serial(appId, async () => {
         this.live(appId);
         this.run("INSERT OR IGNORE INTO roots VALUES(?,?)", appId, root);
@@ -572,6 +637,14 @@ export class Control {
     try {
       for (const table of ["releases", "revisions", "logs"])
         this.run(`DELETE FROM ${table} WHERE app=?`, appId);
+      // Keep deduplication metadata, but remove cached app responses and source
+      // diagnostics. Replaying an old create/request must not resurrect data.
+      this.run(
+        "UPDATE receipts SET state='done',result=? WHERE app=? AND owner=?",
+        JSON.stringify({ outcome: "destroyed", appId }),
+        appId,
+        owner,
+      );
       this.run(
         "UPDATE apps SET state='destroyed',description='',head=NULL,active=NULL WHERE id=?",
         appId,

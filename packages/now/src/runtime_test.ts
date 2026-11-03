@@ -103,6 +103,17 @@ test(
         "denied",
       );
       const second = await publish(ids[0]!, 2, first);
+      const cached = await call("request", {
+        appId: ids[0],
+        path: "/api",
+        method: "GET",
+      });
+      assert.equal(cached.status, 200);
+      assert.ok(
+        control
+          .all("SELECT result FROM receipts WHERE app=?", ids[0])
+          .some((row) => row.result?.includes(userKey(owner))),
+      );
       assert.equal((await (await read(ids[0]!, owner)).json()).n, 1);
       assert.equal(
         (
@@ -135,6 +146,11 @@ test(
         "destroyed",
       );
       await assert.rejects(read(ids[0]!, owner), /destroyed/);
+      assert.ok(
+        control
+          .all("SELECT result FROM receipts WHERE app=?", ids[0])
+          .every((row) => !row.result?.includes(userKey(owner))),
+      );
       const probe = await control.invoke({
         root: `${ids[0]}:${userKey(owner)}`,
         operation: "fetch",
