@@ -11,6 +11,14 @@ an operation key. Repeating identical input recovers its recorded result; an
 interrupted pending operation is reported as uncertain rather than repeated.
 Source edits compare `baseRevision`; activation compares `expectedRelease`.
 
+Apps have a one- or two-word `displayName` (up to 60 characters), separate from
+their immutable ID and generated hostname. Creation requires this name and a
+one-sentence description. The grid uses the display name; discovery matches it,
+the description and the hostname. `now_rename` compares `expectedDisplayName`
+before updating the name without changing code, releases, icons or user data.
+The registry adds a nullable display-name column to older databases on startup;
+legacy entries fall back to a humanised hostname until explicitly named.
+
 Apps export a Durable Object class `App` from `src/app.ts`. Files under `public/`
 are served as authenticated static assets. Dependencies use exact npm versions.
 The server creates its own package manifest and disables lifecycle scripts.

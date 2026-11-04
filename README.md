@@ -141,6 +141,9 @@ renewal. The launcher consumes accepted proofs durably to prevent replay.
 `https://now.leolab.party/` is the authenticated, mobile-first app library: a
 compact grid of app names and stable coloured squiggle icons generated from app
 IDs, headed Apps, with no search or description copy.
+Labels use an agent-chosen display name of one or two words. The one-sentence
+description is retained for discovery, which matches names, descriptions and
+hostnames. Renaming updates metadata without changing the URL, icon or saved data.
 Private-chat buttons for canonical Now app URLs open the selected app inside
 Telegram; group buttons remain browser links. The library and apps retain private
 LAN/Tailscale reachability. Generated apps remain ordinary websites; general and
