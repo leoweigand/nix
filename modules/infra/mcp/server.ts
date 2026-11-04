@@ -87,6 +87,7 @@ export function createApp(
   now?: NowClient,
 ) {
   const canonical = new URL(config.resource);
+  const maxRequestBodySize = now ? 2 * 1024 * 1024 : 64 * 1024;
   const scopes = [...defaultScopes, ...(now ? ["now:read", "now:write"] : [])];
   const metadataUrl = `${canonical.origin}/.well-known/oauth-protected-resource${canonical.pathname}`;
   const mcp = createMcpHandler(
@@ -557,11 +558,11 @@ export function createApp(
     {
       legacy: "stateless",
       responseMode: "auto",
-      maxRequestBodySize: 64 * 1024,
+      maxRequestBodySize,
       maxSubscriptions: 0,
     },
   );
-  const handleMcp = toNodeHandler(mcp, { maxRequestBodySize: 64 * 1024 });
+  const handleMcp = toNodeHandler(mcp, { maxRequestBodySize });
   let active = 0;
   let uploads = 0;
   const server = createServer(

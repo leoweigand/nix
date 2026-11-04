@@ -117,6 +117,24 @@ test("existing lab MCP provides Now tools with verified caller and separate read
       arguments: { key: "create-fixture", description: "Test." },
     });
     assert.equal(calls[1]!.subject, "verified-alice");
+    await rpc("writer", "tools/call", {
+      name: "now_put_source",
+      arguments: {
+        key: "large-source-fixture",
+        appId: "00000000-0000-4000-8000-000000000001",
+        baseRevision: null,
+        files: {
+          "src/app.ts": "export class App {}",
+          "public/app.js": "//" + "x".repeat(100_000),
+        },
+      },
+    });
+    assert.equal(
+      (calls[2]!.body as { files: Record<string, string> }).files[
+        "public/app.js"
+      ]!.length,
+      100_002,
+    );
   } finally {
     await app.close();
     app.server.closeAllConnections();
