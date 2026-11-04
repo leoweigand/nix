@@ -212,6 +212,22 @@ export class Control {
         "gentle",
         "mossy",
         "violet",
+        "bright",
+        "calm",
+        "crimson",
+        "dappled",
+        "frosty",
+        "golden",
+        "hidden",
+        "lunar",
+        "mellow",
+        "nimble",
+        "rosy",
+        "shady",
+        "sunny",
+        "velvet",
+        "wild",
+        "winter",
       ];
       const plants = [
         "monstera",
@@ -222,9 +238,33 @@ export class Control {
         "orchid",
         "cedar",
         "iris",
+        "acacia",
+        "aloe",
+        "aspen",
+        "azalea",
+        "birch",
+        "briar",
+        "cactus",
+        "dahlia",
+        "elm",
+        "hazel",
+        "ivy",
+        "juniper",
+        "lotus",
+        "magnolia",
+        "poppy",
+        "sage",
       ];
       const id = randomUUID();
-      const slug = `${adjectives[randomInt(adjectives.length)]}-${plants[randomInt(plants.length)]}-${randomUUID().slice(0, 6)}`;
+      // Include retired names so old bookmarks can never point to a new app.
+      const reserved = new Set(
+        this.all("SELECT slug FROM apps").map((a) => a.slug),
+      );
+      const available = adjectives
+        .flatMap((adjective) => plants.map((plant) => `${adjective}-${plant}`))
+        .filter((name) => !reserved.has(name));
+      if (!available.length) throw new NowError(409, "App names exhausted");
+      const slug = available[randomInt(available.length)]!;
       this.run(
         "INSERT INTO apps VALUES(?,?,?,?,NULL,NULL,'live')",
         id,

@@ -15,6 +15,42 @@ const source = {
   },
   dependencies: {},
 };
+test("two-word app names remain unique across live and retired apps, with explicit exhaustion", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "now-names-"));
+  const control = new Control({
+    database: join(directory, "registry.sqlite"),
+    scratch: directory,
+    domain: "now.example",
+    runtimeUrl: "http://127.0.0.1:1",
+    runtimeToken: "fixture",
+  });
+  try {
+    const names = new Set<string>();
+    let exhausted = false;
+    for (let i = 0; i < 2000; i++) {
+      try {
+        const { app } = await control.execute(owner, "create", {
+          description: "Name allocation fixture.",
+        });
+        assert.match(app.slug, /^[a-z]+-[a-z]+$/);
+        assert.equal(names.has(app.slug), false);
+        names.add(app.slug);
+        assert.equal(app.url, `https://${app.slug}.now.example`);
+        // Retired app rows reserve their names without needing a runtime here.
+        control.run("UPDATE apps SET state='destroyed' WHERE id=?", app.id);
+      } catch (error) {
+        assert.match(String(error), /App names exhausted/);
+        exhausted = true;
+        break;
+      }
+    }
+    assert.ok(names.size > 24);
+    assert.ok(exhausted);
+  } finally {
+    control.db.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 test("ownership, retry receipts, stale edits and destroyed builds", async () => {
   const directory = await mkdtemp(join(tmpdir(), "now-test-"));
   const control = new Control({
