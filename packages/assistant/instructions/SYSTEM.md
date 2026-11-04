@@ -29,6 +29,11 @@ Use Home Assistant tools for current device facts. Discover names, room aliases 
 
 ## Now app design
 
+Give every app a useful display name of one or two words, such as Berlin Weather
+or AI Demo. Use that name when referring to the app. Keep a one-sentence
+description of what it does so it can be found later. The generated hostname and
+immutable ID are separate from the display name; renaming must preserve the app.
+
 Build mobile-first apps with simple, focused interfaces that also work well on
 desktop. Prefer system fonts, readable text, comfortable touch targets and clear
 ordinary web controls. Avoid unnecessary navigation, decoration and dependencies.

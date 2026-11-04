@@ -21,6 +21,7 @@ export function library(
   apps: {
     id: string;
     slug: string;
+    displayName: string;
     description: string;
     url: string;
     active: string | null;
@@ -30,5 +31,5 @@ export function library(
   const live = apps.filter((app) => app.state === "live");
   return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Apps</title>
 <style>:root{font-family:system-ui,-apple-system,sans-serif;color-scheme:light dark;background:#f5f5f7;color:#1d1d1f}*{box-sizing:border-box}body{max-width:42rem;margin:auto;padding:24px 20px 40px}h1{font-size:28px;letter-spacing:-.6px;line-height:1.2;margin:0 0 28px;font-weight:700}ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px 12px}li{min-width:0}a,.pending{display:flex;flex-direction:column;align-items:center;gap:9px;color:inherit;text-decoration:none;text-align:center;-webkit-tap-highlight-color:transparent}svg{width:72px;height:72px;max-width:100%;filter:drop-shadow(0 2px 3px #0001)}.name{font-size:12px;line-height:1.3;font-weight:500;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}a:active svg{transform:scale(.93)}a:focus-visible{outline:2px solid currentColor;outline-offset:7px;border-radius:16px}.pending{opacity:.45}p{color:#777;font-size:15px}@media(min-width:520px){body{padding:32px}ul{grid-template-columns:repeat(4,minmax(0,1fr));gap:28px 20px}svg{width:80px;height:80px}.name{font-size:13px}}@media(prefers-color-scheme:dark){:root{background:#000;color:#f5f5f7}}</style>
-<h1>Apps</h1><ul>${live.map((app) => `<li>${app.active ? `<a href="${escape(app.url)}" aria-label="${escape(app.slug)}">` : `<div class="pending" aria-label="${escape(app.slug)} — not deployed yet">`}${icon(app.id)}<span class="name">${escape(app.slug)}</span>${app.active ? "</a>" : "</div>"}</li>`).join("")}</ul>${live.length ? "" : "<p>No apps yet.</p>"}</html>`;
+<h1>Apps</h1><ul>${live.map((app) => `<li>${app.active ? `<a href="${escape(app.url)}" aria-label="${escape(app.displayName)}">` : `<div class="pending" aria-label="${escape(app.displayName)} — not deployed yet">`}${icon(app.id)}<span class="name">${escape(app.displayName)}</span>${app.active ? "</a>" : "</div>"}</li>`).join("")}</ul>${live.length ? "" : "<p>No apps yet.</p>"}</html>`;
 }

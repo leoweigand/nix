@@ -138,7 +138,12 @@ test(
     try {
       for (let i = 0; i < 2; i++)
         ids.push(
-          (await call("create", { description: `Counter ${i}.` })).app.id,
+          (
+            await call("create", {
+              displayName: "Test App",
+              description: `Counter ${i}.`,
+            })
+          ).app.id,
         );
       const first = await publish(ids[0]!, 1, null);
       await publish(ids[1]!, 1, null);

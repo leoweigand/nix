@@ -40,6 +40,7 @@ test("Now tools are available in groups with the sender's scopes; personal docum
   const granted = token("now:read now:write documents:read bookmarks:read");
   const shared = availableTools(granted, "shared");
   assert.ok(shared.includes("mcp__leolab__now_create"));
+  assert.ok(shared.includes("mcp__leolab__now_rename"));
   assert.ok(shared.includes("mcp__leolab__now_get"));
   assert.ok(shared.includes("mcp__leolab__now_destroy"));
   assert.ok(!shared.includes("mcp__leolab__search_documents"));
@@ -47,6 +48,7 @@ test("Now tools are available in groups with the sender's scopes; personal docum
   const readOnly = availableTools(token("now:read"), "shared");
   assert.ok(readOnly.includes("mcp__leolab__now_get"));
   assert.ok(!readOnly.includes("mcp__leolab__now_create"));
+  assert.ok(!readOnly.includes("mcp__leolab__now_rename"));
   assert.ok(
     !availableTools(token("media:read"), "shared").includes(
       "mcp__leolab__now_get",

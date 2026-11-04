@@ -30,6 +30,7 @@ test("two-word app names remain unique across live and retired apps, with explic
     for (let i = 0; i < 2000; i++) {
       try {
         const { app } = await control.execute(owner, "create", {
+          displayName: "Test App",
           description: "Name allocation fixture.",
         });
         assert.match(app.slug, /^[a-z]+-[a-z]+$/);
@@ -63,11 +64,13 @@ test("ownership, retry receipts, stale edits and destroyed builds", async () => 
   try {
     const created = await control.operation(owner, "create", {
       key: "create-app-1",
+      displayName: "Test App",
       description: "Save named QR codes.",
     });
     assert.deepEqual(
       await control.operation(owner, "create", {
         key: "create-app-1",
+        displayName: "Test App",
         description: "Save named QR codes.",
       }),
       created,
@@ -75,6 +78,7 @@ test("ownership, retry receipts, stale edits and destroyed builds", async () => 
     await assert.rejects(
       control.operation(owner, "create", {
         key: "create-app-1",
+        displayName: "Test App",
         description: "Different",
       }),
       /different input/,
@@ -148,6 +152,7 @@ test("ownership, retry receipts, stale edits and destroyed builds", async () => 
     assert.equal(control.app(id).state, "destroyed");
     const oldCreate = await control.operation(owner, "create", {
       key: "create-app-1",
+      displayName: "Test App",
       description: "Save named QR codes.",
     });
     assert.equal(oldCreate.outcome, "destroyed");
@@ -245,7 +250,11 @@ test("an interrupted receipt is reported as uncertain without repeating a write"
   };
   let control = new Control(config);
   try {
-    const input = { key: "create-app-1", description: "Test." };
+    const input = {
+      key: "create-app-1",
+      displayName: "Test App",
+      description: "Test.",
+    };
     await control.operation(owner, "create", input);
     control.run("UPDATE receipts SET state='pending'");
     control.db.close();
@@ -317,6 +326,7 @@ test("network permissions are revisioned, preserved by partial edits, revoked ex
   });
   try {
     const { app } = await control.execute(owner, "create", {
+      displayName: "Test App",
       description: "Network fixture.",
     });
     const first = await control.execute(owner, "put_source", {

@@ -11,6 +11,7 @@ type App = {
   slug: string;
   owner: string;
   description: string;
+  display_name: string | null;
   head: string | null;
   active: string | null;
   state: string;
@@ -28,6 +29,20 @@ export function identity(issuer: string, subject: string) {
 }
 export function userKey(owner: string) {
   return createHash("sha256").update(owner).digest("hex");
+}
+function displayName(value: unknown) {
+  if (typeof value !== "string")
+    throw new NowError(
+      400,
+      "Supply a display name of one or two words, at most 60 characters",
+    );
+  const name = value.trim().replace(/\s+/gu, " ");
+  if (!name || name.length > 60 || name.split(" ").length > 2)
+    throw new NowError(
+      400,
+      "Supply a display name of one or two words, at most 60 characters",
+    );
+  return name;
 }
 
 export class Control {
@@ -74,6 +89,12 @@ export class Control {
       )
     )
       this.db.exec("ALTER TABLE receipts ADD COLUMN app TEXT");
+    if (
+      !this.all("PRAGMA table_info(apps)").some(
+        (column) => column.name === "display_name",
+      )
+    )
+      this.db.exec("ALTER TABLE apps ADD COLUMN display_name TEXT");
   }
   one(sql: string, ...params: any[]): Row | undefined {
     return this.db.prepare(sql).get(...params) as Row | undefined;
@@ -107,8 +128,18 @@ export class Control {
     return a;
   }
   describe(a: App) {
-    const { owner: _owner, ...app } = a;
-    return { ...app, url: `https://${a.slug}.${this.config.domain}` };
+    const { owner: _owner, display_name, ...app } = a;
+    return {
+      ...app,
+      displayName:
+        display_name ??
+        a.slug
+          .split("-")
+          .slice(0, 2)
+          .map((word) => word[0].toUpperCase() + word.slice(1))
+          .join(" "),
+      url: `https://${a.slug}.${this.config.domain}`,
+    };
   }
   async operation(owner: string, action: string, input: Row): Promise<Row> {
     const reads = ["list", "get", "get_build", "logs"];
@@ -200,6 +231,7 @@ export class Control {
   }
   async execute(owner: string, action: string, input: Row): Promise<Row> {
     if (action === "create") {
+      const name = displayName(input.displayName);
       if (
         typeof input.description !== "string" ||
         !input.description.trim() ||
@@ -277,11 +309,12 @@ export class Control {
       if (!available.length) throw new NowError(409, "App names exhausted");
       const slug = available[randomInt(available.length)]!;
       this.run(
-        "INSERT INTO apps VALUES(?,?,?,?,NULL,NULL,'live')",
+        "INSERT INTO apps(id,slug,owner,description,head,active,state,display_name) VALUES(?,?,?,?,NULL,NULL,'live',?)",
         id,
         slug,
         owner,
         input.description.trim(),
+        name,
       );
       return { app: this.describe(this.app(id)) };
     }
@@ -294,13 +327,32 @@ export class Control {
           .filter(
             (a) =>
               !input.query ||
-              a.description
-                .toLowerCase()
-                .includes(String(input.query).toLowerCase()),
+              [this.describe(a as App).displayName, a.description, a.slug].some(
+                (value) =>
+                  value
+                    .toLowerCase()
+                    .includes(String(input.query).toLowerCase()),
+              ),
           )
           .map((a) => this.describe(a as App)),
       };
     const app = this.app(input.appId, owner);
+    if (action === "rename") {
+      this.live(app.id, owner);
+      const name = displayName(input.displayName);
+      if (input.expectedDisplayName !== this.describe(app).displayName)
+        throw new NowError(
+          409,
+          "App name changed; read the app before renaming it",
+        );
+      this.run(
+        "UPDATE apps SET display_name=? WHERE id=? AND owner=?",
+        name,
+        app.id,
+        owner,
+      );
+      return { app: this.describe(this.app(app.id, owner)) };
+    }
     if (action === "get")
       return {
         app: this.describe(app),
@@ -769,7 +821,7 @@ export class Control {
         owner,
       );
       this.run(
-        "UPDATE apps SET state='destroyed',description='',head=NULL,active=NULL WHERE id=?",
+        "UPDATE apps SET state='destroyed',description='',display_name=NULL,head=NULL,active=NULL WHERE id=?",
         appId,
       );
       this.db.exec("COMMIT");

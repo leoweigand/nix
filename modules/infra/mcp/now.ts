@@ -2,6 +2,15 @@ import { z } from "zod";
 import type { McpServer, AuthInfo } from "@modelcontextprotocol/server";
 
 const app = { appId: z.string().uuid() };
+const displayName = z
+  .string()
+  .trim()
+  .min(1)
+  .max(60)
+  .refine((name) => name.split(/\s+/u).length <= 2, "Use one or two words")
+  .describe(
+    "A useful human-readable app name of one or two words, such as Berlin Weather or AI Demo. Separate from the generated hostname.",
+  );
 const write = {
   key: z
     .string()
@@ -20,16 +29,34 @@ const release = {
 const definitions = {
   create: {
     description:
-      "Create a private authenticated app with a generated hostname and a one-sentence description for discovery.",
+      "Create a private authenticated app with a one- or two-word display name, generated hostname and a one-sentence description for discovery.",
     schema: z
-      .object({ ...write, description: z.string().min(1).max(300) })
+      .object({
+        ...write,
+        displayName,
+        description: z.string().min(1).max(300),
+      })
       .strict(),
     read: false,
   },
   list: {
-    description: "List your apps, optionally matching their description.",
+    description:
+      "List your apps, optionally matching their display name, description or hostname.",
     schema: z.object({ query: z.string().max(300).optional() }).strict(),
     read: true,
+  },
+  rename: {
+    description:
+      "Change an app's one- or two-word display name. Keeps its ID, hostname, code and saved data. Supply its current displayName as expectedDisplayName to prevent overwriting a concurrent rename.",
+    schema: z
+      .object({
+        ...app,
+        ...write,
+        displayName,
+        expectedDisplayName: displayName,
+      })
+      .strict(),
+    read: false,
   },
   get: {
     description:

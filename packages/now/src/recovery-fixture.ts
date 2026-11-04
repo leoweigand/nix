@@ -18,7 +18,10 @@ const call = (action: string, input: Record<string, unknown>) =>
 try {
   if (process.argv[2] === "seed") {
     const app = (
-      await call("create", { description: "Recovery acceptance counter." })
+      await call("create", {
+        displayName: "Test App",
+        description: "Recovery acceptance counter.",
+      })
     ).app;
     const source = `import {DurableObject} from 'cloudflare:workers';export class App extends DurableObject {async fetch(r){if(r.method==='POST')this.ctx.storage.kv.put('saved',await r.text());return Response.json({saved:this.ctx.storage.kv.get('saved')??null});}}`;
     const revision = await call("put_source", {

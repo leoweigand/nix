@@ -82,6 +82,7 @@ test("inference uses the serving revision, survives restart and follows revocati
   try {
     const owner = identity("https://id.test", "alice");
     const { app } = await control.execute(owner, "create", {
+      displayName: "Test App",
       description: "Inference fixture",
     });
     const root = `${app.id}:user`;

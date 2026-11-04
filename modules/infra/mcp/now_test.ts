@@ -84,7 +84,7 @@ test("existing lab MCP provides Now tools with verified caller and separate read
     assert.equal(
       listed.tools.filter((t: { name: string }) => t.name.startsWith("now_"))
         .length,
-      11,
+      12,
     );
     assert.equal(
       (await rpc("reader", "tools/call", { name: "now_list", arguments: {} }))
@@ -98,7 +98,11 @@ test("existing lab MCP provides Now tools with verified caller and separate read
     });
     const denied = await rpc("reader", "tools/call", {
       name: "now_create",
-      arguments: { key: "create-fixture", description: "Test." },
+      arguments: {
+        key: "create-fixture",
+        displayName: "Test App",
+        description: "Test.",
+      },
     });
     assert.equal(denied.isError, true);
     assert.equal(calls.length, 1);
@@ -106,6 +110,7 @@ test("existing lab MCP provides Now tools with verified caller and separate read
       name: "now_create",
       arguments: {
         key: "create-fixture",
+        displayName: "Test App",
         description: "Test.",
         subject: "bob",
       },
@@ -114,7 +119,11 @@ test("existing lab MCP provides Now tools with verified caller and separate read
     assert.equal(calls.length, 1);
     await rpc("writer", "tools/call", {
       name: "now_create",
-      arguments: { key: "create-fixture", description: "Test." },
+      arguments: {
+        key: "create-fixture",
+        displayName: "Test App",
+        description: "Test.",
+      },
     });
     assert.equal(calls[1]!.subject, "verified-alice");
     await rpc("writer", "tools/call", {
@@ -135,6 +144,48 @@ test("existing lab MCP provides Now tools with verified caller and separate read
       ]!.length,
       100_002,
     );
+    for (const displayName of [undefined, "One Two Three"]) {
+      assert.equal(
+        (
+          await rpc("writer", "tools/call", {
+            name: "now_create",
+            arguments: {
+              key: "invalid-name",
+              displayName,
+              description: "Test.",
+            },
+          })
+        ).isError,
+        true,
+      );
+    }
+    const rename = {
+      key: "rename-fixture",
+      appId: "00000000-0000-4000-8000-000000000001",
+      displayName: "Berlin Weather",
+      expectedDisplayName: "Test App",
+    };
+    assert.equal(
+      (
+        await rpc("reader", "tools/call", {
+          name: "now_rename",
+          arguments: rename,
+        })
+      ).isError,
+      true,
+    );
+    assert.equal(calls.length, 3);
+    assert.equal(
+      (
+        await rpc("writer", "tools/call", {
+          name: "now_rename",
+          arguments: rename,
+        })
+      ).isError,
+      false,
+    );
+    assert.deepEqual(calls[3]!.body, rename);
+    assert.equal(calls[3]!.subject, "verified-alice");
   } finally {
     await app.close();
     app.server.closeAllConnections();

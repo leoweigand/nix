@@ -18,6 +18,7 @@ test("Unix ingress requires identity and same-origin writes; the control API aut
   const owner = identity("https://id.test", "alice");
   const created = await control.operation(owner, "create", {
     key: "create-fixture",
+    displayName: "Test App",
     description: "HTTP fixture.",
   });
   const frontend = createFrontend(control, "https://id.test");
@@ -75,8 +76,8 @@ test("Unix ingress requires identity and same-origin writes; the control API aut
   try {
     const own = await catalogue("alice");
     assert.equal(own.status, 200);
-    assert.match(own.body, new RegExp(created.app.slug));
-    assert.ok(!(await catalogue("bob")).body.includes(created.app.slug));
+    assert.match(own.body, /<span class="name">Test App<\/span>/);
+    assert.ok(!(await catalogue("bob")).body.includes("Test App"));
     assert.equal((await stat(socket)).mode & 0o777, 0o660);
     for (const token of ["", "fixture-secret"]) {
       const denied = await fetch(url.replace("/v1/get", "/internal/egress"), {

@@ -2,6 +2,7 @@ import { decodeJwt } from "jose";
 
 export const toolRegistry = {
   mcp__leolab__now_create: { scope: "now:write", write: true },
+  mcp__leolab__now_rename: { scope: "now:write", write: true },
   mcp__leolab__now_list: { scope: "now:read", write: false },
   mcp__leolab__now_get: { scope: "now:read", write: false },
   mcp__leolab__now_put_source: { scope: "now:write", write: true },
