@@ -12,10 +12,22 @@ const worldModule = new URL(
   import.meta.resolve("eve"),
 );
 
+// The runtime rejects run IDs older than a day. Keep the crash fixtures current.
+function freshRunId() {
+  const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+  let timestamp = BigInt(Date.now());
+  let prefix = "";
+  for (let index = 0; index < 10; index++) {
+    prefix = alphabet[Number(timestamp & 31n)] + prefix;
+    timestamp >>= 5n;
+  }
+  return `wrun_${prefix}WMP6780AMKKEZT4B`;
+}
+
 test("Eve local world can finish a step after an interrupted terminal checkpoint", async () => {
   const { createWorld } = await import(worldModule.href);
   const directory = mkdtempSync(join(tmpdir(), "eve-storage-crash-"));
-  const runId = "wrun_01M6H4HJX6WMP6780AMKKEZT4B";
+  const runId = freshRunId();
   const stepId = "step_01M6H4HJX6EWC5872SH9EV50K0";
   const options = { dataDir: directory, recoverActiveRuns: false };
   let world = createWorld(options);
@@ -100,7 +112,7 @@ for (const outcome of [
       const { fileURLToPath } = await import("node:url");
       const { createWorld } = await import(worldModule.href);
       const directory = mkdtempSync(join(tmpdir(), "eve-terminal-crash-"));
-      const runId = "wrun_01M6H4HJX6WMP6780AMKKEZT4B";
+      const runId = freshRunId();
       const stepId = "step_01M6H4HJX6EWC5872SH9EV50K0";
       const isRun = outcome.startsWith("run_");
       const terminal = {
@@ -148,6 +160,7 @@ for (const outcome of [
               directory,
               point,
               outcome,
+              runId,
             ],
             { stdio: ["ignore", "pipe", "pipe"] },
           );
@@ -210,7 +223,7 @@ for (const kind of ["steps", "runs"])
     test(`recovery preserves uncertain ${kind} ${legacyState} terminal state`, async () => {
       const { createWorld } = await import(worldModule.href);
       const directory = mkdtempSync(join(tmpdir(), "eve-legacy-terminal-"));
-      const runId = "wrun_01M6H4HJX6WMP6780AMKKEZT4B";
+      const runId = freshRunId();
       const stepId = "step_01M6H4HJX6EWC5872SH9EV50K0";
       const options = { dataDir: directory, recoverActiveRuns: false };
       let world = createWorld(options);

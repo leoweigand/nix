@@ -1,8 +1,7 @@
 // Executed only by eve-local-world_test.ts in a disposable fixture directory.
 import fs from "node:fs/promises";
 import { join } from "node:path";
-const [directory, boundary, outcome] = process.argv.slice(2);
-const runId = "wrun_01M6H4HJX6WMP6780AMKKEZT4B";
+const [directory, boundary, outcome, runId] = process.argv.slice(2);
 const stepId = "step_01M6H4HJX6EWC5872SH9EV50K0";
 const isRun = outcome.startsWith("run_");
 const marker = isRun
