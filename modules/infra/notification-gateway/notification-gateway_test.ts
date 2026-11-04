@@ -1,5 +1,7 @@
 import { test } from "node:test";
 import {
+  nowLaunchButton,
+  registerNowMenu,
   createHandler,
   type GatewayConfig,
   loadConfig,
@@ -910,4 +912,47 @@ test("assistant attachment download rejects oversized files and unsafe Telegram 
     assert(response.status === 413);
     assert(test.calls.length === 1);
   }
+});
+
+test("Now links become Mini App buttons only in the owner's private chat", async () => {
+  const cfg = config({
+    destinations: new Map([["leo", "123"]]),
+    nowLauncherUrl: "https://auth.leolab.party/now/telegram",
+  });
+  const app = "https://violet-iris.now.leolab.party/";
+  assert(
+    JSON.stringify(nowLaunchButton(app, "123", cfg)) ===
+      JSON.stringify({
+        web_app: {
+          url: "https://auth.leolab.party/now/telegram?app=violet-iris",
+        },
+      }),
+  );
+  assert(
+    JSON.stringify(nowLaunchButton("https://now.leolab.party/", "123", cfg)) ===
+      JSON.stringify({ web_app: { url: cfg.nowLauncherUrl } }),
+  );
+  for (const [url, chat] of [
+    [app, "-456"],
+    ["https://evil.now.leolab.party.example/", "123"],
+    ["https://other.example/", "123"],
+    ["https://secret@violet-iris.now.leolab.party/", "123"],
+    ["https://violet-iris.now.leolab.party/private", "123"],
+  ]) {
+    assert(
+      JSON.stringify(nowLaunchButton(url, chat, cfg)) ===
+        JSON.stringify({ url }),
+    );
+  }
+  let sent: Record<string, any> = {};
+  await registerNowMenu(cfg, {
+    log: console,
+    fetch: async (_input, init) => {
+      sent = JSON.parse(String(init?.body));
+      return Response.json({ ok: true });
+    },
+  });
+  assert(sent.chat_id === "123");
+  assert(sent.menu_button.web_app.url === cfg.nowLauncherUrl);
+  assert(sent.menu_button.text === "Apps");
 });

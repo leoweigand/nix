@@ -6,6 +6,7 @@ import {
 import { chmod, rm } from "node:fs/promises";
 import { timingSafeEqual } from "node:crypto";
 import { Control, NowError, identity } from "./control.ts";
+import { library } from "./library.ts";
 
 async function body(request: IncomingMessage) {
   const chunks: Buffer[] = [];
@@ -93,6 +94,28 @@ export function createFrontend(control: Control, issuer: string) {
       if (typeof subject !== "string" || !subject || subject.length > 200)
         throw new NowError(401, "Missing authenticated user");
       const host = request.headers.host ?? "";
+      if (host === control.config.domain) {
+        if (
+          request.url !== "/" ||
+          !["GET", "HEAD"].includes(request.method ?? "")
+        )
+          throw new NowError(404, "Not found");
+        const { apps } = await control.operation(
+          identity(issuer, subject),
+          "list",
+          {},
+        );
+        response.writeHead(200, {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control": "no-store",
+          "referrer-policy": "no-referrer",
+          "x-content-type-options": "nosniff",
+          "content-security-policy":
+            "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; frame-ancestors https://web.telegram.org https://*.web.telegram.org; base-uri 'none'; form-action 'none'",
+        });
+        response.end(request.method === "HEAD" ? undefined : library(apps));
+        return;
+      }
       const suffix = `.${control.config.domain}`;
       if (!host.endsWith(suffix)) throw new NowError(404, "Unknown app");
       const slug = host.slice(0, -suffix.length);

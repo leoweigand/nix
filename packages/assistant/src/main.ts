@@ -11,6 +11,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { Sessions, type Instructions } from "./sessions.ts";
 import { Worker } from "./worker.ts";
+import { MiniApp, miniAppPath } from "./miniapp.ts";
 const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
 const stateDir = process.env.ASSISTANT_STATE_DIR;
 const subject = process.env.ASSISTANT_POCKET_ID_SUBJECT;
@@ -86,17 +87,33 @@ if (engine)
 const assistant = useEve
   ? new EveAssistant(stateDir, sessions)
   : new PiAssistant(stateDir, sessions);
+const connections = new Connections({
+  stateDir,
+  telegramId: ownerId,
+  subject,
+  callbackUrl,
+});
+const miniConfig = process.env.ASSISTANT_MINIAPP_CONFIG;
+const miniApp = miniConfig
+  ? new MiniApp({
+      ...JSON.parse(readFileSync(miniConfig, "utf8")),
+      stateDir,
+      ownerId,
+      subject,
+      connections,
+      botToken: process.env.TELEGRAM_BOT_TOKEN!,
+      apiKey: readFileSync(
+        join(process.env.CREDENTIALS_DIRECTORY!, "pocket-id-api-key"),
+        "utf8",
+      ).trim(),
+    })
+  : undefined;
 const worker = new Worker({
   secret,
   sessions,
   policy,
   inbox: new Inbox(join(stateDir, "inbox")),
-  connections: new Connections({
-    stateDir,
-    telegramId: ownerId,
-    subject,
-    callbackUrl,
-  }),
+  connections,
   assistant,
   stageAttachment: (job, token) => stageTelegramAttachment(job, token, secret),
   gateway: async (endpoint, body) => {
@@ -125,8 +142,16 @@ const server = createServer(async (incoming, outgoing) => {
             }),
       },
     );
-    const response = await worker.handle(request);
-    outgoing.writeHead(response.status, Object.fromEntries(response.headers));
+    const response =
+      miniApp && new URL(request.url).pathname === miniAppPath
+        ? await miniApp.handle(request)
+        : await worker.handle(request);
+    outgoing.writeHead(response.status, {
+      ...Object.fromEntries(response.headers),
+      ...(response.headers.has("set-cookie")
+        ? { "set-cookie": response.headers.getSetCookie() }
+        : {}),
+    });
     outgoing.end(await response.text());
   } catch {
     outgoing.writeHead(500).end();

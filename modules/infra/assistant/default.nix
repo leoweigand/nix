@@ -17,13 +17,24 @@ let
       channelName = "telegram";
     }
   );
+  miniAppEnabled = cfg.miniApp.enable;
+  miniAppConfig = pkgs.writeText "now-telegram.json" (
+    builtins.toJSON {
+      issuer = config.homelab.infra.oauth2Proxy.issuerUrl;
+      libraryUrl = "https://now.${config.homelab.baseDomain}/";
+      loginUrl = "https://${config.homelab.infra.oauth2Proxy.subdomain}.${config.homelab.baseDomain}";
+      allowedGroups = config.homelab.infra.oauth2Proxy.allowedGroups;
+    }
+  );
   launcher = pkgs.writeShellApplication {
     name = "leolab-assistant";
     text = ''
       exec ${sandbox}/bin/landrun \
         --rox /nix/store --ro /etc/resolv.conf --ro /etc/nsswitch.conf \
         --ro /etc/hosts --ro /dev/urandom --ro /proc/self --ro /proc/meminfo --ro /proc/cpuinfo \
-        --rw ${lib.escapeShellArg cfg.stateDir} ${lib.optionalString (cfg.runtime == "eve") "--rw ${cfg.eveStateDir}"} \
+        --rw ${lib.escapeShellArg cfg.stateDir} ${
+          lib.optionalString (cfg.runtime == "eve") "--rw ${cfg.eveStateDir}"
+        } \
         --ro ${instructionsDir} \
         --ro "$CREDENTIALS_DIRECTORY" \
         --env CREDENTIALS_DIRECTORY \
@@ -38,6 +49,7 @@ let
         ${lib.optionalString (cfg.runtime == "eve") "--env ASSISTANT_EVE_STATE_DIR=${cfg.eveStateDir}"} \
         --env ASSISTANT_STATE_DIR=${lib.escapeShellArg cfg.stateDir} \
         --env TELEGRAM_WEBHOOK_SECRET --env TELEGRAM_DESTINATIONS \
+        ${lib.optionalString miniAppEnabled "--env TELEGRAM_BOT_TOKEN --env ASSISTANT_MINIAPP_CONFIG=${miniAppConfig}"} \
         --env ASSISTANT_BOT_USERNAME=${lib.escapeShellArg cfg.botUsername} \
         --connect-tcp 443 --connect-tcp 9087 --bind-tcp 9090 ${
           lib.optionalString (cfg.runtime == "eve") "--connect-tcp 9091 --bind-tcp 9091"
@@ -77,9 +89,15 @@ in
       default = "";
       description = "Telegram bot username, without @; empty disables group replies";
     };
+    miniApp.enable = lib.mkEnableOption "Now launcher using Telegram identity and Pocket ID browser sign-in";
   };
   config = lib.mkIf cfg.enable {
     assertions = [
+      {
+        assertion =
+          !miniAppEnabled || (config.homelab.infra.now.enable && config.homelab.infra.pocketId.enable);
+        message = "The Telegram Now launcher requires Now and Pocket ID";
+      }
       {
         assertion =
           config.homelab.infra.notificationGateway.enable
@@ -87,6 +105,21 @@ in
         message = "The assistant requires the notification gateway on port 9087";
       }
     ];
+    services.caddy.virtualHosts."${config.homelab.infra.pocketId.subdomain}.${config.homelab.baseDomain}".extraConfig =
+      lib.mkIf miniAppEnabled (
+        lib.mkBefore ''
+          handle /now/telegram {
+            reverse_proxy http://127.0.0.1:9090
+          }
+        ''
+      );
+    services.onepassword-secrets.secrets.assistantPocketIdApiKey = lib.mkIf miniAppEnabled {
+      reference = "op://Homelab/Pocket ID API Key/credential";
+      owner = "root";
+      group = "root";
+      mode = "0400";
+      services = [ "leolab-assistant" ];
+    };
     homelab.infra.edge.webhookRoutes = lib.mkAfter [
       {
         path = "/assistant/oauth/callback";
@@ -130,7 +163,8 @@ in
         EnvironmentFile = config.services.onepassword-secrets.secretPaths.notificationGatewayEnv;
         LoadCredential = [
           "exa-api-key:${config.services.onepassword-secrets.secretPaths.assistantExaApiKey}"
-        ];
+        ]
+        ++ lib.optional miniAppEnabled "pocket-id-api-key:${config.services.onepassword-secrets.secretPaths.assistantPocketIdApiKey}";
         WorkingDirectory = cfg.stateDir;
         StateDirectory = eveStateName;
         StateDirectoryMode = "0700";

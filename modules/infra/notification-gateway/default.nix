@@ -22,6 +22,7 @@ let
       "TELEGRAM_ASSISTANT_ENABLED"
       "NOTIFICATION_CONTEXT_DIR"
       "NOTIFICATION_GATEWAY_PORT"
+      "NOW_TELEGRAM_LAUNCH_URL"
     ];
   };
 in
@@ -105,7 +106,8 @@ in
           "TELEGRAM_ASSISTANT_ENABLED=${lib.boolToString config.homelab.infra.assistant.enable}"
           "NOTIFICATION_GATEWAY_PORT=${toString cfg.port}"
           "TELEGRAM_WEBHOOK_URL=https://webhooks.${config.homelab.baseDomain}${cfg.webhookPath}"
-        ];
+        ]
+        ++ lib.optional config.homelab.infra.assistant.miniApp.enable "NOW_TELEGRAM_LAUNCH_URL=${config.homelab.infra.oauth2Proxy.issuerUrl}/now/telegram";
         DynamicUser = true;
         StateDirectory = lib.optional config.homelab.infra.assistant.enable "notification-gateway";
         Restart = "on-failure";

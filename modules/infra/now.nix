@@ -237,6 +237,10 @@ in
       upstream = "unix//run/leolab-now/frontend.sock";
       auth.passSubject = true;
     };
+    homelab.infra.edge.proxies.now = {
+      upstream = "unix//run/leolab-now/frontend.sock";
+      auth.passSubject = true;
+    };
     security.acme.certs.${config.homelab.baseDomain}.extraDomainNames = [ "*.${domain}" ];
     systemd.services.leolab-mcp = {
       requires = [ "leolab-now-keys.service" ];

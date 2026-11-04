@@ -51,7 +51,32 @@ test("Unix ingress requires identity and same-origin writes; the control API aut
       req.end();
     });
   }
+  async function catalogue(subject: string) {
+    return new Promise<{ status: number; body: string }>((resolve, reject) => {
+      const req = httpRequest(
+        {
+          socketPath: socket,
+          path: "/",
+          headers: { host: "now.test", "x-now-subject": subject },
+        },
+        (response) => {
+          let body = "";
+          response.setEncoding("utf8");
+          response.on("data", (chunk) => (body += chunk));
+          response.on("end", () =>
+            resolve({ status: response.statusCode!, body }),
+          );
+        },
+      );
+      req.on("error", reject);
+      req.end();
+    });
+  }
   try {
+    const own = await catalogue("alice");
+    assert.equal(own.status, 200);
+    assert.match(own.body, new RegExp(created.app.slug));
+    assert.ok(!(await catalogue("bob")).body.includes(created.app.slug));
     assert.equal((await stat(socket)).mode & 0o777, 0o660);
     for (const token of ["", "fixture-secret"]) {
       const denied = await fetch(url.replace("/v1/get", "/internal/egress"), {

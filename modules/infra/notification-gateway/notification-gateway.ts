@@ -35,6 +35,7 @@ export interface GatewayConfig {
   webhookSecret: string;
   webhookUrl: string;
   assistantEnabled?: boolean;
+  nowLauncherUrl?: string;
 }
 
 interface GatewayDependencies {
@@ -66,6 +67,7 @@ function runtimeEnvironment(): Record<string, string | undefined> {
     TELEGRAM_WEBHOOK_SECRET: process.env["TELEGRAM_WEBHOOK_SECRET"],
     TELEGRAM_WEBHOOK_URL: process.env["TELEGRAM_WEBHOOK_URL"],
     TELEGRAM_ASSISTANT_ENABLED: process.env["TELEGRAM_ASSISTANT_ENABLED"],
+    NOW_TELEGRAM_LAUNCH_URL: process.env["NOW_TELEGRAM_LAUNCH_URL"],
   };
 }
 
@@ -102,6 +104,7 @@ export function loadConfig(
     webhookSecret: requiredEnvironment("TELEGRAM_WEBHOOK_SECRET", environment),
     webhookUrl,
     assistantEnabled: environment["TELEGRAM_ASSISTANT_ENABLED"] === "true",
+    nowLauncherUrl: environment["NOW_TELEGRAM_LAUNCH_URL"] || undefined,
   };
 }
 
@@ -852,7 +855,7 @@ async function handleAssistantReply(
                 {
                   text: button.label,
                   ...(button.url
-                    ? { url: button.url }
+                    ? nowLaunchButton(button.url, chatId, config)
                     : { callback_data: button.token }),
                 },
               ],
@@ -951,6 +954,59 @@ async function handleAssistantReply(
   } catch {
     return new Response(null, { status: 400 });
   }
+}
+
+// Presentation belongs to the channel: agents supply normal, verified Now URLs.
+export function nowLaunchButton(
+  url: string,
+  chatId: string,
+  config: GatewayConfig,
+) {
+  if (!config.nowLauncherUrl || chatId !== config.destinations.get("leo"))
+    return { url };
+  const source = new URL(url);
+  const launch = new URL(config.nowLauncherUrl);
+  const domain = `now.${launch.hostname.split(".").slice(1).join(".")}`;
+  const slug = source.hostname.endsWith(`.${domain}`)
+    ? source.hostname.slice(0, -domain.length - 1)
+    : "";
+  if (
+    source.protocol !== "https:" ||
+    source.username ||
+    source.password ||
+    source.port ||
+    source.pathname !== "/" ||
+    source.search ||
+    source.hash ||
+    (source.hostname !== domain && !/^[a-z][a-z0-9-]{0,62}$/.test(slug))
+  )
+    return { url };
+  if (slug) launch.searchParams.set("app", slug);
+  return { web_app: { url: launch.href } };
+}
+
+export async function registerNowMenu(
+  config: GatewayConfig,
+  dependencies = defaultDependencies,
+) {
+  if (!config.nowLauncherUrl) return;
+  const response = await dependencies.fetch(
+    `https://api.telegram.org/bot${config.telegramBotToken}/setChatMenuButton`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        chat_id: config.destinations.get("leo"),
+        menu_button: {
+          type: "web_app",
+          text: "Apps",
+          web_app: { url: config.nowLauncherUrl },
+        },
+      }),
+    },
+  );
+  if (!response.ok || (await response.json()).ok !== true)
+    throw new Error("Now menu registration failed");
 }
 
 // Only the trusted worker can fetch Telegram bytes; the model never receives bot URLs/tokens.
@@ -1084,6 +1140,14 @@ if (import.meta.main) {
     throw new Error("NOTIFICATION_GATEWAY_PORT must be a valid TCP port");
   }
   await registerTelegramWebhook(config);
+  // An optional launcher must never prevent operational notifications starting.
+  try {
+    await registerNowMenu(config);
+  } catch {
+    console.warn(
+      "Now menu registration failed; notification delivery remains available",
+    );
+  }
   const outbox = config.assistantEnabled
     ? new ContextOutbox(
         process.env.NOTIFICATION_CONTEXT_DIR ??
