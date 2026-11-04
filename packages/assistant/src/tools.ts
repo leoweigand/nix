@@ -54,16 +54,15 @@ export function availableTools(
     .filter(
       ([name]) =>
         audience === "private" ||
-        (!name.startsWith("mcp__leolab__now_") &&
-          ![
-            "mcp__leolab__search_documents",
-            "mcp__leolab__get_document",
-            "mcp__leolab__ingest_document",
-            "mcp__leolab__get_ingestion_status",
-            "mcp__leolab__search_bookmarks",
-            "mcp__leolab__get_bookmark",
-            "mcp__leolab__save_bookmark",
-          ].includes(name)),
+        ![
+          "mcp__leolab__search_documents",
+          "mcp__leolab__get_document",
+          "mcp__leolab__ingest_document",
+          "mcp__leolab__get_ingestion_status",
+          "mcp__leolab__search_bookmarks",
+          "mcp__leolab__get_bookmark",
+          "mcp__leolab__save_bookmark",
+        ].includes(name),
     )
     .map(([name]) => name);
 }

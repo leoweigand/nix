@@ -13,7 +13,7 @@ export async function labConnection(
   return defineMcpClientConnection({
     url: process.env.ASSISTANT_MCP_URL ?? "https://mcp.leolab.party/mcp",
     description:
-      "LeoLab documents, bookmarks, media and approved home controls for the authenticated caller.",
+      "LeoLab documents, bookmarks, media, approved home controls and creating, publishing and managing authenticated Now apps for the caller.",
     instanceKey: senderId,
     auth: {
       principalType: "user",

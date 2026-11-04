@@ -785,23 +785,21 @@ test(
         "shared",
         privateTaskId,
       );
-      assert.equal(count("now_get"), 1);
-      assert.equal(count("now_put_source"), 1);
+      assert.equal(count("now_get"), 2);
+      assert.equal(count("now_put_source"), 2);
       const sharedCoderCalls = modelCalls
         .slice(sharedCoderOffset)
         .filter((entry: any) => entry.model === "deepseek-v4.1-flash") as any[];
       const sharedCoderDiscovery = sharedCoderCalls[1].messages
         .filter((entry: any) => entry.role === "tool")
         .at(-1).content;
-      assert.doesNotMatch(
-        sharedCoderDiscovery,
-        /leolab__now_get|leolab__now_put_source/,
-      );
-      assert.equal(
+      assert.match(sharedCoderDiscovery, /leolab__now_get/);
+      assert.match(sharedCoderDiscovery, /leolab__now_put_source/);
+      assert.deepEqual(
         readJson<ToolJournal>(
           join(directory, "eve-requests/coder-shared/tools.json"),
-        ),
-        undefined,
+        )!.entries.map((entry) => entry.tool),
+        ["mcp__leolab__now_get", "mcp__leolab__now_put_source"],
       );
 
       const staleToken = await connection.token("123");
