@@ -10,11 +10,15 @@ import {
 import { spawn, type ChildProcess } from "node:child_process";
 import path from "node:path";
 
+import { validateNetwork } from "./egress.ts";
+
 export interface Source {
+  network?: { server: string[] };
   files: Record<string, string>;
   dependencies: Record<string, string>;
 }
 export function validateSource(source: Source) {
+  validateNetwork(source.network);
   if (!source.files?.["src/app.ts"])
     throw new Error("Supply src/app.ts exporting class App");
   if (Object.keys(source.files).length > 64)

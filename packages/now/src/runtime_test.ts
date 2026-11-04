@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { createControlServer } from "./http.ts";
 import { Control, identity, userKey } from "./control.ts";
 
 test(
@@ -19,6 +20,24 @@ test(
       runtimeToken: process.env.NOW_TEST_RUNTIME_TOKEN!,
       compileSandbox: process.env.NOW_TEST_COMPILE_SANDBOX,
     });
+    const broker = createControlServer(
+      control,
+      "fixture-control",
+      "https://id.test",
+      process.env.NOW_TEST_RUNTIME_TOKEN!,
+    );
+    await new Promise<void>((resolve) =>
+      broker.listen(18972, "127.0.0.1", resolve),
+    );
+    const realEgress = control.egress.bind(control);
+    control.egress = async (input) => {
+      if (input.url === "https://api.example.com/fixture") {
+        assert.equal(input.headers.cookie, undefined);
+        assert.equal(input.headers.authorization, undefined);
+        return Response.json({ root: input.root, release: input.release });
+      }
+      return realEgress(input);
+    };
     const owner = identity("https://id.test", "alice"),
       other = identity("https://id.test", "bob");
     const ids: string[] = [];
@@ -29,7 +48,8 @@ test(
     ) => `import {DurableObject} from "cloudflare:workers";
     export class App extends DurableObject { async fetch(r) {
       const p=new URL(r.url).pathname;
-      if(p==='/egress'){try{await fetch('http://127.0.0.1:8333/');return new Response('unsafe');}catch{return new Response('denied');}}
+      if(p==='/network')return fetch('https://api.example.com/fixture');
+      if(p==='/egress'){try{const r=await fetch('http://127.0.0.1:8333/');return new Response(r.status===502?'denied':'unsafe');}catch{return new Response('denied');}}
       const n=this.ctx.storage.kv.get('n')??0;
       if(r.method==='POST')this.ctx.storage.kv.put('n',n+1);
       return Response.json({n,version:${version},user:r.headers.get('X-Now-User-ID')});
@@ -102,6 +122,15 @@ test(
         await (await read(ids[0]!, owner, "GET", "/egress")).text(),
         "denied",
       );
+      for (const who of [owner, other]) {
+        const outgoing = await (
+          await read(ids[0]!, who, "GET", "/network")
+        ).json();
+        assert.deepEqual(outgoing, {
+          root: `${ids[0]}:${userKey(who)}`,
+          release: first,
+        });
+      }
       const second = await publish(ids[0]!, 2, first);
       const cached = await call("request", {
         appId: ids[0],
@@ -175,6 +204,7 @@ test(
       for (const appId of ids)
         if (control.app(appId).state !== "destroyed")
           await call("destroy", { appId });
+      await new Promise<void>((resolve) => broker.close(() => resolve()));
       await Promise.all(control.jobs);
       control.db.close();
       await rm(directory, { recursive: true, force: true });

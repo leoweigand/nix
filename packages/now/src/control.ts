@@ -2,6 +2,8 @@ import { DatabaseSync } from "node:sqlite";
 import { randomUUID, createHash, randomInt } from "node:crypto";
 import { bundle, validateSource, type Source } from "./builder.ts";
 
+import { fetchPublic, type OutboundRequest } from "./egress.ts";
+
 type App = {
   id: string;
   slug: string;
@@ -30,6 +32,11 @@ export class Control {
   db: DatabaseSync;
   locks = new Map<string, Promise<unknown>>();
   jobs = new Set<Promise<unknown>>();
+  outbound = new Map<
+    string,
+    { since: number; count: number; active: number }
+  >();
+  outboundActive = 0;
   builds = new Map<
     string,
     { appId: string; controller: AbortController; job?: Promise<void> }
@@ -365,6 +372,7 @@ export class Control {
       const source = {
         files,
         dependencies: input.dependencies ?? base?.dependencies ?? {},
+        network: input.network ?? base?.network ?? { server: [] },
       } as Source;
       validateSource(source);
       const id = randomUUID();
@@ -531,6 +539,63 @@ export class Control {
       );
     }
   }
+  async egress(input: OutboundRequest & { root: string; release: string }) {
+    if (typeof input.root !== "string" || typeof input.release !== "string")
+      throw new NowError(400, "Missing outbound capability");
+    const appId = input.root.split(":")[0]!;
+    const app = this.live(appId);
+    if (
+      !this.one(
+        "SELECT root FROM roots WHERE app=? AND root=?",
+        appId,
+        input.root,
+      )
+    )
+      throw new NowError(403, "Unknown app root");
+    const release = this.one(
+      "SELECT * FROM releases WHERE id=? AND app=?",
+      input.release,
+      appId,
+    );
+    if (!release || (release.state !== "building" && app.active !== release.id))
+      throw new NowError(403, "Outbound release is no longer active");
+    const source: Source = JSON.parse(
+      this.one(
+        "SELECT source FROM revisions WHERE id=? AND app=?",
+        release.revision,
+        appId,
+      )!.source,
+    );
+    const now = Date.now();
+    let budget = this.outbound.get(appId);
+    if (!budget) {
+      budget = { since: now, count: 0, active: 0 };
+      this.outbound.set(appId, budget);
+    }
+    if (now - budget.since >= 60_000) {
+      budget.since = now;
+      budget.count = 0;
+    }
+    if (budget.count >= 60 || budget.active >= 2 || this.outboundActive >= 8)
+      throw new NowError(
+        429,
+        "Server fetch limit reached; do not automatically retry writes",
+      );
+    budget.count++;
+    budget.active++;
+    this.outboundActive++;
+    try {
+      return await fetchPublic(input, source.network?.server ?? []);
+    } catch (error) {
+      throw new NowError(
+        502,
+        error instanceof Error ? error.message : "Server fetch failed",
+      );
+    } finally {
+      budget.active--;
+      this.outboundActive--;
+    }
+  }
   async invoke(envelope: Row) {
     return fetch(this.config.runtimeUrl, {
       method: "POST",
@@ -631,7 +696,7 @@ export class Control {
         safe.set("Referrer-Policy", "no-referrer");
         safe.set(
           "Content-Security-Policy",
-          "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+          "default-src 'self' https:; script-src 'self' https: 'unsafe-inline'; style-src 'self' https: 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https: wss:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
         );
         return new Response(response.body, { status, headers: safe });
       } catch (e) {

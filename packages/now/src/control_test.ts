@@ -305,3 +305,93 @@ test(
     }
   },
 );
+
+test("network permissions are revisioned, preserved by partial edits, revoked explicitly and bound to the serving release", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "now-network-"));
+  const control = new Control({
+    database: join(directory, "registry.sqlite"),
+    scratch: directory,
+    domain: "now.test",
+    runtimeUrl: "http://127.0.0.1:1",
+    runtimeToken: "fixture",
+  });
+  try {
+    const { app } = await control.execute(owner, "create", {
+      description: "Network fixture.",
+    });
+    const first = await control.execute(owner, "put_source", {
+      appId: app.id,
+      baseRevision: null,
+      ...source,
+      network: { server: ["https://api.example.com"] },
+    });
+    const second = await control.execute(owner, "put_source", {
+      appId: app.id,
+      baseRevision: first.revision,
+      replace: false,
+      files: { "public/index.html": "weather" },
+    });
+    assert.deepEqual(
+      (await control.execute(owner, "get", { appId: app.id })).source.network,
+      { server: ["https://api.example.com"] },
+    );
+    const third = await control.execute(owner, "put_source", {
+      appId: app.id,
+      baseRevision: second.revision,
+      replace: false,
+      files: {},
+      network: { server: [] },
+    });
+    assert.deepEqual(
+      (await control.execute(owner, "get", { appId: app.id })).source.network,
+      { server: [] },
+    );
+    control.run(
+      "INSERT INTO releases VALUES(?,?,?,'ready',?,NULL,NULL)",
+      "release",
+      app.id,
+      third.revision,
+      "code",
+    );
+    control.run("UPDATE apps SET active=? WHERE id=?", "release", app.id);
+    const root = `${app.id}:user`;
+    control.run("INSERT INTO roots VALUES(?,?)", app.id, root);
+    const outbound = {
+      root,
+      release: "release",
+      url: "https://api.example.com/data",
+      method: "GET",
+      headers: {},
+      body: "",
+    };
+    await assert.rejects(control.egress(outbound), /not declared/);
+    await assert.rejects(
+      control.egress({ ...outbound, root: `${app.id}:forged` }),
+      /Unknown app root/,
+    );
+    await assert.rejects(
+      control.egress({ ...outbound, release: "unknown" }),
+      /no longer active/,
+    );
+    control.outbound.get(app.id)!.count = 60;
+    await assert.rejects(control.egress(outbound), /limit reached/);
+    const result = await control.serve(
+      app.id,
+      owner,
+      new Request(`https://${app.slug}.now.test/`),
+    );
+    assert.match(
+      result.headers.get("content-security-policy")!,
+      /connect-src 'self' https: wss:/,
+    );
+    assert.match(
+      result.headers.get("content-security-policy")!,
+      /frame-ancestors 'none'/,
+    );
+    control.run("UPDATE apps SET state='destroyed' WHERE id=?", app.id);
+    await assert.rejects(control.egress(outbound), /destroyed/);
+  } finally {
+    control.db.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});

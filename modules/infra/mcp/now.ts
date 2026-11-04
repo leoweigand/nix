@@ -39,7 +39,7 @@ const definitions = {
   },
   put_source: {
     description:
-      "Submit source files (default: COMPLETE snapshot), with src/app.ts exporting a DurableObject class App with fetch(request). public/* are static files. Set replace:false to merge changed files and use null to delete; omitted files/dependencies then stay unchanged. By default, omitted files are deleted. Supply current baseRevision (null initially), and exact npm dependency versions. No scripts, filesystem or outbound network in app code. X-Now-User-ID is verified; storage is isolated per app AND user.",
+      "Submit source files (default: COMPLETE snapshot), with src/app.ts exporting a DurableObject class App with fetch(request). public/* are static files. Set replace:false to merge changed files and use null to delete; omitted files/dependencies then stay unchanged. By default, omitted files are deleted. Supply current baseRevision (null initially), and exact npm dependency versions. Browser fetch may use external HTTPS APIs subject to CORS. Server fetch requires network.server listing exact HTTPS origins (maximum 16); private addresses, non-HTTPS, WebSockets and raw sockets are blocked. No scripts or host filesystem in app code. X-Now-User-ID is verified; storage is isolated per app AND user.",
     schema: z
       .object({
         ...app,
@@ -48,6 +48,10 @@ const definitions = {
         files: z.record(z.string(), z.string().nullable()),
         replace: z.boolean().default(true),
         dependencies: z.record(z.string(), z.string()).optional(),
+        network: z
+          .object({ server: z.array(z.string().max(300)).max(16) })
+          .strict()
+          .optional(),
       })
       .strict(),
     read: false,

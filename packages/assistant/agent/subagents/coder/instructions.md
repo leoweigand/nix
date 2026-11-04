@@ -25,8 +25,17 @@ extending DurableObject from cloudflare:workers, with fetch(request). Use
 this.ctx.storage.kv or this.ctx.storage.sql for durable data. State is private to
 each authenticated user; X-Now-User-ID is always a verified stable identifier.
 Use public/index.html and other public/* files for the UI; npm dependencies must
-use exact versions. App code has no outbound network access, host filesystem,
-shell, platform credentials or package lifecycle scripts.
+use exact versions. Browser fetch can call external HTTPS APIs; normal CORS rules apply. Keep API
+keys out of frontend code. For server-side fetch(), submit network:{server:[
+"https://api.example.com"]} in now_put_source. List each required exact HTTPS
+origin (up to 16, no paths, credentials, IP literals or custom ports); redirects
+must also target a declared origin. Omitted network is preserved with replace:false;
+use network:{server:[]} to revoke access. The platform broker blocks private and
+reserved addresses, raw sockets and WebSockets. Fetch is limited to 10 seconds,
+1 MiB request bodies, 2 MiB responses and three redirects; app budgets are 60
+requests/minute and two concurrent requests. Check non-success responses and
+report errors clearly; never blindly retry a write. App code has no host
+filesystem, shell, platform credentials or package lifecycle scripts.
 
 Build, poll the returned release ID, inspect diagnostics and fix source when
 needed, then deploy with the expected currently active release. Test the app

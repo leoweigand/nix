@@ -47,7 +47,7 @@ pkgs.runCommand "now-runtime-check"
     python3 - <<'PY'
     import json,pathlib
     c=json.loads(pathlib.Path("${package}/lib/leolab-now/runtime/wrangler.json").read_text())
-    c["vars"]={"CAPABILITY":"fixture-only"}
+    c["vars"]={"CAPABILITY":"fixture-only","EGRESS_URL":"http://127.0.0.1:18972/internal/egress"}
     pathlib.Path("bootstrap/wrangler.json").write_text(json.dumps(c))
     PY
     ${celld}/bin/celld deploy bootstrap --json

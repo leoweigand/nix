@@ -15,6 +15,7 @@ const api = createControlServer(
   control,
   credential("control-token"),
   config.issuer,
+  credential("runtime-token"),
 );
 api.listen(config.port, "127.0.0.1");
 const frontend = createFrontend(control, config.issuer);

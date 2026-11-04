@@ -23,7 +23,12 @@ test("Unix ingress requires identity and same-origin writes; the control API aut
   const frontend = createFrontend(control, "https://id.test");
   const socket = join(directory, "app.sock");
   await listenFrontend(frontend, socket);
-  const api = createControlServer(control, "fixture-secret", "https://id.test");
+  const api = createControlServer(
+    control,
+    "fixture-secret",
+    "https://id.test",
+    "runtime-secret",
+  );
   await new Promise<void>((resolve) => api.listen(0, "127.0.0.1", resolve));
   const address = api.address();
   assert.ok(address && typeof address !== "string");
@@ -48,6 +53,21 @@ test("Unix ingress requires identity and same-origin writes; the control API aut
   }
   try {
     assert.equal((await stat(socket)).mode & 0o777, 0o660);
+    for (const token of ["", "fixture-secret"]) {
+      const denied = await fetch(url.replace("/v1/get", "/internal/egress"), {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}` },
+        body: "{}",
+      });
+      assert.equal(denied.status, 401);
+    }
+    const invalid = await fetch(url.replace("/v1/get", "/internal/egress"), {
+      method: "POST",
+      headers: { authorization: "Bearer runtime-secret" },
+      body: "{}",
+    });
+    assert.equal(invalid.status, 400);
+
     assert.equal(await ingress({}), 401);
     assert.equal(
       await ingress(

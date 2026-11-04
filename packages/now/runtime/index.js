@@ -1,7 +1,7 @@
-import { DurableObject } from "cloudflare:workers";
+import { WorkerEntrypoint, DurableObject } from "cloudflare:workers";
 
 // Only the control plane holds this binding. Uploaded code gets no bindings,
-// loader, network access or authority to select another app's root object.
+// loader, direct network access or authority to select another app's root object.
 export default {
   async fetch(request, env) {
     if (request.headers.get("authorization") !== `Bearer ${env.CAPABILITY}`)
@@ -45,13 +45,15 @@ export class Supervisor extends DurableObject {
       return new Response("App state retired", { status: 410 });
     if (this.release !== e.release) {
       await this.ctx.facets.abort("app", "Code release changed");
-      this.worker = this.env.LOADER.get(e.release, () => ({
+      this.worker = this.env.LOADER.get(`${e.root}:${e.release}`, () => ({
         compatibilityDate: "2026-01-01",
         mainModule: "app.js",
         modules: { "app.js": e.code },
         env: {},
-        globalOutbound: null,
-        limits: { cpuMs: 1000, subRequests: 0 },
+        globalOutbound: this.ctx.exports.Outbound({
+          props: { root: e.root, release: e.release },
+        }),
+        limits: { cpuMs: 1000, subRequests: 16 },
       }));
       this.release = e.release;
     }
@@ -81,5 +83,52 @@ export class Supervisor extends DurableObject {
       [204, 205, 304].includes(response.status) ? null : body,
       { status: response.status, headers: response.headers },
     );
+  }
+}
+
+// Only this trusted entrypoint knows the broker URL and runtime credential.
+export class Outbound extends WorkerEntrypoint {
+  async fetch(request) {
+    if (!this.env.EGRESS_URL)
+      return new Response("Server fetch is unavailable", { status: 503 });
+    const chunks = [];
+    let size = 0;
+    const reader = request.body?.getReader();
+    if (reader) {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > 1024 * 1024) {
+          await reader.cancel();
+          return new Response("Outbound body exceeds 1 MiB", { status: 413 });
+        }
+        chunks.push(value);
+      }
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += 8192)
+      binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+    return fetch(this.env.EGRESS_URL, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${this.env.CAPABILITY}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        ...this.ctx.props,
+        url: request.url,
+        method: request.method,
+        headers: Object.fromEntries(request.headers),
+        body: btoa(binary),
+      }),
+      redirect: "error",
+    });
   }
 }

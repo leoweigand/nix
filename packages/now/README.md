@@ -22,7 +22,16 @@ The celld bootstrap authenticates control-plane envelopes, then routes to one
 supervisor per immutable app ID and verified user identity. Each supervisor
 owns an `app` facet. A release change aborts the facet and recreates its class
 while retaining its database. Uploaded code receives no platform bindings,
-credentials or outbound network capability. Requests always receive the stable
+credentials or direct outbound network capability. Server fetches use a trusted
+`globalOutbound` entrypoint and a loopback-only authenticated broker.
+`network.server` in each immutable source revision declares up to 16 exact HTTPS
+origins. The broker checks every redirect, rejects all private/reserved DNS
+answers and pins the checked address for TLS. It strips browser/platform identity
+headers, limits calls to ten seconds, 1 MiB request bodies, 2 MiB responses and
+three redirects, and allows two concurrent calls and 60 calls/minute per app
+(eight concurrent globally). Raw sockets and server WebSockets remain blocked.
+Browser pages can use external HTTPS resources and fetch APIs under normal
+CORS rules; framing, base URL and form restrictions remain. Requests always receive the stable
 `X-Now-User-ID` derived from the configured issuer and authenticated OIDC subject.
 Deploying or rolling back code does not roll back user data.
 

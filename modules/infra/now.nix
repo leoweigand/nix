@@ -169,7 +169,7 @@ in
         ${pkgs.python3}/bin/python3 - <<'PY'
         import json,os,pathlib
         config=json.loads(pathlib.Path("${source}/runtime/wrangler.json").read_text())
-        config["vars"]={"CAPABILITY":pathlib.Path(os.environ["CREDENTIALS_DIRECTORY"],"runtime-token").read_text().strip()}
+        config["vars"]={"CAPABILITY":pathlib.Path(os.environ["CREDENTIALS_DIRECTORY"],"runtime-token").read_text().strip(),"EGRESS_URL":"http://127.0.0.1:${toString cfg.port}/internal/egress"}
         pathlib.Path("/var/lib/leolab-now-runtime/wrangler.json").write_text(json.dumps(config))
         PY
         ${celld}/bin/celld deploy /var/lib/leolab-now-runtime --json

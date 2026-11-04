@@ -40,9 +40,23 @@ export function createControlServer(
   control: Control,
   token: string,
   issuer: string,
+  runtimeToken = "",
 ) {
   return createServer(async (request, response) => {
     try {
+      if (request.url === "/internal/egress" && request.method === "POST") {
+        if (
+          !runtimeToken ||
+          !equal(request.headers.authorization ?? "", `Bearer ${runtimeToken}`)
+        )
+          throw new NowError(401, "Unauthorised");
+        const result = await control.egress(
+          JSON.parse((await body(request)).toString()),
+        );
+        response.writeHead(result.status, Object.fromEntries(result.headers));
+        response.end(Buffer.from(await result.arrayBuffer()));
+        return;
+      }
       if (!equal(request.headers.authorization ?? "", `Bearer ${token}`))
         throw new NowError(401, "Unauthorised");
       if (
