@@ -6,7 +6,7 @@ import { readJson, writeJson } from "./storage.ts";
 import { messageContent, type ConversationMessage } from "./conversation.ts";
 
 export const MODEL_ID = "claude-haiku-5-5";
-export const MESSAGE_LIMIT = 10;
+export const MESSAGE_LIMIT = 20;
 export const IDLE_MS = 10 * 60_000;
 export interface Instructions {
   system: string;
@@ -104,7 +104,7 @@ export class Sessions {
         this.metadata(manager).createdAt,
         ...events.map((e) => e.at),
       );
-      if (events.length >= MESSAGE_LIMIT) reason = "ten-message limit";
+      if (events.length >= MESSAGE_LIMIT) reason = "twenty-message limit";
       else if (at - last >= IDLE_MS) reason = "ten minutes of inactivity";
       else return { file: old.file, id: old.id };
     }
@@ -149,7 +149,7 @@ export class Sessions {
       file: manager.getSessionFile()!,
       id: manager.getSessionId(),
       notice:
-        reason === "ten-message limit"
+        reason === "twenty-message limit"
           ? "Context cleared (message limit reached)"
           : "🐾",
     };

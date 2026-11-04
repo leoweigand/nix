@@ -151,7 +151,7 @@ The package checks cover identity binding, PKCE/replay/expiry, rotating refresh
 grants, persistent resumption, private routing and interrupted write handling.
 
 The routing layer selects a native Pi session per DM or group/topic, starting
-fresh after ten conversation messages or ten minutes of inactivity, or on
+fresh after twenty conversation messages or ten minutes of inactivity, or on
 `/clear`. Tool calls and controls do not consume this counter. Notifications enter
 Pi history without invoking inference, quoted messages accompany requests, and
 `/session` reports the current session, model and pinned instruction revision.

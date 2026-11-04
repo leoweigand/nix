@@ -371,11 +371,11 @@ test("notification ingestion never invokes the agent and /session reports the pe
     await worker.drain();
     while (worker.working) await new Promise((r) => setTimeout(r, 5));
     assert.equal(f.modelCalls.length, 0);
-    assert.match(f.sessions.status("123:0"), /Messages: 1\/10/);
+    assert.match(f.sessions.status("123:0"), /Messages: 1\/20/);
     f.inbox.enqueue({ ...f.job(80), text: "/session" });
     await worker.drain();
     assert.equal(f.modelCalls.length, 0);
-    assert.match(f.messages.at(-1)!.body.message, /Messages: 1\/10/);
+    assert.match(f.messages.at(-1)!.body.message, /Messages: 1\/20/);
   } finally {
     f.cleanup();
   }
@@ -407,7 +407,7 @@ test("notifications and resets proceed while a human request waits for OAuth, wi
       f.inbox.jobs().find((j) => j.id === notification.id)?.done,
       true,
     );
-    assert.match(f.sessions.status("123:0"), /Messages: 2\/10/);
+    assert.match(f.sessions.status("123:0"), /Messages: 2\/20/);
     f.inbox.enqueue({ ...f.job(3), text: "/clear" });
     await new Worker(f.options).drain();
     const fresh = f.sessions.select("123:0", Date.now());
@@ -429,7 +429,7 @@ test("message-limit resets use a short context-cleared notice", async () => {
   const f = fixture();
   try {
     f.casual();
-    for (let id = 200; id < 206; id++) {
+    for (let id = 200; id < 211; id++) {
       f.inbox.enqueue(f.job(id));
       await new Worker(f.options).drain();
     }
@@ -544,7 +544,7 @@ test("card delivery resumes after a failure without repeating cards or invoking 
     };
     await new Worker(options).drain();
     assert.equal(f.inbox.jobs()[0].deliveredParts, 1);
-    assert.match(f.sessions.status("123:0"), /Messages: 2\/10/);
+    assert.match(f.sessions.status("123:0"), /Messages: 2\/20/);
     fail = false;
     await new Worker(options).drain();
     assert.equal(calls, 1);
@@ -557,7 +557,7 @@ test("card delivery resumes after a failure without repeating cards or invoking 
     assert.equal(replies[1].body.message, "**Dune (1984)**\nAnother film.");
     assert.equal(replies[0].body.buttons.length, 1);
     assert.equal(replies[1].body.buttons.length, 1);
-    assert.match(f.sessions.status("123:0"), /Messages: 3\/10/);
+    assert.match(f.sessions.status("123:0"), /Messages: 3\/20/);
     assert.equal(f.inbox.jobs()[0].replyParts, undefined);
 
     const source = f.inbox.jobs()[0];

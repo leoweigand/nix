@@ -272,7 +272,7 @@ export class Worker {
         ) {
           notices.push(
             this.options.sessions.metadata(manager).reason ===
-              "ten-message limit"
+              "twenty-message limit"
               ? "Context cleared (message limit reached)"
               : "🐾",
           );
@@ -392,7 +392,7 @@ export class Worker {
     if (command === "/start" || command === "/help") {
       job.control = true;
       job.reply =
-        "Hi! Ask me to find a document, file a PDF/photo in our private chat, save or find your bookmarks, inspect or control your lights and blinds, look up a film or request a movie or TV season. I'll send you a private Pocket ID link when I need MCP access. /connect connects or renews your account; /clear starts a new conversation; /session shows the current session. Sessions restart after ten conversation messages or ten minutes of inactivity.";
+        "Hi! Ask me to find a document, file a PDF/photo in our private chat, save or find your bookmarks, inspect or control your lights and blinds, look up a film or request a movie or TV season. I'll send you a private Pocket ID link when I need MCP access. /connect connects or renews your account; /clear starts a new conversation; /session shows the current session. Sessions restart after twenty conversation messages or ten minutes of inactivity.";
     } else if (job.control) {
       // Deterministic commands do not invoke the model or consume the conversation budget.
     } else if (job.writeAttempted) {

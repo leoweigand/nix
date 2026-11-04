@@ -44,24 +44,24 @@ function fixture() {
     cleanup: () => rmSync(directory, { recursive: true, force: true }),
   };
 }
-test("ten visible messages rotate a session without copying history, while tool entries do not count", () => {
+test("twenty visible messages rotate a session without copying history, while tool entries do not count", () => {
   const f = fixture();
   try {
     const ref = f.sessions.select("chat", f.now());
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 10; i++) {
       f.sessions.record(ref, f.message(i));
       f.sessions
         .open(ref)
         .appendCustomEntry("tool-observation", { count: 999 });
       f.sessions.delivered(ref, `reply-${i}`, `reply ${i}`, false);
     }
-    assert.match(f.sessions.status("chat"), /Messages: 10\/10/);
+    assert.match(f.sessions.status("chat"), /Messages: 20\/20/);
     const next = f.sessions.select("chat", f.now());
     assert.notEqual(next.id, ref.id);
     assert.equal(next.notice, "Context cleared (message limit reached)");
     assert.equal(
       f.sessions.metadata(f.sessions.open(next)).reason,
-      "ten-message limit",
+      "twenty-message limit",
     );
     assert.equal(
       f.sessions
@@ -83,7 +83,7 @@ test("ten visible messages rotate a session without copying history, while tool 
             e.type === "custom_message" &&
             e.customType === "conversation-message",
         ).length,
-      5,
+      10,
     );
   } finally {
     f.cleanup();
@@ -150,7 +150,7 @@ test("notifications are durable context, count once, and do not need an agent ru
     const restarted = new Sessions(f.directory, f.sessions.instructions, () =>
       f.now(),
     );
-    assert.match(restarted.status("chat"), /Messages: 1\/10/);
+    assert.match(restarted.status("chat"), /Messages: 1\/20/);
     const context = restarted.open(ref).buildSessionContext().messages;
     assert.match(JSON.stringify(context), /external_notification/);
     assert.match(JSON.stringify(context), /message 1/);
@@ -170,12 +170,12 @@ test("a running exchange can finish across the message limit before the next inc
   const f = fixture();
   try {
     const ref = f.sessions.select("chat", f.now());
-    for (let i = 0; i < 9; i++)
+    for (let i = 0; i < 19; i++)
       f.sessions.record(ref, f.message(i, "notification"));
     assert.equal(f.sessions.select("chat", f.now()).id, ref.id);
-    f.sessions.record(ref, f.message(10));
-    f.sessions.delivered(ref, "reply-10", "Completed the request", false);
-    assert.match(f.sessions.status("chat"), /Messages: 11\/10/);
+    f.sessions.record(ref, f.message(20));
+    f.sessions.delivered(ref, "reply-20", "Completed the request", false);
+    assert.match(f.sessions.status("chat"), /Messages: 21\/20/);
     assert.notEqual(f.sessions.select("chat", f.now()).id, ref.id);
   } finally {
     f.cleanup();
