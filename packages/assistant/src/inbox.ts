@@ -37,6 +37,7 @@ export interface Job {
   deliveredParts?: number;
   replyPrepared?: boolean;
   reactionSent?: boolean;
+  reactionEmoji?: string;
   buttonsExpireAt?: number;
   done?: boolean;
   waitingForAuth?: boolean;

@@ -24,6 +24,7 @@ export interface RuntimeResult {
   cards?: ReplyCard[];
   buttons?: ReplyButton[];
   reaction?: string;
+  reactionOnly?: boolean;
 }
 export interface ToolEntry {
   callId: string;

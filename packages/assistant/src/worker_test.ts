@@ -442,7 +442,7 @@ test("message-limit resets use a short context-cleared notice", async () => {
   }
 });
 
-test("fast answers skip the working reaction and fold the session notice into the answer", async () => {
+test("text answers fold the session notice into the answer without an automatic reaction", async () => {
   const f = fixture();
   try {
     f.casual();
@@ -465,43 +465,55 @@ test("fast answers skip the working reaction and fold the session notice into th
   }
 });
 
-test("slow answers react once to the incoming message before delivering, even across an auth resume", async () => {
+test("slow answers keep typing without an automatic reaction", async () => {
   const f = fixture();
   try {
     f.inbox.enqueue(f.job(92, true));
-    let release!: () => void;
-    const reacted = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const worker = new Worker({
+    await new Worker({
       ...f.options,
-      reactionDelayMs: 1,
       assistant: {
         answer: async () => {
-          await reacted;
-          return { text: "Ready", needsConnection: true };
+          await new Promise((resolve) => setTimeout(resolve, 3100));
+          return { text: "Ready", needsConnection: false };
         },
       },
-      gateway: async (endpoint, body) => {
-        await f.options.gateway(endpoint, body);
-        if (endpoint === "/v1/reactions") release();
-      },
-    });
-    await worker.drain();
-    assert.deepEqual(
-      f.messages.find((m) => m.endpoint === "/v1/reactions")?.body,
-      {
-        to: "group",
-        message_id: 92,
-        emoji: "👀",
-      },
+    }).drain();
+    assert.ok(f.messages.some((m) => m.endpoint === "/v1/typing"));
+    assert.equal(
+      f.messages.some((m) => m.endpoint === "/v1/reactions"),
+      false,
     );
-    f.setToken();
-    await new Worker(f.options).drain();
+    assert.match(f.messages.at(-1)?.body.message, /Ready$/);
+  } finally {
+    f.cleanup();
+  }
+});
+
+test("a reaction can be the whole response and leaves session notices for the next text answer", async () => {
+  const f = fixture();
+  try {
+    f.inbox.enqueue(f.job(94));
+    await new Worker({
+      ...f.options,
+      assistant: {
+        answer: async (_message, _ref, _token, _onWrite, react) => {
+          await react!("👍");
+          return { text: "", needsConnection: false };
+        },
+      },
+    }).drain();
+    assert.equal(f.inbox.jobs()[0].done, true);
     assert.equal(
       f.messages.filter((m) => m.endpoint === "/v1/reactions").length,
       1,
     );
+    assert.equal(
+      f.messages.filter((m) => m.endpoint === "/v1/assistant-replies").length,
+      0,
+    );
+    f.casual();
+    f.inbox.enqueue(f.job(95));
+    await new Worker(f.options).drain();
     assert.match(f.messages.at(-1)?.body.message, /^🐾\n\nDune/s);
   } finally {
     f.cleanup();
@@ -659,38 +671,6 @@ test("compaction notices are prepended once to the answer", async () => {
     f.inbox.enqueue(f.job(97));
     await new Worker(f.options).drain();
     assert.equal(f.messages.at(-1)?.body.message, "Dune (2021), available");
-  } finally {
-    f.cleanup();
-  }
-});
-
-test("a working reaction failure cannot prevent the answer", async () => {
-  const f = fixture();
-  try {
-    f.inbox.enqueue(f.job(98));
-    let release!: () => void;
-    const failed = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    await new Worker({
-      ...f.options,
-      reactionDelayMs: 1,
-      assistant: {
-        answer: async () => {
-          await failed;
-          return { text: "Ready", needsConnection: false };
-        },
-      },
-      gateway: async (endpoint, body) => {
-        if (endpoint === "/v1/reactions") {
-          release();
-          throw new Error("Reaction rejected");
-        }
-        await f.options.gateway(endpoint, body);
-      },
-    }).drain();
-    assert.equal(f.inbox.jobs()[0].done, true);
-    assert.match(f.messages.at(-1)?.body.message, /Ready$/);
   } finally {
     f.cleanup();
   }

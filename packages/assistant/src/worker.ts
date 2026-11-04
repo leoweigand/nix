@@ -26,7 +26,6 @@ interface Options {
     Partial<Pick<EveAssistant, "writeAttempt">>;
   gateway: Gateway;
   log?: Pick<Console, "info" | "error">;
-  reactionDelayMs?: number;
   stageAttachment?: (job: Job, token: string) => Promise<string>;
 }
 export class Worker {
@@ -250,6 +249,10 @@ export class Worker {
     });
   }
   private async deliver(job: Job): Promise<void> {
+    if (job.reply === "" && job.reactionSent && !job.replyParts?.length) {
+      this.finish(job);
+      return;
+    }
     if (!job.replyPrepared) {
       const notices: string[] = [];
       if (job.session && !job.control) {
@@ -349,7 +352,7 @@ export class Worker {
     );
   }
   private async process(job: Job): Promise<void> {
-    if (job.reply) {
+    if (job.reply !== undefined) {
       await this.deliver(job);
       return;
     }
@@ -453,22 +456,6 @@ export class Worker {
       await typing();
       const timer = setInterval(() => void typing(), 4500);
       let needsConnection = false;
-      let reaction: Promise<void> | undefined;
-      let settled = false;
-      const reactionTimer = setTimeout(() => {
-        if (settled || job.reactionSent) return;
-        reaction = this.options
-          .gateway("/v1/reactions", {
-            to: job.destination,
-            message_id: job.messageId,
-            emoji: "👀",
-          })
-          .then(() => {
-            job.reactionSent = true;
-            this.options.inbox.save(job);
-          })
-          .catch(() => {});
-      }, this.options.reactionDelayMs ?? 3000);
       try {
         const result = await this.options.assistant.answer(
           messageForJob(job),
@@ -480,12 +467,14 @@ export class Worker {
             this.options.inbox.save(job);
           },
           async (emoji) => {
+            if (job.reactionEmoji === emoji) return;
             await this.options.gateway("/v1/reactions", {
               to: job.destination,
               message_id: job.messageId,
               emoji,
             });
             job.reactionSent = true;
+            job.reactionEmoji = emoji;
             this.options.inbox.save(job);
           },
         );
@@ -525,10 +514,7 @@ export class Worker {
           ? "The change's result is uncertain. I won't retry it automatically; ask me to check the current document ingestion, bookmark, device or library state first."
           : "I couldn't complete that request. Please try again shortly, or send /connect if my MCP connection needs renewing.";
       } finally {
-        settled = true;
-        clearTimeout(reactionTimer);
         clearInterval(timer);
-        await reaction;
       }
       if (needsConnection) {
         await this.connect(job);

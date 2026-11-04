@@ -103,6 +103,8 @@ export class PiAssistant {
     const bookmarkWriteGuard = new BookmarkWriteGuard();
     let toolCalls = 0;
     let searchCalls = 0;
+    let reacted = false;
+    let reactionOnly = false;
     let needsConnection = false;
     let cards: ReplyCard[] | undefined;
     let buttons: Array<{ label: string; url?: string }> = [];
@@ -255,12 +257,15 @@ export class PiAssistant {
             name: "react_to_message",
             label: "React to message",
             description:
-              "Set one Telegram emoji reaction on the current user's message. Provide the emoji as text.",
+              "React instead of replying with text, or acknowledge before continuing work. Typing already indicates progress. Set reactionOnly=false for an acknowledgement.",
             parameters: Type.Object({
               emoji: Type.String({ minLength: 1, maxLength: 32 }),
+              reactionOnly: Type.Optional(Type.Boolean()),
             }),
             execute: async (_id, args) => {
               await react(args.emoji);
+              reacted = true;
+              reactionOnly = args.reactionOnly ?? true;
               return {
                 content: [{ type: "text", text: "Reaction sent." }],
                 details: {},
@@ -409,8 +414,9 @@ export class PiAssistant {
         throw new Error("Assistant inference failed");
       const text =
         cards?.map(cardMarkdown).join("\n\n") ??
-        session.getLastAssistantText()?.trim();
-      if (!text) throw new Error("Assistant returned no response");
+        session.getLastAssistantText()?.trim() ??
+        "";
+      if (!text && !reacted) throw new Error("Assistant returned no response");
       console.info(
         JSON.stringify({
           event: "assistant_answer",
@@ -436,7 +442,7 @@ export class PiAssistant {
           });
       }
       return {
-        text,
+        text: reactionOnly && !cards?.length && !needsConnection ? "" : text,
         needsConnection,
         buttons: cards ? undefined : buttons,
         cards,

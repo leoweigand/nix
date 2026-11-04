@@ -92,6 +92,24 @@ export class EveAssistant {
     this.active = { abort: async () => controller.abort() };
     // The read may time out without cancelling the accepted durable Eve delivery.
     const timer = setTimeout(() => controller.abort(), 10 * 60_000);
+    let sentReaction: string | undefined;
+    const flushReaction = async (presentation?: RuntimeResult) => {
+      const emoji = (
+        presentation ?? readJson<RuntimeResult>(join(directory, "result.json"))
+      )?.reaction;
+      if (emoji && emoji !== sentReaction) {
+        await react(emoji);
+        sentReaction = emoji;
+      }
+    };
+    // Eve writes presentation while the turn runs; acknowledgements must reach
+    // Telegram before the final answer. Serialise sends to avoid duplicate polls.
+    let reactionDelivery = Promise.resolve();
+    const reactionTimer = setInterval(() => {
+      reactionDelivery = reactionDelivery
+        .then(() => flushReaction())
+        .catch(() => {});
+    }, 250);
     try {
       const response = await fetch(
         process.env.ASSISTANT_EVE_URL ?? "http://127.0.0.1:9091/internal/turn",
@@ -122,20 +140,31 @@ export class EveAssistant {
       const attempt = this.writeAttempt(message);
       if (attempt) onWriteAttempt(attempt);
       if (result.status === "failed") throw new Error("Eve inference failed");
-      if (presentation.reaction) await react(presentation.reaction);
+      clearInterval(reactionTimer);
+      await reactionDelivery;
+      await flushReaction(presentation);
       const text =
         presentation.cards?.map(cardMarkdown).join("\n\n") ??
         result.reply?.trim();
-      if (!text && !presentation.needsConnection)
+      if (!text && !sentReaction && !presentation.needsConnection)
         throw new Error("Eve returned no response");
       return {
-        text: text ?? "Connection requested",
+        text:
+          presentation.reactionOnly &&
+          sentReaction &&
+          !presentation.cards?.length &&
+          !presentation.needsConnection
+            ? ""
+            : (text ??
+              (presentation.needsConnection ? "Connection requested" : "")),
         needsConnection: presentation.needsConnection ?? false,
         cards: presentation.cards,
         buttons: presentation.cards ? undefined : presentation.buttons,
       };
     } finally {
       clearTimeout(timer);
+      clearInterval(reactionTimer);
+      await reactionDelivery;
       this.active = undefined;
     }
   }
