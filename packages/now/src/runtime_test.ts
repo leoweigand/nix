@@ -32,6 +32,12 @@ test(
     const realEgress = control.egress.bind(control);
     control.egress = async (input) => {
       if (input.url === "https://api.example.com/fixture") {
+        assert.equal(input.method, "POST");
+        assert.equal(
+          Buffer.from(input.body, "base64").toString(),
+          "fixture-body",
+        );
+        assert.equal(input.headers["x-fixture"], "yes");
         assert.equal(input.headers.cookie, undefined);
         assert.equal(input.headers.authorization, undefined);
         return Response.json({ root: input.root, release: input.release });
@@ -48,7 +54,7 @@ test(
     ) => `import {DurableObject} from "cloudflare:workers";
     export class App extends DurableObject { async fetch(r) {
       const p=new URL(r.url).pathname;
-      if(p==='/network')return fetch('https://api.example.com/fixture');
+      if(p==='/network')return fetch('https://api.example.com/fixture',{method:'POST',headers:{'x-fixture':'yes'},body:'fixture-body'});
       if(p==='/egress'){try{const r=await fetch('http://127.0.0.1:8333/');return new Response(r.status===502?'denied':'unsafe');}catch{return new Response('denied');}}
       const n=this.ctx.storage.kv.get('n')??0;
       if(r.method==='POST')this.ctx.storage.kv.put('n',n+1);
