@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -6,6 +7,8 @@ import {
   resolvePublic,
   validateNetwork,
   MAX_BODY,
+  MAX_RESPONSE,
+  requestPinned,
 } from "./egress.ts";
 
 const origins = ["https://api.example.com", "https://other.example.com"];
@@ -184,4 +187,51 @@ test("empty permissions, credential URLs, redirect loops, bodies and slow DNS fa
     }),
     /timed out/,
   );
+});
+
+test("HTTPS transport pins DNS and contains malformed or oversized upstream responses", async () => {
+  async function receive(status: number, bytes: number) {
+    const transport = ((_url: URL, options: any, callback: any) => {
+      assert.equal(options.agent, false);
+      assert.equal(options.autoSelectFamily, false);
+      options.lookup(
+        "api.example.com",
+        {},
+        (error: unknown, address: string, family: number) => {
+          assert.equal(error, null);
+          assert.equal(address, "1.1.1.1");
+          assert.equal(family, 4);
+        },
+      );
+      const request = new EventEmitter() as any;
+      request.destroy = (error: Error) => request.emit("error", error);
+      request.end = () =>
+        queueMicrotask(() => {
+          const incoming = new EventEmitter() as any;
+          incoming.headers = {
+            "set-cookie": "private",
+            "content-type": "text/plain",
+          };
+          incoming.statusCode = status;
+          callback(incoming);
+          incoming.emit("data", Buffer.alloc(bytes));
+          incoming.emit("end");
+        });
+      return request;
+    }) as any;
+    return requestPinned(
+      new URL(input.url),
+      "GET",
+      new Headers(),
+      Buffer.alloc(0),
+      await publicDns(),
+      new AbortController().signal,
+      transport,
+    );
+  }
+  await assert.rejects(receive(700, 0), /status/);
+  await assert.rejects(receive(200, MAX_RESPONSE + 1), /exceeds 2 MiB/);
+  const response = await receive(200, 5);
+  assert.equal((await response.arrayBuffer()).byteLength, 5);
+  assert.equal(response.headers.get("set-cookie"), null);
 });

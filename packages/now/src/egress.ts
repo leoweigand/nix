@@ -115,10 +115,11 @@ export function requestPinned(
   body: Buffer,
   addresses: Address[],
   signal: AbortSignal,
+  transport = httpsRequest,
 ): Promise<Response> {
   return new Promise((resolve, reject) => {
     const pinned = addresses[0]!;
-    const request = httpsRequest(
+    const request = transport(
       url,
       {
         method,
@@ -142,30 +143,34 @@ export function requestPinned(
           else chunks.push(chunk);
         });
         incoming.on("end", () => {
-          const responseHeaders = new Headers();
-          for (const [name, value] of Object.entries(incoming.headers))
-            if (
-              value !== undefined &&
-              !/^(set-cookie|connection|transfer-encoding|content-length|upgrade|trailer)$/i.test(
-                name,
+          try {
+            const responseHeaders = new Headers();
+            for (const [name, value] of Object.entries(incoming.headers))
+              if (
+                value !== undefined &&
+                !/^(set-cookie|connection|transfer-encoding|content-length|upgrade|trailer)$/i.test(
+                  name,
+                )
               )
-            )
-              responseHeaders.set(
-                name,
-                Array.isArray(value) ? value.join(", ") : value,
-              );
-          const status = incoming.statusCode ?? 502;
-          resolve(
-            new Response(
-              method === "HEAD" || [204, 205, 304].includes(status)
-                ? null
-                : Buffer.concat(chunks),
-              {
-                status,
-                headers: responseHeaders,
-              },
-            ),
-          );
+                responseHeaders.set(
+                  name,
+                  Array.isArray(value) ? value.join(", ") : value,
+                );
+            const status = incoming.statusCode ?? 502;
+            resolve(
+              new Response(
+                method === "HEAD" || [204, 205, 304].includes(status)
+                  ? null
+                  : Buffer.concat(chunks),
+                {
+                  status,
+                  headers: responseHeaders,
+                },
+              ),
+            );
+          } catch (error) {
+            reject(error);
+          }
         });
       },
     );
