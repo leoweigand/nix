@@ -192,6 +192,18 @@ export const detailsOutputSchema = summaryOutputSchema
   .extend({
     qualityProfile: z.string().nullable(),
     qualityProfiles: z.array(z.string()),
+    nextEpisode: z
+      .object({
+        seasonNumber: z.number().int(),
+        episodeNumber: z.number().int(),
+        title: z.string().nullable(),
+        airDateUtc: z.iso.datetime(),
+      })
+      .strict()
+      .nullable()
+      .describe(
+        "Earliest known future TV episode, including specials, regardless of monitoring or library state. Null for movies or when no future air time is known; this does not prove the series has ended. Air time is scheduled metadata, not a download or availability promise.",
+      ),
     monitorNewSeasons: z.string().optional(),
     seasons: z
       .array(

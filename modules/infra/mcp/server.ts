@@ -254,9 +254,9 @@ export function createApp(
       server.registerTool(
         "get_media_details",
         {
-          title: "Check media availability and seasons",
+          title: "Check media availability, seasons and next episode",
           description:
-            "See a title’s availability, seasons, and quality options. Use its media ID from search_media; availableActions describe ready-to-call next steps.",
+            "See a title’s availability, seasons, quality options and next scheduled TV episode. Use this for questions about when a show’s next episode airs; a null nextEpisode means no future air time is known (or the title is a movie). Use its media ID from search_media; availableActions describe ready-to-call next steps.",
           inputSchema: detailsSchema,
           outputSchema: detailsOutputSchema,
           annotations: { ...annotations, openWorldHint: true },

@@ -74,6 +74,7 @@ const episodes = [
   },
   {
     id: 3,
+    title: "The return",
     seasonNumber: 1,
     episodeNumber: 3,
     airDateUtc: "2027-01-01T00:00:00Z",
@@ -308,6 +309,65 @@ test("new TV details provide aired counts without adding a series or leaking API
     canRequest: true,
   });
   assert.equal(state.writes.length, 0);
+});
+for (const inLibrary of [false, true]) {
+  test(`next episode uses the earliest future air time for ${inLibrary ? "library" : "catalogue"} shows without writes`, async (t) => {
+    const { service, state } = await fixture(t);
+    if (inLibrary)
+      state.shows.push({ ...structuredClone(show), id: 22, monitored: false });
+    state.episodes[4].airDateUtc = "2026-11-02T12:00:00+01:00";
+    state.episodes.reverse();
+    const details = detailsOutputSchema.parse(
+      await service.details("tv:tvdb:200"),
+    );
+    assert.deepEqual(details.nextEpisode, {
+      seasonNumber: 2,
+      episodeNumber: 1,
+      title: null,
+      airDateUtc: "2026-11-02T11:00:00.000Z",
+    });
+    state.episodes.find((e) => e.id === 5)!.airDateUtc = "invalid";
+    assert.deepEqual((await service.details("tv:tvdb:200")).nextEpisode, {
+      seasonNumber: 1,
+      episodeNumber: 3,
+      title: "The return",
+      airDateUtc: "2027-01-01T00:00:00.000Z",
+    });
+    assert.equal(state.writes.length, 0);
+  });
+}
+test("next episode excludes aired, unknown and invalid dates and returns null when no schedule is known", async (t) => {
+  const { service, state } = await fixture(t);
+  state.episodes[2].airDateUtc = new Date(now).toISOString();
+  state.episodes[4].airDateUtc = "invalid";
+  assert.equal((await service.details("tv:tvdb:200")).nextEpisode, null);
+  state.episodes = [];
+  assert.equal((await service.details("tv:tvdb:200")).nextEpisode, null);
+  assert.equal(
+    detailsOutputSchema.parse(await service.details("movie:tmdb:100"))
+      .nextEpisode,
+    null,
+  );
+  assert.equal(state.writes.length, 0);
+});
+test("next episode includes specials and resolves simultaneous episodes by season then episode number", async (t) => {
+  const { service, state } = await fixture(t);
+  state.episodes[4].airDateUtc = state.episodes[2].airDateUtc;
+  state.episodes.reverse();
+  assert.equal(
+    (await service.details("tv:tvdb:200")).nextEpisode?.seasonNumber,
+    1,
+  );
+  state.episodes.find((e) => e.id === 5)!.seasonNumber = 1;
+  assert.equal(
+    (await service.details("tv:tvdb:200")).nextEpisode?.episodeNumber,
+    1,
+  );
+  state.episodes.find((e) => e.id === 3)!.seasonNumber = 0;
+  assert.equal(
+    (await service.details("tv:tvdb:200")).nextEpisode?.seasonNumber,
+    0,
+  );
 });
 test("movie requests use HD, fixed roots and a separate search command; parallel repeats do not duplicate", async (t) => {
   const { service, state } = await fixture(t);

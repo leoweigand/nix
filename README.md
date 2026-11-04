@@ -66,6 +66,10 @@ explicit; completed torrents and empty queues do not prove library availability.
 MCP receives Syncthing's existing config as a systemd credential and reads only
 its fixed local API; there is no seedbox connection, polling or media mount.
 
+TV details include the next known scheduled episode (season, episode number,
+optional title and UTC air time), including specials and unmonitored shows.
+No known future air time returns null; this does not establish that a show has ended.
+
 Search and details return public artwork URLs, release metadata, library facts
 and permission-filtered `availableActions` containing complete tool arguments.
 Every tool publishes an output schema from `modules/infra/mcp/contracts.ts`

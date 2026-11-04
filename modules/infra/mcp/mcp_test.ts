@@ -357,6 +357,7 @@ test("MCP delivers rich structured results matching JSON text and limits action 
   const readOnly = await rpc("media:read", "get_media_details", {
     mediaId: "movie:tmdb:100",
   });
+  assert.equal(readOnly.nextEpisode, null);
   assert.equal(readOnly.canRequest, true);
   assert.deepEqual(readOnly.availableActions, []);
   const writable = await rpc("media:read media:request", "get_media_details", {

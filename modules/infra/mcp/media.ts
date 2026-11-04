@@ -58,6 +58,7 @@ const episodeSchema = z
     id: z.number().int().optional(),
     seasonNumber: z.number().int(),
     episodeNumber: z.number().int(),
+    title: z.string().nullish(),
     airDateUtc: z.string().nullish(),
     hasFile: z.boolean().default(false),
     monitored: z.boolean().default(false),
@@ -193,6 +194,27 @@ function hasAired(episode: Episode, now: number) {
     Number.isFinite(Date.parse(episode.airDateUtc)) &&
     Date.parse(episode.airDateUtc) <= now
   );
+}
+function nextEpisode(
+  episodes: Episode[],
+  now: number,
+): MediaDetails["nextEpisode"] {
+  const episode = episodes
+    .filter((e) => e.airDateUtc && Date.parse(e.airDateUtc) > now)
+    .sort(
+      (a, b) =>
+        Date.parse(a.airDateUtc!) - Date.parse(b.airDateUtc!) ||
+        a.seasonNumber - b.seasonNumber ||
+        a.episodeNumber - b.episodeNumber,
+    )[0];
+  return episode
+    ? {
+        seasonNumber: episode.seasonNumber,
+        episodeNumber: episode.episodeNumber,
+        title: episode.title ?? null,
+        airDateUtc: new Date(episode.airDateUtc!).toISOString(),
+      }
+    : null;
 }
 function summary(item: Item, kind: Kind, existing?: Item): MediaSummary {
   const available =
@@ -461,6 +483,7 @@ export class MediaService {
       qualityProfile:
         profiles.find((p) => p.id === existing?.qualityProfileId)?.name ?? null,
       qualityProfiles: profiles.map((p) => p.name),
+      nextEpisode: nextEpisode(episodes, now),
       availableActions: [] as MediaAction[],
     };
     const profile = existing
