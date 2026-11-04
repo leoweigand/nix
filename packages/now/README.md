@@ -1,8 +1,9 @@
-# Now platform candidate
+# Now platform
 
 This package implements the shared publishing backend. It is opt-in through
-`homelab.infra.now.enable`; it is not enabled on Picard yet. The user interface
-for agents is the existing lab MCP server's `now_*` tools.
+`homelab.infra.now.enable` and is enabled on Picard. The user interface for agents
+is the existing lab MCP server’s `now_*` tools. The operational runbook is
+`../homelab/docs/now.md` in the sibling Homelab checkout.
 
 `src/control.ts` keeps app ownership, immutable source revisions, asynchronous
 builds, releases, operation receipts and request logs in SQLite. Mutations need
@@ -34,8 +35,7 @@ MCP tokens are never treated as browser cookies.
 Destroy first withdraws routing, cancels complete builder process groups, then
 deletes each tracked user/probe facet, live source/releases and cached app
 responses. Receipt hashes remain to prevent replay. Retired supervisor roots
-retain a small tombstone, so old
-code cannot reopen them. Generated hostnames are never reused. Existing backups
+retain a small tombstone, so old code cannot reopen them. Generated hostnames are never reused. Existing backups
 expire normally; destroy is not secure erasure.
 
 The Nix module uses native `/var/lib` storage for SQLite, celld and SeaweedFS,
