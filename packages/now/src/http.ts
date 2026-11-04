@@ -111,7 +111,7 @@ export function createFrontend(control: Control, issuer: string) {
           "referrer-policy": "no-referrer",
           "x-content-type-options": "nosniff",
           "content-security-policy":
-            "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; frame-ancestors https://web.telegram.org https://*.web.telegram.org; base-uri 'none'; form-action 'none'",
+            "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors https://web.telegram.org https://*.web.telegram.org; base-uri 'none'; form-action 'none'",
         });
         response.end(request.method === "HEAD" ? undefined : library(apps));
         return;

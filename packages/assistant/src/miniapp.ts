@@ -8,6 +8,7 @@ import { mkdirSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { decodeJwt } from "jose";
 import type { Connections } from "./connections.ts";
+import { gatewaySession, embeddedCookieName } from "./gateway-session.ts";
 
 export const miniAppPath = "/now/telegram";
 interface Options {
@@ -86,7 +87,7 @@ export class MiniApp {
       const challenge = `${Math.floor(this.now() / 1000)}.${randomBytes(24).toString("hex")}`;
       headers.set(
         "set-cookie",
-        `${cookieName}=${challenge}.${this.mac(challenge)}; Path=${miniAppPath}; Secure; HttpOnly; SameSite=None; Max-Age=${maxAge}`,
+        `${cookieName}=${challenge}.${this.mac(challenge)}; Path=${miniAppPath}; Secure; HttpOnly; SameSite=None; Partitioned; Max-Age=${maxAge}`,
       );
       headers.set("content-type", "text/html; charset=utf-8");
       return new Response(
@@ -225,8 +226,8 @@ const result=await response.json();if(!response.ok)throw new Error(result.messag
         !/^[A-Za-z0-9]{6,12}$/.test(minted.token)
       )
         throw new Error("Pocket ID returned an invalid login token");
-      // Redeem server-side; only Pocket ID's genuine cookies reach the browser.
-      // Never return the administrative key or the one-time token to JavaScript.
+      // Keep Pocket ID's cookie server-side while completing the real gateway
+      // exchange. Neither identity-provider pages nor tokens enter the iframe.
       const exchanged = await this.pocket(
         `/one-time-access-token/${minted.token}`,
         {
@@ -241,14 +242,27 @@ const result=await response.json();if(!response.ok)throw new Error(result.messag
       const cookies = exchanged.headers.getSetCookie();
       if (!cookies.length)
         throw new Error("Pocket ID did not establish a session");
-      for (const value of cookies) headers.append("set-cookie", value);
+      const gatewayCookies = await gatewaySession({
+        issuer: this.options.issuer,
+        loginUrl: this.options.loginUrl,
+        target,
+        subject: this.options.subject,
+        pocketCookies: cookies,
+        fetch: this.fetch,
+      });
+      for (const value of gatewayCookies) headers.append("set-cookie", value);
+      const cookieDomain = new URL(this.options.libraryUrl).hostname.slice(
+        "now.".length,
+      );
       headers.append(
         "set-cookie",
-        `${cookieName}=; Path=${miniAppPath}; Secure; HttpOnly; SameSite=None; Max-Age=0`,
+        `${embeddedCookieName}=1; Domain=${cookieDomain}; Path=/; Secure; HttpOnly; SameSite=None; Partitioned; Max-Age=43200`,
       );
-      const redirect = new URL("/oauth2/start", this.options.loginUrl);
-      redirect.searchParams.set("rd", target);
-      return new Response(JSON.stringify({ redirect: redirect.href }), {
+      headers.append(
+        "set-cookie",
+        `${cookieName}=; Path=${miniAppPath}; Secure; HttpOnly; SameSite=None; Partitioned; Max-Age=0`,
+      );
+      return new Response(JSON.stringify({ redirect: target }), {
         headers,
       });
     } catch (error) {

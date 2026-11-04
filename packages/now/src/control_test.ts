@@ -386,7 +386,7 @@ test("network permissions are revisioned, preserved by partial edits, revoked ex
     );
     assert.match(
       result.headers.get("content-security-policy")!,
-      /frame-ancestors 'none'/,
+      /frame-ancestors https:\/\/web\.telegram\.org https:\/\/\*\.web\.telegram\.org;/,
     );
     control.run("UPDATE apps SET state='destroyed' WHERE id=?", app.id);
     await assert.rejects(control.egress(outbound), /destroyed/);

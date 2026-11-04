@@ -13,6 +13,7 @@ test("Telegram launcher establishes only the linked user's genuine Pocket ID ses
     disabled = false,
     allowed = true;
   const calls: string[] = [];
+  let target = "";
   const options = {
     issuer: "https://auth.lab.test",
     libraryUrl: "https://now.lab.test/",
@@ -31,7 +32,52 @@ test("Telegram launcher establishes only the linked user's genuine Pocket ID ses
           : undefined,
     },
     fetch: (async (input, init) => {
-      const path = new URL(String(input)).pathname;
+      const url = new URL(String(input));
+      const path = url.pathname;
+      if (url.origin === options.loginUrl || path === "/authorize") {
+        assert.equal(new Headers(init?.headers).get("x-api-key"), null);
+        if (path === "/oauth2/start") {
+          target = url.searchParams.get("rd")!;
+          return new Response(null, {
+            status: 302,
+            headers: {
+              location: `${options.issuer}/authorize`,
+              "set-cookie": "csrf=fixture; Secure; HttpOnly",
+            },
+          });
+        }
+        if (path === "/authorize") {
+          assert.match(
+            new Headers(init?.headers).get("cookie")!,
+            /access_token=pocket-session/,
+          );
+          return new Response(null, {
+            status: 303,
+            headers: {
+              location: `${options.loginUrl}/oauth2/callback?code=fixture`,
+            },
+          });
+        }
+        if (path === "/oauth2/callback") {
+          assert.match(
+            new Headers(init?.headers).get("cookie")!,
+            /csrf=fixture/,
+          );
+          return new Response(null, {
+            status: 302,
+            headers: {
+              location: target,
+              "set-cookie":
+                "__Secure-leolab_gateway=real-gateway-session; Domain=lab.test; Path=/; Secure; HttpOnly; SameSite=Lax",
+            },
+          });
+        }
+        assert.equal(path, "/oauth2/auth");
+        return new Response(null, {
+          status: 202,
+          headers: { "x-auth-request-user": options.subject },
+        });
+      }
       calls.push(path);
       assert.equal(
         new Headers(init?.headers).get("x-api-key"),
@@ -136,15 +182,22 @@ test("Telegram launcher establishes only the linked user's genuine Pocket ID ses
     const response = await post(proof, cookie);
     assert.equal(response.status, 200);
     const result = await response.json();
-    assert.equal(
-      new URL(result.redirect).searchParams.get("rd"),
-      "https://violet-iris.now.lab.test/",
-    );
+    assert.equal(result.redirect, "https://violet-iris.now.lab.test/");
     assert.equal(response.headers.getSetCookie().length, 3);
     assert.ok(
       response.headers
         .getSetCookie()
-        .some((c) => c.startsWith("access_token=pocket-session;")),
+        .some((c) =>
+          c.startsWith("__Secure-leolab_gateway=real-gateway-session;"),
+        ),
+    );
+    assert.ok(
+      response.headers.getSetCookie().every((c) => /Partitioned/.test(c)),
+    );
+    assert.ok(
+      !response.headers
+        .getSetCookie()
+        .some((c) => c.includes("pocket-session")),
     );
     assert.ok(!JSON.stringify(result).includes("ABC123"));
     const usedCalls = calls.length;
@@ -162,10 +215,7 @@ test("Telegram launcher establishes only the linked user's genuine Pocket ID ses
     );
     assert.equal(replay.status, 403);
     const library = await post(signed(), await open(), null);
-    assert.equal(
-      new URL((await library.json()).redirect).searchParams.get("rd"),
-      options.libraryUrl,
-    );
+    assert.equal((await library.json()).redirect, options.libraryUrl);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

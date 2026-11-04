@@ -241,6 +241,14 @@ in
       upstream = "unix//run/leolab-now/frontend.sock";
       auth.passSubject = true;
     };
+    # Preserve the iframe's partition when forward authentication renews a cookie.
+    # Other apps and ordinary browser sessions keep the gateway's existing policy.
+    services.caddy.virtualHosts = lib.genAttrs [ "${domain}" "*.${domain}" ] (_: {
+      extraConfig = lib.mkBefore ''
+        @nowEmbedded header Cookie *__Secure-now_embed=1*
+        header @nowEmbedded >Set-Cookie "(?i); SameSite=Lax" "; SameSite=None; Partitioned"
+      '';
+    });
     security.acme.certs.${config.homelab.baseDomain}.extraDomainNames = [ "*.${domain}" ];
     systemd.services.leolab-mcp = {
       requires = [ "leolab-now-keys.service" ];

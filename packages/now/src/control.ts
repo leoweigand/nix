@@ -714,7 +714,7 @@ export class Control {
         safe.set("Referrer-Policy", "no-referrer");
         safe.set(
           "Content-Security-Policy",
-          "default-src 'self' https:; script-src 'self' https: 'unsafe-inline'; style-src 'self' https: 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https: wss:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+          "default-src 'self' https:; script-src 'self' https: 'unsafe-inline'; style-src 'self' https: 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https: wss:; frame-ancestors https://web.telegram.org https://*.web.telegram.org; base-uri 'none'; form-action 'self'",
         );
         return new Response(response.body, { status, headers: safe });
       } catch (e) {

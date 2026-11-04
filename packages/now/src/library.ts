@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 const escape = (value: string) =>
   value.replace(
     /[&<>"']/g,
@@ -6,8 +8,18 @@ const escape = (value: string) =>
         c
       ]!,
   );
+
+function icon(id: string) {
+  const seed = createHash("sha256").update(id).digest();
+  const hue = seed.readUInt16BE(0) % 360;
+  const y = (i: number) => 18 + (seed[i] % 44);
+  const path = `M 17 ${y(2)} C 17 ${y(3)}, 39 ${y(4)}, 40 ${y(5)} S 63 ${y(6)}, 63 ${y(7)}`;
+  return `<svg viewBox="0 0 80 80" aria-hidden="true"><rect width="80" height="80" rx="19" fill="hsl(${hue} 62% 44%)"/><path d="${path}" fill="none" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${20 + (seed[8] % 40)}" cy="${16 + (seed[9] % 46)}" r="3" fill="white" opacity=".45"/></svg>`;
+}
+
 export function library(
   apps: {
+    id: string;
     slug: string;
     description: string;
     url: string;
@@ -15,17 +27,8 @@ export function library(
     state: string;
   }[],
 ) {
-  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Now apps</title>
-<style>:root{font-family:system-ui,sans-serif;color-scheme:light dark}*{box-sizing:border-box}body{max-width:48rem;margin:auto;padding:1.25rem;line-height:1.5}h1{margin-bottom:.25rem}header p{margin-top:0;opacity:.7}input{font:inherit;width:100%;padding:.8rem;border:1px solid #8888;border-radius:.6rem;background:transparent;color:inherit}ul{list-style:none;padding:0;display:grid;gap:.75rem}li{border:1px solid #8885;border-radius:.75rem}a,li>div{display:block;color:inherit;text-decoration:none;padding:1rem}a:focus-visible,a:hover{outline:2px solid currentColor;border-radius:.75rem}h2{font-size:1.1rem;margin:0}li p{margin:.4rem 0 0;overflow-wrap:anywhere}small{opacity:.7}[hidden]{display:none}</style>
-<header><h1>Now</h1><p>Your little apps, ready when you are.</p></header>
-<label for="search">Find an app</label><input id="search" type="search" placeholder="Search your apps" autocomplete="off">
-<ul>${apps
-    .filter((a) => a.state === "live")
-    .map(
-      (a) =>
-        `<li>${a.active ? `<a href="${escape(a.url)}">` : "<div>"}<h2>${escape(a.slug)}</h2><p>${escape(a.description)}</p>${a.active ? "</a>" : "<small>Not deployed yet</small></div>"}</li>`,
-    )
-    .join("")}</ul>
-<p id="empty"${apps.some((a) => a.state === "live") ? " hidden" : ""}>No apps here yet. Ask your assistant to make one.</p>
-<script>const input=document.getElementById('search'),items=[...document.querySelectorAll('li')];input.addEventListener('input',()=>{for(const item of items)item.hidden=!item.textContent.toLowerCase().includes(input.value.toLowerCase());document.getElementById('empty').hidden=items.some(item=>!item.hidden);});</script></html>`;
+  const live = apps.filter((app) => app.state === "live");
+  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Apps</title>
+<style>:root{font-family:system-ui,-apple-system,sans-serif;color-scheme:light dark;background:#f5f5f7;color:#1d1d1f}*{box-sizing:border-box}body{max-width:42rem;margin:auto;padding:24px 20px 40px}h1{font-size:28px;letter-spacing:-.6px;line-height:1.2;margin:0 0 28px;font-weight:700}ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px 12px}li{min-width:0}a,.pending{display:flex;flex-direction:column;align-items:center;gap:9px;color:inherit;text-decoration:none;text-align:center;-webkit-tap-highlight-color:transparent}svg{width:72px;height:72px;max-width:100%;filter:drop-shadow(0 2px 3px #0001)}.name{font-size:12px;line-height:1.3;font-weight:500;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}a:active svg{transform:scale(.93)}a:focus-visible{outline:2px solid currentColor;outline-offset:7px;border-radius:16px}.pending{opacity:.45}p{color:#777;font-size:15px}@media(min-width:520px){body{padding:32px}ul{grid-template-columns:repeat(4,minmax(0,1fr));gap:28px 20px}svg{width:80px;height:80px}.name{font-size:13px}}@media(prefers-color-scheme:dark){:root{background:#000;color:#f5f5f7}}</style>
+<h1>Apps</h1><ul>${live.map((app) => `<li>${app.active ? `<a href="${escape(app.url)}" aria-label="${escape(app.slug)}">` : `<div class="pending" aria-label="${escape(app.slug)} — not deployed yet">`}${icon(app.id)}<span class="name">${escape(app.slug)}</span>${app.active ? "</a>" : "</div>"}</li>`).join("")}</ul>${live.length ? "" : "<p>No apps yet.</p>"}</html>`;
 }
