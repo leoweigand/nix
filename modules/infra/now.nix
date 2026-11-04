@@ -165,7 +165,7 @@ in
           sleep 1
         done
         "$ready"
-        cp ${source}/runtime/index.js /var/lib/leolab-now-runtime/index.js
+        install -m 0600 ${source}/runtime/index.js /var/lib/leolab-now-runtime/index.js
         ${pkgs.python3}/bin/python3 - <<'PY'
         import json,os,pathlib
         config=json.loads(pathlib.Path("${source}/runtime/wrangler.json").read_text())
@@ -177,7 +177,7 @@ in
       script = ''
         export AWS_ACCESS_KEY_ID="$(cat "$CREDENTIALS_DIRECTORY/s3-key")"
         export AWS_SECRET_ACCESS_KEY="$(cat "$CREDENTIALS_DIRECTORY/s3-secret")"
-        exec ${celld}/bin/celld --listen 127.0.0.1:${toString cfg.runtimePort} --internal-listen 127.0.0.1:9094
+        exec ${celld}/bin/celld --listen 127.0.0.1:${toString cfg.runtimePort} --internal-listen 127.0.0.1:0
       '';
       serviceConfig = hardening // {
         User = "leolab-now";

@@ -9,12 +9,15 @@ let
     ];
   };
   cfg = enabled.config;
+  disabled = picard.extendModules {
+    modules = [ { homelab.infra.now.enable = pkgs.lib.mkForce false; } ];
+  };
   services = cfg.systemd.services;
   domain = cfg.homelab.baseDomain;
   route = cfg.homelab.infra.edge.proxies."*.now";
 in
-assert !picard.config.homelab.infra.now.enable;
-assert !(picard.config.systemd.services ? leolab-now);
+assert !disabled.config.homelab.infra.now.enable;
+assert !(disabled.config.systemd.services ? leolab-now);
 assert builtins.all (x: x.assertion) cfg.assertions;
 assert route.auth.passSubject && !route.public;
 assert route.upstream == "unix//run/leolab-now/frontend.sock";

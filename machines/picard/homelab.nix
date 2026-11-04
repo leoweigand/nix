@@ -261,13 +261,15 @@ in
       };
       assistant = {
         enable = true;
+        runtime = "eve";
         botUsername = "purrmeister_bot";
         pocketIdSubject = "10bca0fd-70f4-4bec-ac14-365ce6d29454";
       };
+      now.enable = true;
 
       edgeDns = {
         enable = true;
-        serial = 2026110201; # Bump whenever DNS names or values change
+        serial = 2026110401; # Bump whenever DNS names or values change
         lanListenAddress = "192.168.2.4";
         lanAnswerAddress = "192.168.2.4";
         tailnetListenAddress = "100.104.119.103";
