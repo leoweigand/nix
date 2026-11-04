@@ -133,9 +133,14 @@ verifies the signed Telegram identity and existing account connection, checks
 current Pocket ID access, then uses a short-lived one-time Pocket ID login and
 the normal OAuth2 Proxy flow. The existing Pocket ID administrative API key is
 loaded as a systemd credential; it is never exposed to generated apps or models.
-The launcher consumes accepted proofs durably to prevent replay.
+The backend completes OAuth and verifies the gateway identity before issuing a
+partitioned browser session, so Telegram Web never embeds Pocket ID pages. Now
+permits framing by Telegram Web only and preserves the cookie partition during
+renewal. The launcher consumes accepted proofs durably to prevent replay.
 
-`https://now.leolab.party/` is the authenticated, mobile-first app library.
+`https://now.leolab.party/` is the authenticated, mobile-first app library: a
+compact grid of app names and stable coloured squiggle icons generated from app
+IDs, headed Apps, with no search or description copy.
 Private-chat buttons for canonical Now app URLs open the selected app inside
 Telegram; group buttons remain browser links. The library and apps retain private
 LAN/Tailscale reachability. Generated apps remain ordinary websites; general and
