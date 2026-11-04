@@ -127,6 +127,21 @@ those files exist, allowing workers with `ProcSubset=pid` to start the hook.
 
 ## Telegram assistant
 
+With `homelab.infra.assistant.miniApp.enable`, the private Telegram Apps menu
+opens Now through a trusted launcher on the Pocket ID hostname. The launcher
+verifies the signed Telegram identity and existing account connection, checks
+current Pocket ID access, then uses a short-lived one-time Pocket ID login and
+the normal OAuth2 Proxy flow. The existing Pocket ID administrative API key is
+loaded as a systemd credential; it is never exposed to generated apps or models.
+The launcher consumes accepted proofs durably to prevent replay.
+
+`https://now.leolab.party/` is the authenticated, mobile-first app library.
+Private-chat buttons for canonical Now app URLs open the selected app inside
+Telegram; group buttons remain browser links. The library and apps retain private
+LAN/Tailscale reachability. Generated apps remain ordinary websites; general and
+coding guidance requires simple mobile-first interfaces and system fonts, while
+launch-button guidance belongs only to the Telegram channel.
+
 `homelab.infra.assistant` runs Pi 1.4.0 as a separate worker behind the existing
 notification gateway's Telegram webhook. It accepts Leo's DMs and explicit bot
 mentions in configured groups, persists accepted jobs, and keeps Pi sessions
