@@ -37,6 +37,18 @@ requests/minute and two concurrent requests. Check non-success responses and
 report errors clearly; never blindly retry a write. App code has no host
 filesystem, shell, platform credentials or package lifecycle scripts.
 
+For AI features, include a root now.json file containing
+{"permissions":{"inference":true}}. In src/app.ts, fetch
+https://ai.internal.leolab.party/v1/chat/completions with POST JSON containing
+messages and optionally model; omit model for the gateway default. Use stream:false.
+GET /v1/models lists models; POST /v1/systemone accepts structured decisions.
+No API key or network.server entry is needed for inference. Calls are buffered,
+limited to 60 seconds, 1 MiB input and 2 MiB output, and share the server-fetch
+budgets. Check HTTP errors; do not automatically retry. Keep inference in the
+worker and expose an appropriate same-origin API to the frontend. Removing
+now.json or setting inference:false revokes access when deployed; partial edits
+preserve an omitted now.json, and rollback restores its release's permission.
+
 Build, poll the returned release ID, inspect diagnostics and fix source when
 needed, then deploy with the expected currently active release. Test the app
 through now_request before returning its URL. A failed build must not replace

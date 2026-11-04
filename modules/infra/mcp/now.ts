@@ -39,7 +39,7 @@ const definitions = {
   },
   put_source: {
     description:
-      "Submit source files (default: COMPLETE snapshot), with src/app.ts exporting a DurableObject class App with fetch(request). public/* are static files. Set replace:false to merge changed files and use null to delete; omitted files/dependencies then stay unchanged. By default, omitted files are deleted. Supply current baseRevision (null initially), and exact npm dependency versions. Browser fetch may use external HTTPS APIs subject to CORS. Server fetch requires network.server listing exact HTTPS origins (maximum 16); private addresses, non-HTTPS, WebSockets and raw sockets are blocked. No scripts or host filesystem in app code. X-Now-User-ID is verified; storage is isolated per app AND user.",
+      'Submit source files (default: COMPLETE snapshot), with src/app.ts exporting a DurableObject class App with fetch(request). public/* are static files. Set replace:false to merge changed files and use null to delete; omitted files/dependencies then stay unchanged. By default, omitted files are deleted. Supply current baseRevision (null initially), and exact npm dependency versions. Browser fetch may use external HTTPS APIs subject to CORS. Include now.json with {"permissions":{"inference":true}} to enable server inference via https://ai.internal.leolab.party/v1/models (GET), /v1/chat/completions or /v1/systemone (POST JSON, stream:false). Inference is buffered, limited to 60 seconds, 1 MiB input and 2 MiB output; no credentials needed. Deleting now.json or setting inference:false revokes access on deployment. Other server fetch requires network.server listing exact HTTPS origins (maximum 16); private addresses, non-HTTPS, WebSockets and raw sockets are blocked. No scripts or host filesystem in app code. X-Now-User-ID is verified; storage is isolated per app AND user.',
     schema: z
       .object({
         ...app,
@@ -128,7 +128,7 @@ export class NowClient {
         "content-type": "application/json",
       },
       body: JSON.stringify(input),
-      signal: AbortSignal.timeout(40_000),
+      signal: AbortSignal.timeout(action === "request" ? 90_000 : 40_000),
       redirect: "error",
     });
     const output = (await response.json()) as Record<string, unknown>;

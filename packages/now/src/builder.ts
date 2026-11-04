@@ -10,6 +10,7 @@ import {
 import { spawn, type ChildProcess } from "node:child_process";
 import path from "node:path";
 
+import { permissions } from "./permissions.ts";
 import { validateNetwork } from "./egress.ts";
 
 export interface Source {
@@ -19,6 +20,7 @@ export interface Source {
 }
 export function validateSource(source: Source) {
   validateNetwork(source.network);
+  permissions(source.files);
   if (!source.files?.["src/app.ts"])
     throw new Error("Supply src/app.ts exporting class App");
   if (Object.keys(source.files).length > 64)
@@ -26,7 +28,7 @@ export function validateSource(source: Source) {
   let bytes = 0;
   for (const [name, value] of Object.entries(source.files)) {
     if (
-      !/^(src|public)\/[a-zA-Z0-9_./-]+$/.test(name) ||
+      (name !== "now.json" && !/^(src|public)\/[a-zA-Z0-9_./-]+$/.test(name)) ||
       name.split("/").some((p) => !p || p === "." || p === "..") ||
       typeof value !== "string"
     )

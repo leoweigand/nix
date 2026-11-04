@@ -1,3 +1,4 @@
+import { createServer } from "node:http";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -12,6 +13,26 @@ test(
   { skip: !process.env.NOW_TEST_RUNTIME_URL },
   async () => {
     const directory = await mkdtemp(join(tmpdir(), "now-runtime-"));
+    let inferenceCalls = 0;
+    const gateway = createServer(async (request, response) => {
+      inferenceCalls++;
+      assert.equal(request.url, "/v1/chat/completions");
+      assert.equal(request.headers.authorization, undefined);
+      for await (const _chunk of request) {
+        /* consume the prompt */
+      }
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          choices: [{ message: { content: "Fixture inference" } }],
+        }),
+      );
+    });
+    await new Promise<void>((resolve) =>
+      gateway.listen(0, "127.0.0.1", resolve),
+    );
+    const gatewayAddress = gateway.address();
+    assert.ok(gatewayAddress && typeof gatewayAddress !== "string");
     const control = new Control({
       database: join(directory, "registry.sqlite"),
       scratch: directory,
@@ -19,6 +40,7 @@ test(
       runtimeUrl: process.env.NOW_TEST_RUNTIME_URL!,
       runtimeToken: process.env.NOW_TEST_RUNTIME_TOKEN!,
       compileSandbox: process.env.NOW_TEST_COMPILE_SANDBOX,
+      inferenceUrl: `http://127.0.0.1:${gatewayAddress.port}`,
     });
     const broker = createControlServer(
       control,
@@ -54,6 +76,7 @@ test(
     ) => `import {DurableObject} from "cloudflare:workers";
     export class App extends DurableObject { async fetch(r) {
       const p=new URL(r.url).pathname;
+      if(p==='/inference')return fetch('https://ai.internal.leolab.party/v1/chat/completions',{method:'POST',headers:{'content-type':'application/json',authorization:'must-not-forward'},body:JSON.stringify({messages:[{role:'user',content:'Hello'}]})});
       if(p==='/network')return fetch('https://api.example.com/fixture',{method:'POST',headers:{'x-fixture':'yes'},body:'fixture-body'});
       if(p==='/egress'){try{const r=await fetch('http://127.0.0.1:8333/');return new Response(r.status===502?'denied':'unsafe');}catch{return new Response('denied');}}
       const n=this.ctx.storage.kv.get('n')??0;
@@ -71,6 +94,9 @@ test(
         baseRevision: current.app.head,
         files: {
           "src/app.ts": code(version),
+          "now.json": JSON.stringify({
+            permissions: { inference: version === 1 },
+          }),
           "public/index.html": "<h1>Counter</h1>",
         },
         dependencies: {},
@@ -137,7 +163,18 @@ test(
           release: first,
         });
       }
+      assert.equal(
+        (await (await read(ids[0]!, owner, "GET", "/inference")).json())
+          .choices[0].message.content,
+        "Fixture inference",
+      );
+      assert.equal(inferenceCalls, 1);
       const second = await publish(ids[0]!, 2, first);
+      assert.equal(
+        (await read(ids[0]!, owner, "GET", "/inference")).status,
+        403,
+      );
+      assert.equal(inferenceCalls, 1);
       const cached = await call("request", {
         appId: ids[0],
         path: "/api",
@@ -170,6 +207,11 @@ test(
         version: 1,
         user: userKey(owner),
       });
+      assert.equal(
+        (await read(ids[0]!, owner, "GET", "/inference")).status,
+        200,
+      );
+      assert.equal(inferenceCalls, 2);
       // Idle eviction must reconstruct the dynamic class against the same database.
       if (process.env.NOW_TEST_IDLE_WAIT_MS)
         await new Promise((resolve) =>
@@ -212,6 +254,7 @@ test(
           await call("destroy", { appId });
       await new Promise<void>((resolve) => broker.close(() => resolve()));
       await Promise.all(control.jobs);
+      await new Promise<void>((resolve) => gateway.close(() => resolve()));
       control.db.close();
       await rm(directory, { recursive: true, force: true });
     }

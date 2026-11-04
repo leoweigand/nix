@@ -2,6 +2,8 @@ import { DatabaseSync } from "node:sqlite";
 import { randomUUID, createHash, randomInt } from "node:crypto";
 import { bundle, validateSource, type Source } from "./builder.ts";
 
+import { permissions } from "./permissions.ts";
+import { fetchInference } from "./inference.ts";
 import { fetchPublic, type OutboundRequest } from "./egress.ts";
 
 type App = {
@@ -47,6 +49,8 @@ export class Control {
     domain: string;
     runtimeUrl: string;
     runtimeToken: string;
+    inferenceUrl?: string;
+    inferenceOrigin?: string;
     npm?: string;
     sandbox?: string;
     compileSandbox?: string;
@@ -585,8 +589,22 @@ export class Control {
     budget.active++;
     this.outboundActive++;
     try {
+      if (
+        new URL(input.url).origin ===
+        (this.config.inferenceOrigin ?? "https://ai.internal.leolab.party")
+      ) {
+        if (!permissions(source.files).inference)
+          throw new NowError(
+            403,
+            "Declare permissions.inference:true in now.json",
+          );
+        if (!this.config.inferenceUrl)
+          throw new NowError(503, "Inference gateway is unavailable");
+        return await fetchInference(input, this.config.inferenceUrl);
+      }
       return await fetchPublic(input, source.network?.server ?? []);
     } catch (error) {
+      if (error instanceof NowError) throw error;
       throw new NowError(
         502,
         error instanceof Error ? error.message : "Server fetch failed",
@@ -604,7 +622,7 @@ export class Control {
         "content-type": "application/json",
       },
       body: JSON.stringify(envelope),
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(75_000),
       redirect: "error",
     });
   }
