@@ -863,3 +863,31 @@ test("reply failures report recorded deployments and only confirmed Telegram del
     f.cleanup();
   }
 });
+
+test("app replies get a launch button even when the model omits presentation tools", async () => {
+  const f = fixture();
+  try {
+    f.casual();
+    const url = "https://fixture.now.example";
+    const worker = new Worker({
+      ...f.options,
+      assistant: {
+        answer: async () => ({
+          text: `Your app is live at [${url}](${url}/)`,
+          needsConnection: false,
+          appLinks: [{ id: "fixture", name: "Test App", url }],
+        }),
+      },
+    });
+    for (const [index, group] of [false, true].entries()) {
+      f.inbox.enqueue(f.job(index + 1, group));
+      await worker.drain();
+      const reply = f.messages
+        .filter((m) => m.endpoint === "/v1/assistant-replies")
+        .at(-1)!;
+      assert.deepEqual(reply.body.buttons, [{ label: "Open app", url }]);
+    }
+  } finally {
+    f.cleanup();
+  }
+});

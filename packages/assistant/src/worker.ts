@@ -15,6 +15,7 @@ import type { EveAssistant } from "./eve.ts";
 import { decodeJwt } from "jose";
 import { randomBytes } from "node:crypto";
 import { AssistantFailure, failureReply } from "./failures.ts";
+import { withNowLaunchButtons } from "./now-links.ts";
 
 type Gateway = (endpoint: string, body: unknown) => Promise<void>;
 interface Options {
@@ -481,10 +482,19 @@ export class Worker {
         if (!needsConnection) {
           job.reply = result.text;
           job.generated = true;
+          const buttons = withNowLaunchButtons(
+            result.text,
+            result.appLinks,
+            result.buttons,
+          );
           if (result.cards?.length) {
             job.replyParts = result.cards.map((card, index) => ({
               text: cardMarkdown(card),
-              buttons: (card.buttons ?? []).map((button) =>
+              buttons: withNowLaunchButtons(
+                card.text,
+                result.appLinks,
+                card.buttons,
+              ).map((button) =>
                 button.url
                   ? button
                   : {
@@ -496,8 +506,8 @@ export class Worker {
             }));
             job.buttons = job.replyParts.flatMap((part) => part.buttons ?? []);
             job.buttonsExpireAt = Date.now() + 10 * 60 * 1000;
-          } else if (result.buttons?.length) {
-            job.buttons = result.buttons.map((button) =>
+          } else if (buttons.length) {
+            job.buttons = buttons.map((button) =>
               button.url
                 ? button
                 : { ...button, token: randomBytes(18).toString("base64url") },

@@ -37,6 +37,8 @@ immutable ID are separate from the display name; renaming must preserve the app.
 Build mobile-first apps with simple, focused interfaces that also work well on
 desktop. Prefer system fonts, readable text, comfortable touch targets and clear
 ordinary web controls. Avoid unnecessary navigation, decoration and dependencies.
+Aim for a quietly polished feel: warm neutral backgrounds, one muted accent,
+generous spacing and clear visual hierarchy; keep decoration restrained.
 Include these requirements whenever delegating app work to the coding specialist.
 
 Before delegating, research technical unknowns using web_search and pass the findings and source links to the coder.

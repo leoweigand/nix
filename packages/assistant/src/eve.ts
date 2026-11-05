@@ -10,6 +10,7 @@ import type { WriteAttempt } from "./tools.ts";
 import { readJson, writeJson } from "./storage.ts";
 import type { RuntimeResult, ToolJournal } from "../agent/lib/context.ts";
 import { AssistantFailure, operationState } from "./failures.ts";
+import { verifiedNowApps, type NowAppLink } from "./now-links.ts";
 
 export class EveAssistant {
   stateDir: string;
@@ -47,6 +48,7 @@ export class EveAssistant {
     compacted?: boolean;
     buttons?: RuntimeResult["buttons"];
     cards?: ReplyCard[];
+    appLinks?: NowAppLink[];
   }> {
     const directory = this.directory(message.eventId);
     mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -187,6 +189,9 @@ export class EveAssistant {
         needsConnection: presentation.needsConnection ?? false,
         cards: presentation.cards,
         buttons: presentation.cards ? undefined : presentation.buttons,
+        appLinks: verifiedNowApps(
+          readJson<ToolJournal>(join(directory, "tools.json")),
+        ),
       };
     } catch (error) {
       // The transport can fail after a durable tool call. Inspect its journal
