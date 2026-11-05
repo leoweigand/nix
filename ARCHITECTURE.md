@@ -32,7 +32,8 @@ The separate publication module, `modules/infra/cloudflare-publication/default.n
 Internal APIs share one network gate at `*.internal.leolab.party`, allowing
 loopback, Podman bridge and Tailscale callers. LAN DNS visibility does not grant
 access. The AI gateway uses this namespace to expose allowlisted OpenCode Zen
-models with centrally held credentials. See [internal service APIs](README.md#internal-service-apis).
+models and account-discovered OpenAI subscription models with centrally held
+credentials. See [internal service APIs](README.md#internal-service-apis).
 
 ### Access Flow
 1. Local client resolves `service.leolab.party` via the home DNS server and connects to picard's LAN IP over HTTPS.

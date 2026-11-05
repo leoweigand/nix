@@ -17,7 +17,8 @@ our `.ts` sources directly; constructors use explicit fields rather than
 TypeScript parameter properties. Prefer Node and Web built-ins; use Nix or
 shell only for configuration and small glue.
 
-`nix develop` supplies the pinned Node/npm toolchain. Run `npm ci`, `npm test`,
+`nix develop` supplies the pinned Node/npm toolchain. Run `npm ci`,
+`patch -p1 < packages/automation/openai-oauth.patch`, `npm test`,
 `npm run check` and `npm run format:check`; `npm run format` formats the sources.
 Type checking is separate from execution. `package-lock.json` pins dependencies,
 including the JSR packages accessed through their npm compatibility registry.
@@ -37,6 +38,25 @@ Sonarr/Radarr import notifications.
 `nix build .#checks.x86_64-linux.automation` runs all TypeScript checks and tests;
 `nix build .#checks.x86_64-linux.automation-sandbox` verifies filesystem/SQLite
 isolation, atomic writes and TCP denial on Linux.
+
+## AI gateway
+
+`homelab.infra.aiGateway` provides the existing private Chat Completions and
+System One endpoints. Picard enables `openaiOauth.enable` to add subscription
+models through the pinned `openai-oauth` 2.0.0 adapter inside the gateway process.
+`openaiOauth.models = null` exposes all discovered text models; a list restricts
+OpenAI model selection. Reasoning effort passes through without a local policy.
+The existing network gate applies to every model, with no caller-account check.
+
+The refreshable OAuth session lives in the systemd-owned
+`/var/lib/ai-gateway/auth.json`, outside the Nix store and 1Password. Picard's
+appdata backup includes its private state directory. The launcher permits writes
+only to that directory and limits outbound HTTP to the configured providers.
+The package applies a small compatibility patch for request cancellation,
+no automatic inference retries, effort forwarding for unfamiliar model IDs,
+concurrent session refresh and upstream error status codes. Its integration tests
+exercise the actual adapter against a simulated backend.
+See the [AI gateway runbook](../homelab/docs/ai-gateway.md) for sign-in and usage.
 
 ## MCP tools
 

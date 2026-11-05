@@ -17,6 +17,7 @@ let
       "/var/lib/private/cloudflare-publication" # DynamicUser's persistent route ownership state
       "/var/lib/private/leolab-mcp" # Private document ingestion receipts and expiring uploads
       "/var/lib/private/notification-gateway" # Delivered alerts waiting to enter assistant context
+      "/var/lib/private/ai-gateway" # Refreshable ChatGPT subscription session
       "/var/lib/leolab-assistant-instructions"
       config.homelab.infra.assistant.eveStateDir # Native filesystem; virtiofs cannot safely unlink hard-link staging files
     ];
@@ -116,6 +117,7 @@ in
       aiGateway = {
         enable = true;
         apiKeyReference = "op://Homelab/OpenCode Zen/credential";
+        openaiOauth.enable = true;
       };
 
       mcp = {

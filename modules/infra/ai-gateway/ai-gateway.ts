@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { createWebServer } from "../../runtime/http.ts";
 import { restrictedFetch } from "../../runtime/network.ts";
+import { createOpenAIProvider, type OpenAIProvider } from "./openai-oauth.ts";
 
 export interface ModelPolicy {
   chatModels: string[];
@@ -17,6 +18,7 @@ export interface GatewayConfig extends ModelPolicy {
 interface Dependencies {
   fetch: typeof fetch;
   log: Pick<Console, "info">;
+  openai?: OpenAIProvider;
 }
 const upstreamFetch = restrictedFetch(["https://opencode.ai"]);
 
@@ -50,15 +52,31 @@ export function createHandler(
     if (url.pathname === "/v1/models") {
       if (request.method !== "GET")
         return error(405, "Use GET", "method_not_allowed");
+      let openaiModels: string[] = [];
+      if (dependencies.openai) {
+        try {
+          openaiModels = await dependencies.openai.models(
+            AbortSignal.any([request.signal, AbortSignal.timeout(15_000)]),
+          );
+        } catch {
+          dependencies.log.info(
+            JSON.stringify({ event: "openai_catalog_unavailable" }),
+          );
+        }
+      }
       return Response.json({
         object: "list",
         data: [
-          ...new Set([...config.chatModels, ...config.systemoneModels]),
+          ...new Set([
+            ...config.chatModels,
+            ...config.systemoneModels,
+            ...openaiModels,
+          ]),
         ].map((id) => ({
           id,
           object: "model",
           created: 0,
-          owned_by: "opencode",
+          owned_by: openaiModels.includes(id) ? "openai" : "opencode",
         })),
       });
     }
@@ -165,7 +183,32 @@ export function createHandler(
             ? config.defaultChatModel
             : config.defaultSystemoneModel
           : payload.model;
-      if (typeof selected !== "string" || !allowed.includes(selected))
+      let openai = false;
+      if (
+        chat &&
+        typeof selected === "string" &&
+        !allowed.includes(selected) &&
+        dependencies.openai
+      ) {
+        try {
+          openai = (
+            await dependencies.openai.models(controller.signal)
+          ).includes(selected);
+        } catch {
+          if (controller.signal.aborted) throw new Error("aborted");
+          return fail(
+            error(
+              503,
+              "OpenAI model discovery unavailable",
+              "openai_unavailable",
+            ),
+          );
+        }
+      }
+      if (
+        typeof selected !== "string" ||
+        (!allowed.includes(selected) && !openai)
+      )
         return fail(
           error(
             400,
@@ -175,21 +218,34 @@ export function createHandler(
         );
       model = selected;
       payload.model = model;
-      const upstream = await dependencies.fetch(
-        `https://opencode.ai/inference/${chat ? "openai/v1/chat/completions" : "systemone/v1/systemone"}`,
-        {
-          method: "POST",
-          redirect: "manual",
-          signal: controller.signal,
-          headers: {
-            "content-type": "application/json",
-            authorization: `Bearer ${config.apiKey}`,
-            "accept-encoding": "identity",
-            accept: request.headers.get("accept") ?? "application/json",
-          },
-          body: JSON.stringify(payload),
-        },
-      );
+      const upstream = openai
+        ? await dependencies.openai!.handle(
+            new Request("http://localhost/v1/chat/completions", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify(payload),
+              signal: controller.signal,
+            }),
+          )
+        : await dependencies.fetch(
+            `https://opencode.ai/inference/${chat ? "openai/v1/chat/completions" : "systemone/v1/systemone"}`,
+            {
+              method: "POST",
+              redirect: "manual",
+              signal: controller.signal,
+              headers: {
+                "content-type": "application/json",
+                authorization: `Bearer ${config.apiKey}`,
+                "accept-encoding": "identity",
+                accept: request.headers.get("accept") ?? "application/json",
+              },
+              body: JSON.stringify(payload),
+            },
+          );
+      if (controller.signal.aborted) {
+        await upstream.body?.cancel();
+        throw new Error("aborted");
+      }
       status = upstream.status;
       // Redirects could replay paid requests or expose credentials; never follow them.
       if (status >= 300 && status < 400) {
@@ -261,8 +317,16 @@ if (import.meta.main) {
   ).trim();
   if (!apiKey || /[\r\n]/.test(apiKey))
     throw new Error("Invalid upstream API key");
-  createWebServer(createHandler({ ...policy, apiKey })).listen(
-    policy.port,
-    "127.0.0.1",
-  );
+  const openai = policy.openaiOauth.enable
+    ? createOpenAIProvider(
+        "/var/lib/ai-gateway/auth.json",
+        policy.openaiOauth.models,
+      )
+    : undefined;
+  createWebServer(
+    createHandler(
+      { ...policy, apiKey },
+      { fetch: upstreamFetch, log: console, openai },
+    ),
+  ).listen(policy.port, "127.0.0.1");
 }

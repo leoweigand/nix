@@ -303,3 +303,72 @@ test("a failing upstream stream cancellation still releases capacity", async () 
   await assert.rejects(response.body!.cancel());
   assert.equal((await handler(request({ model: "invalid" }))).status, 400);
 });
+
+test("OpenAI routing preserves effort and isolates caller headers", async () => {
+  const received: Request[] = [];
+  const handler = createHandler(config, {
+    log: quiet,
+    fetch: async () => {
+      throw new Error("unexpected Zen request");
+    },
+    openai: {
+      models: async () => ["gpt-test"],
+      handle: async (request) => {
+        received.push(request);
+        return Response.json({ ok: true });
+      },
+    },
+  });
+  const listed = await (
+    await handler(new Request("http://localhost/v1/models"))
+  ).json();
+  assert.deepEqual(listed.data.at(-1), {
+    id: "gpt-test",
+    object: "model",
+    created: 0,
+    owned_by: "openai",
+  });
+  for (const effort of [undefined, "low", "high", "ultra", "future-value"]) {
+    const response = await handler(
+      request({ model: "gpt-test", reasoning_effort: effort }),
+    );
+    assert.equal(response.status, 200);
+    await response.text();
+    const forwarded = received.at(-1)!;
+    assert.equal(forwarded.headers.get("authorization"), null);
+    assert.equal(forwarded.headers.get("cookie"), null);
+    assert.equal((await forwarded.json()).reasoning_effort, effort);
+  }
+  assert.equal((await handler(request({ model: "unknown" }))).status, 400);
+  assert.equal(
+    (await handler(request({ model: "gpt-test" }, "/v1/systemone"))).status,
+    400,
+  );
+});
+
+test("OpenAI discovery failure leaves Zen available and never falls back for inference", async () => {
+  let calls = 0;
+  const handler = createHandler(config, {
+    log: quiet,
+    fetch: async () => {
+      calls++;
+      return Response.json({ ok: true });
+    },
+    openai: {
+      models: async () => {
+        throw new Error("not signed in");
+      },
+      handle: async () => {
+        throw new Error("unexpected inference");
+      },
+    },
+  });
+  assert.equal(
+    (await handler(new Request("http://localhost/v1/models"))).status,
+    200,
+  );
+  assert.equal((await handler(request({ model: "gpt-test" }))).status, 503);
+  assert.equal(calls, 0);
+  await (await handler(request())).text();
+  assert.equal(calls, 1);
+});

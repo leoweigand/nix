@@ -18,6 +18,7 @@ let
         maxBodyBytes
         maxConcurrent
         timeoutMs
+        openaiOauth
         ;
     }
   );
@@ -25,6 +26,7 @@ let
     name = serviceName;
     script = "modules/infra/ai-gateway/ai-gateway.ts";
     credentialNames = [ "api-key" ];
+    writePaths = lib.optional cfg.openaiOauth.enable "/var/lib/ai-gateway";
     environmentNames = [
       "CREDENTIALS_DIRECTORY"
       "AI_GATEWAY_CONFIG"
@@ -34,7 +36,15 @@ let
 in
 {
   options.homelab.infra.aiGateway = {
-    enable = lib.mkEnableOption "private OpenCode Zen inference gateway";
+    enable = lib.mkEnableOption "private inference gateway";
+    openaiOauth = {
+      enable = lib.mkEnableOption "ChatGPT subscription inference through openai-oauth";
+      models = lib.mkOption {
+        type = lib.types.nullOr (lib.types.listOf lib.types.str);
+        default = null;
+        description = "Allowed OpenAI model IDs; null exposes all account-discovered text models. Reasoning effort is unrestricted.";
+      };
+    };
     port = lib.mkOption {
       type = lib.types.port;
       default = 9088;
@@ -111,7 +121,7 @@ in
     };
     homelab.infra.edge.internalProxies.ai.upstream = "http://127.0.0.1:${toString cfg.port}";
     systemd.services.${serviceName} = {
-      description = "Private OpenCode Zen inference gateway";
+      description = "Private inference gateway";
       wantedBy = [ "multi-user.target" ];
       after = [
         "network-online.target"
@@ -124,6 +134,8 @@ in
         ExecStart = "${launcher}/bin/${serviceName}";
         LoadCredential = [ "api-key:${config.services.onepassword-secrets.secretPaths.aiGatewayApiKey}" ];
         DynamicUser = true;
+        StateDirectory = lib.optional cfg.openaiOauth.enable "ai-gateway";
+        StateDirectoryMode = "0700";
         Restart = "on-failure";
         RestartSec = "5s";
         NoNewPrivileges = true;

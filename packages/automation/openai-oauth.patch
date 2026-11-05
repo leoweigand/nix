@@ -1,0 +1,65 @@
+--- a/node_modules/openai-oauth/dist/chunk-INHW7GRB.js
++++ b/node_modules/openai-oauth/dist/chunk-INHW7GRB.js
+@@ -387,6 +387,8 @@
+   const created = Math.floor(Date.now() / 1e3);
+   const id = `chatcmpl_${crypto.randomUUID()}`;
+   const result = streamText({
++    maxRetries: 0,
++    abortSignal: logContext.signal,
+     model: provider(request.model ?? "gpt-5.2"),
+     messages: toModelMessages(request.messages ?? []),
+     tools: createToolSet(request.tools),
+@@ -397,6 +399,7 @@
+     maxOutputTokens: request.max_tokens,
+     providerOptions: {
+       openai: {
++        forceReasoning: request.reasoning_effort === undefined ? undefined : true,
+         parallelToolCalls: request.parallel_tool_calls,
+         reasoningEffort: request.reasoning_effort
+       }
+@@ -633,6 +636,7 @@
+   });
+   if (body.stream === true) {
+     return streamChatCompletions(body, provider, {
++      signal: request.signal,
+       logger,
+       requestId,
+       startedAt
+@@ -640,6 +644,8 @@
+   }
+   try {
+     const result = await generateText({
++      maxRetries: 0,
++      abortSignal: request.signal,
+       model: provider(body.model ?? "gpt-5.2"),
+       messages: toModelMessages(body.messages),
+       tools: createToolSet(body.tools),
+@@ -650,6 +656,7 @@
+       maxOutputTokens: body.max_tokens,
+       providerOptions: {
+         openai: {
++          forceReasoning: body.reasoning_effort === undefined ? undefined : true,
+           parallelToolCalls: body.parallel_tool_calls,
+           reasoningEffort: body.reasoning_effort
+         }
+@@ -817,9 +824,10 @@
+ };
+ var createOpenAIOAuthRuntime = (settings = {}) => {
+   const auth = openaiCredentials(settings);
++  let loadingSession;
+   const sharedSettings = {
+     ...settings,
+-    auth: () => auth.getSession(),
++    auth: () => loadingSession ??= auth.getSession().finally(() => { loadingSession = undefined; }),
+     responsesState: false
+   };
+   const client = createOpenAIOAuthTransport(sharedSettings);
+@@ -838,7 +846,7 @@
+     } catch (error) {
+       return toErrorResponse(
+         error instanceof Error ? error.message : "Unexpected server error.",
+-        500,
++        Number.isInteger(error?.statusCode) && error.statusCode >= 400 && error.statusCode < 600 ? error.statusCode : 500,
+         "server_error"
+       );
+     }
