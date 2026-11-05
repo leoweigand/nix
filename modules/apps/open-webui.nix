@@ -31,6 +31,11 @@ in
       default = "/var/lib/open-webui";
       description = "Local filesystem state; keep SQLite off virtiofs";
     };
+    extraModels = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "Additional gateway chat model IDs exposed in the model selector";
+    };
     backupDir = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -98,7 +103,10 @@ in
           OPENAI_API_CONFIGS = builtins.toJSON {
             "0" = {
               enable = true;
-              model_ids = lib.filter (model: model != "beam-free") config.homelab.infra.aiGateway.chatModels;
+              model_ids = lib.unique (
+                (lib.filter (model: model != "beam-free") config.homelab.infra.aiGateway.chatModels)
+                ++ cfg.extraModels
+              );
             };
           };
           DEFAULT_MODELS = config.homelab.infra.aiGateway.defaultChatModel;
