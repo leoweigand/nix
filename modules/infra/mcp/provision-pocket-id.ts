@@ -2,17 +2,17 @@ import { execFileSync } from "node:child_process";
 
 // Run explicitly as the lab administrator; credentials never enter server config.
 const assistant = process.argv.includes("--assistant");
-const openWebui = process.argv.includes("--open-webui");
-if (assistant && openWebui) throw new Error("Choose only one MCP client");
+const librechat = process.argv.includes("--librechat");
+if (assistant && librechat) throw new Error("Choose only one MCP client");
 const clientName = assistant
   ? "LeoLab MCP — Telegram Assistant"
-  : openWebui
-    ? "LeoLab MCP — Open WebUI"
+  : librechat
+    ? "LeoLab MCP — LibreChat"
     : "LeoLab MCP — Codex";
 const callback = assistant
   ? "https://webhooks.leolab.party/assistant/oauth/callback"
-  : openWebui
-    ? "https://chat.leolab.party/oauth/clients/mcp:leolab/callback"
+  : librechat
+    ? "https://chat.leolab.party/api/mcp/leolab/oauth/callback"
     : "http://127.0.0.1:47831/callback";
 const key = execFileSync(
   "op",
@@ -131,8 +131,8 @@ const permissionIds = entry.permissions
   .map((p: { id: string }) => p.id);
 const clientId = assistant
   ? "leolab-mcp-telegram"
-  : openWebui
-    ? "leolab-mcp-open-webui"
+  : librechat
+    ? "leolab-mcp-librechat"
     : "leolab-mcp-codex";
 const clients = await api("/oidc/clients?pagination%5Blimit%5D=100");
 const existing = clients.data.find(
@@ -144,8 +144,8 @@ if (!existing) {
     name: clientName,
     description: assistant
       ? "User-bound media and Home Assistant tools through the Telegram assistant"
-      : openWebui
-        ? "Per-user access to private LeoLab tools from Open WebUI"
+      : librechat
+        ? "Per-user access to private LeoLab tools from LibreChat"
         : "Codex desktop and CLI access to private LeoLab tools",
     isPublic: true,
     pkceEnabled: true,
@@ -161,12 +161,12 @@ if (!existing) {
     "Client ID already has a different configuration; inspect it manually",
   );
 }
-if ((assistant || openWebui) && existing) {
+if ((assistant || librechat) && existing) {
   await api(`/oidc/clients/${clientId}`, "PUT", {
     name: clientName,
     description: assistant
       ? "User-bound media and Home Assistant tools through the Telegram assistant"
-      : "Per-user access to private LeoLab tools from Open WebUI",
+      : "Per-user access to private LeoLab tools from LibreChat",
     isPublic: true,
     pkceEnabled: true,
     isGroupRestricted: true,

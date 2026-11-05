@@ -665,23 +665,25 @@ systemctl status paperless-scheduler
 > [!TIP]
 > To quickly browse backups before restoring, use `restic snapshots`, `restic ls latest`, and `restic find <pattern>`. For interactive browsing, mount temporarily with `restic mount /mnt/restic`.
 
-## Open WebUI
+## LibreChat
 
-`homelab.apps.open-webui` runs the pinned v0.13.0 slim container behind the
-Pocket ID gateway at `chat.leolab.party` on Picard. Verified email and username
-headers provide automatic sign-in, with the first account becoming administrator.
-The existing AI gateway supplies six Zen chat models plus eight OpenAI
-subscription models configured through `extraModels`, and defaults to `glm-5.3`.
-SQLite, uploads and the signing key live in `/var/lib/open-webui`; the appdata
-backup prepares a quiesced copy under `/mnt/fast/appdata/open-webui-backup`.
-`mcp.enable` declares the shared LeoLab Streamable HTTP connection. Each user
-explicitly enables it in a chat and grants their own Pocket ID OAuth access.
-Its public PKCE client is provisioned explicitly with
-`node modules/infra/mcp/provision-pocket-id.ts --open-webui`; no shared user token
-or client secret is installed. A startup wrapper encrypts the declarative client
-metadata with the existing persistent signing key.
-See the [Open WebUI runbook](../homelab/docs/open-webui.md) for configuration
-limits, service checks and recovery.
+`homelab.apps.librechat` runs the digest-pinned official LibreChat container and
+MongoDB 8.0.20 on a dedicated Podman bridge. Picard publishes it privately at
+`chat.leolab.party`, with native Pocket ID PKCE sign-in restricted to `admins`.
+The existing AI gateway supplies six Zen and eight OpenAI subscription models.
+`extraModels` declares the subscription model IDs; `mcp.enable` adds the LeoLab
+connection with per-user Pocket ID consent. MongoDB has no published port.
+State and locally generated encryption keys live under `/var/lib/librechat`;
+`backupDir` prepares a quiesced copy for appdata restic. Search and document RAG
+services are not enabled. Provision the login and MCP public clients explicitly:
+
+```sh
+node modules/apps/librechat/provision-pocket-id.ts
+node modules/infra/mcp/provision-pocket-id.ts --librechat
+```
+
+The scripts only read the existing Pocket ID API key from 1Password. See the
+[LibreChat runbook](../homelab/docs/librechat.md) for access, limits and recovery.
 
 ## Audiobookshelf
 

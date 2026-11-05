@@ -9,7 +9,7 @@
     ./immich.nix
     ./linkding.nix
     ./miniflux.nix
-    ./open-webui.nix
+    ./librechat.nix
     ./paperless
     ./pingvin.nix
     ./prowlarr.nix

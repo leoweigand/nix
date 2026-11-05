@@ -410,7 +410,7 @@ in
           description = "Audiobooks and podcasts";
         };
       };
-      open-webui = {
+      librechat = {
         enable = true;
         mcp.enable = true;
         extraModels = [
@@ -423,11 +423,11 @@ in
           "gpt-5.6-terra"
           "gpt-5.6-luna"
         ];
-        backupDir = "${mounts.fast}/appdata/open-webui-backup";
+        backupDir = "${mounts.fast}/appdata/librechat-backup";
         homepage = {
           category = "Productivity";
-          name = "Open WebUI";
-          icon = "open-webui";
+          name = "LibreChat";
+          icon = "librechat";
           description = "Chat with AI models";
         };
       };
