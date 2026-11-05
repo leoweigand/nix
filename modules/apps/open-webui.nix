@@ -92,7 +92,7 @@ in
           WEBUI_SECRET_KEY_FILE = "/app/backend/data/.webui_secret_key";
           ENABLE_PERSISTENT_CONFIG = "False";
           ENABLE_OLLAMA_API = "False";
-          OPENAI_API_BASE_URLS = "https://ai.internal.${config.homelab.baseDomain}/v1";
+          OPENAI_API_BASE_URLS = "https://inference.internal.${config.homelab.baseDomain}/v1";
           OPENAI_API_KEYS = "unused";
           # Jev has a separate API and Beam's free tier rejects third-party clients.
           OPENAI_API_CONFIGS = builtins.toJSON {

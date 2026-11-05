@@ -40,7 +40,7 @@ three redirects, and allows two concurrent calls and 60 calls/minute per app
 (eight concurrent globally). Raw sockets and server WebSockets remain blocked.
 A root `now.json` with `{"permissions":{"inference":true}}` grants access to
 GET `/v1/models`, POST `/v1/chat/completions` and POST `/v1/systemone` on
-`https://ai.internal.leolab.party`. The broker routes only these calls to its
+`https://inference.internal.leolab.party`. The broker routes only these calls to its
 configured gateway backend, discards app-supplied headers and retains no gateway
 credentials. Calls have a 60-second deadline, 1 MiB input and 2 MiB output, share
 the outbound budgets and reject streaming and redirects. Permissions follow the

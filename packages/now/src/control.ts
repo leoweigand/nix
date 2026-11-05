@@ -643,7 +643,7 @@ export class Control {
     try {
       if (
         new URL(input.url).origin ===
-        (this.config.inferenceOrigin ?? "https://ai.internal.leolab.party")
+        (this.config.inferenceOrigin ?? "https://inference.internal.leolab.party")
       ) {
         if (!permissions(source.files).inference)
           throw new NowError(

@@ -63,7 +63,7 @@ export class PiAssistant {
       JSON.stringify({
         providers: {
           leolab: {
-            baseUrl: "https://ai.internal.leolab.party/v1",
+            baseUrl: "https://inference.internal.leolab.party/v1",
             api: "openai-completions",
             apiKey: "internal-gateway",
             models: [

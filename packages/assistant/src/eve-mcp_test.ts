@@ -221,7 +221,7 @@ test(
           modelCalls.push(body);
           if (liveAuthoring)
             return await forward(
-              "https://ai.internal.leolab.party/v1/chat/completions",
+              "https://inference.internal.leolab.party/v1/chat/completions",
               request,
               response,
               raw,

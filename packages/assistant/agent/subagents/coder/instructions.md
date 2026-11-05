@@ -55,7 +55,7 @@ filesystem, shell, platform credentials or package lifecycle scripts.
 
 For AI features, include a root now.json file containing
 {"permissions":{"inference":true}}. In src/app.ts, fetch
-https://ai.internal.leolab.party/v1/chat/completions with POST JSON containing
+https://inference.internal.leolab.party/v1/chat/completions with POST JSON containing
 messages and optionally model; omit model for the gateway default. Use stream:false.
 GET /v1/models lists models; POST /v1/systemone accepts structured decisions.
 No API key or network.server entry is needed for inference. Calls are buffered,

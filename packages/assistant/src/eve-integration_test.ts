@@ -60,7 +60,7 @@ for (const interruption of process.env.EVE_LIVE_TEST === "1"
         }
         if (process.env.EVE_LIVE_TEST === "1") {
           const upstream = await fetch(
-            "https://ai.internal.leolab.party/v1/chat/completions",
+            "https://inference.internal.leolab.party/v1/chat/completions",
             {
               method: "POST",
               headers: { "content-type": "application/json" },
