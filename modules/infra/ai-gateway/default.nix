@@ -119,7 +119,7 @@ in
       mode = "0400";
       services = [ serviceName ];
     };
-    homelab.infra.edge.internalProxies.ai.upstream = "http://127.0.0.1:${toString cfg.port}";
+    homelab.infra.edge.internalProxies.inference.upstream = "http://127.0.0.1:${toString cfg.port}";
     systemd.services.${serviceName} = {
       description = "Private inference gateway";
       wantedBy = [ "multi-user.target" ];

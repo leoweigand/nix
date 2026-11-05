@@ -24,7 +24,7 @@ let
       port = cfg.port;
       socket = "/run/leolab-now/frontend.sock";
       runtimeUrl = "http://127.0.0.1:${toString cfg.runtimePort}";
-      inferenceOrigin = "https://ai.internal.${config.homelab.baseDomain}";
+      inferenceOrigin = "https://inference.internal.${config.homelab.baseDomain}";
       inferenceUrl =
         if config.homelab.infra.aiGateway.enable then
           "http://127.0.0.1:${toString config.homelab.infra.aiGateway.port}"

@@ -9,7 +9,7 @@ import { validateSource } from "./builder.ts";
 import { Control, identity } from "./control.ts";
 import { fetchInference } from "./inference.ts";
 
-const origin = "https://ai.internal.leolab.party";
+const origin = "https://inference.internal.leolab.party";
 const files = { "src/app.ts": "export class App {}" };
 const manifest = (inference: boolean) =>
   JSON.stringify({ permissions: { inference } });

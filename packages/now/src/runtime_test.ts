@@ -76,7 +76,7 @@ test(
     ) => `import {DurableObject} from "cloudflare:workers";
     export class App extends DurableObject { async fetch(r) {
       const p=new URL(r.url).pathname;
-      if(p==='/inference')return fetch('https://ai.internal.leolab.party/v1/chat/completions',{method:'POST',headers:{'content-type':'application/json',authorization:'must-not-forward'},body:JSON.stringify({messages:[{role:'user',content:'Hello'}]})});
+      if(p==='/inference')return fetch('https://inference.internal.leolab.party/v1/chat/completions',{method:'POST',headers:{'content-type':'application/json',authorization:'must-not-forward'},body:JSON.stringify({messages:[{role:'user',content:'Hello'}]})});
       if(p==='/network')return fetch('https://api.example.com/fixture',{method:'POST',headers:{'x-fixture':'yes'},body:'fixture-body'});
       if(p==='/egress'){try{const r=await fetch('http://127.0.0.1:8333/');return new Response(r.status===502?'denied':'unsafe');}catch{return new Response('denied');}}
       const n=this.ctx.storage.kv.get('n')??0;

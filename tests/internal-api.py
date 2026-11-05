@@ -15,8 +15,8 @@ fixture = json.loads(pathlib.Path(sys.argv[1]).read_text())
 assert fixture["namespaceReserved"], "Competing internal virtual host bypasses policy"
 assert fixture["legacyUnchanged"], "Existing notification route changed"
 assert "*.internal.leolab.party" in fixture["tls"]
-assert "ai.internal 60 IN A 192.168.2.4" in fixture["lan"]
-assert "ai.internal 60 IN A 100.104.119.103" in fixture["tailnet"]
+assert "inference.internal 60 IN A 192.168.2.4" in fixture["lan"]
+assert "inference.internal 60 IN A 100.104.119.103" in fixture["tailnet"]
 
 
 class Backend(BaseHTTPRequestHandler):
@@ -76,7 +76,7 @@ with tempfile.TemporaryDirectory(prefix="ai-caddy-check-") as directory:
             else:
                 raise RuntimeError("Caddy did not start")
 
-            def request(client_ip, host="ai.internal.leolab.party", extra=None):
+            def request(client_ip, host="inference.internal.leolab.party", extra=None):
                 connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
                 headers = {"Host": host, "Content-Type": "application/json"}
                 if client_ip:
