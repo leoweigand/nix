@@ -270,7 +270,7 @@ in
 
       edgeDns = {
         enable = true;
-        serial = 2026110402; # Bump whenever DNS names or values change
+        serial = 2026110501; # Bump whenever DNS names or values change
         lanListenAddress = "192.168.2.4";
         lanAnswerAddress = "192.168.2.4";
         tailnetListenAddress = "100.104.119.103";
@@ -399,6 +399,16 @@ in
     };
 
     apps = {
+      open-webui = {
+        enable = true;
+        backupDir = "${mounts.fast}/appdata/open-webui-backup";
+        homepage = {
+          category = "Productivity";
+          name = "Open WebUI";
+          icon = "open-webui";
+          description = "Chat with AI models";
+        };
+      };
       jellyfin = {
         enable = true;
         homepage = {

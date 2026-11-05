@@ -644,3 +644,14 @@ systemctl status paperless-scheduler
 
 > [!TIP]
 > To quickly browse backups before restoring, use `restic snapshots`, `restic ls latest`, and `restic find <pattern>`. For interactive browsing, mount temporarily with `restic mount /mnt/restic`.
+
+## Open WebUI
+
+`homelab.apps.open-webui` runs the pinned v0.13.0 slim container behind the
+Pocket ID gateway at `chat.leolab.party` on Picard. Verified email and username
+headers provide automatic sign-in, with the first account becoming administrator.
+The existing AI gateway supplies six chat models and defaults to `glm-5.3`.
+SQLite, uploads and the signing key live in `/var/lib/open-webui`; the appdata
+backup prepares a quiesced copy under `/mnt/fast/appdata/open-webui-backup`.
+See the [Open WebUI runbook](../homelab/docs/open-webui.md) for configuration
+limits, service checks and recovery.

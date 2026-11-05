@@ -9,10 +9,11 @@ let
         homelab.infra.edge.proxies.identity = {
           upstream = "http://127.0.0.1:3000";
           auth.passUser = true;
+          auth.passEmail = true;
           auth.passSubject = true;
         };
         homelab.infra.edge.proxies."*.now" = {
-          upstream = "http://127.0.0.1:3000";
+          upstream = lib.mkForce "http://127.0.0.1:3000";
           auth.passSubject = true;
         };
       }

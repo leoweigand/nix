@@ -8,6 +8,7 @@
     ./immich.nix
     ./linkding.nix
     ./miniflux.nix
+    ./open-webui.nix
     ./paperless
     ./pingvin.nix
     ./prowlarr.nix

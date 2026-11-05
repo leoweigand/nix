@@ -75,6 +75,7 @@ class Backend(Handler):
             "path": self.path,
             "body": body.decode(),
             "user": self.headers.get("Remote-User"),
+            "email": self.headers.get("Remote-Email"),
         }
         backend_requests.append(result)
         if self.headers.get("X-Now-Subject") is not None:
@@ -90,6 +91,7 @@ class Authoriser(Handler):
         assert self.path == "/", self.path
         self.send(auth_state["status"], headers=[
             ("X-Auth-Request-Preferred-Username", "leo"),
+            ("X-Auth-Request-Email", "leo@leolab.party"),
             ("X-Auth-Request-User", "subject-leo-123"),
             ("Set-Cookie", "renewed=one; Secure; HttpOnly; Path=/"),
             ("Set-Cookie", "second=two; Secure; HttpOnly; Path=/"),
@@ -273,11 +275,12 @@ with tempfile.TemporaryDirectory() as temp:
         })
         assert status == 200
         received = json.loads(body)
-        assert received == {"method": "POST", "path": path, "body": "keep this body", "user": None}, received
+        assert received == {"method": "POST", "path": path, "body": "keep this body", "user": None, "email": None}, received
         assert auth_requests[-1]["X-Auth-Request-Redirect"] == "https://notes.leolab.party" + path
         assert auth_requests[-1]["X-Forwarded-Method"] == "POST"
         assert len([value for name, value in headers if name.lower() == "set-cookie"]) == 2
         assert json.loads(request(caddy_port, "identity.leolab.party", "/", headers={"Remote-User": "attacker"})[2])["user"] == "leo"
+        assert json.loads(request(caddy_port, "identity.leolab.party", "/", headers={"Remote-Email": "attacker@example.com"})[2])["email"] == "leo@leolab.party"
         received = json.loads(request(caddy_port, "autumn-monstera.now.leolab.party", "/", headers={"X-Now-Subject": "attacker"})[2])
         assert received["subject"] == "subject-leo-123", received
         auth_state["status"] = 503

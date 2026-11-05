@@ -22,6 +22,11 @@ let
         default = false;
         description = "Forward the authenticated Remote-User header to upstream";
       };
+      passEmail = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Forward verified email as Remote-Email, stripping any client value";
+      };
       passSubject = lib.mkOption {
         type = lib.types.bool;
         default = false;
@@ -83,12 +88,18 @@ let
             enable = proxyCfg.auth;
             passUser = false;
             passSubject = false;
+            passEmail = false;
             bypassPaths = [ ];
           }
         else
           {
             enable = true;
-            inherit (proxyCfg.auth) passUser passSubject bypassPaths;
+            inherit (proxyCfg.auth)
+              passUser
+              passSubject
+              passEmail
+              bypassPaths
+              ;
           };
       needsAuth = authCfg.enable;
       authGate = ''
@@ -106,6 +117,7 @@ let
               include Set-Cookie
             }
             ${lib.optionalString authCfg.passUser "request_header Remote-User {rp.header.X-Auth-Request-Preferred-Username}"}
+            ${lib.optionalString authCfg.passEmail "request_header Remote-Email {rp.header.X-Auth-Request-Email}"}
             ${lib.optionalString authCfg.passSubject "request_header X-Now-Subject {rp.header.X-Auth-Request-User}"}
           }
         }
@@ -120,6 +132,7 @@ let
         + lib.optionalString (proxyCfg.redirects != { }) "\n";
       protectedProxy = ''
         route {
+          request_header -Remote-Email
           request_header -Remote-User
           request_header -X-Now-Subject
           ${authGate}
