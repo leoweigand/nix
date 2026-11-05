@@ -2,12 +2,18 @@ import { execFileSync } from "node:child_process";
 
 // Run explicitly as the lab administrator; credentials never enter server config.
 const assistant = process.argv.includes("--assistant");
+const openWebui = process.argv.includes("--open-webui");
+if (assistant && openWebui) throw new Error("Choose only one MCP client");
 const clientName = assistant
   ? "LeoLab MCP — Telegram Assistant"
-  : "LeoLab MCP — Codex";
+  : openWebui
+    ? "LeoLab MCP — Open WebUI"
+    : "LeoLab MCP — Codex";
 const callback = assistant
   ? "https://webhooks.leolab.party/assistant/oauth/callback"
-  : "http://127.0.0.1:47831/callback";
+  : openWebui
+    ? "https://chat.leolab.party/oauth/clients/mcp:leolab/callback"
+    : "http://127.0.0.1:47831/callback";
 const key = execFileSync(
   "op",
   [
@@ -123,7 +129,11 @@ const permissionIds = entry.permissions
     permissions.some((permission) => permission.key === p.key),
   )
   .map((p: { id: string }) => p.id);
-const clientId = assistant ? "leolab-mcp-telegram" : "leolab-mcp-codex";
+const clientId = assistant
+  ? "leolab-mcp-telegram"
+  : openWebui
+    ? "leolab-mcp-open-webui"
+    : "leolab-mcp-codex";
 const clients = await api("/oidc/clients?pagination%5Blimit%5D=100");
 const existing = clients.data.find(
   (item: { id: string }) => item.id === clientId,
@@ -134,7 +144,9 @@ if (!existing) {
     name: clientName,
     description: assistant
       ? "User-bound media and Home Assistant tools through the Telegram assistant"
-      : "Codex desktop and CLI access to private LeoLab tools",
+      : openWebui
+        ? "Per-user access to private LeoLab tools from Open WebUI"
+        : "Codex desktop and CLI access to private LeoLab tools",
     isPublic: true,
     pkceEnabled: true,
     isGroupRestricted: true,
@@ -149,11 +161,12 @@ if (!existing) {
     "Client ID already has a different configuration; inspect it manually",
   );
 }
-if (assistant && existing) {
+if ((assistant || openWebui) && existing) {
   await api(`/oidc/clients/${clientId}`, "PUT", {
     name: clientName,
-    description:
-      "User-bound media and Home Assistant tools through the Telegram assistant",
+    description: assistant
+      ? "User-bound media and Home Assistant tools through the Telegram assistant"
+      : "Per-user access to private LeoLab tools from Open WebUI",
     isPublic: true,
     pkceEnabled: true,
     isGroupRestricted: true,

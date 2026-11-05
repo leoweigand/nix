@@ -7,6 +7,60 @@
 
 let
   cfg = config.homelab.apps.open-webui;
+  mcp = config.homelab.infra.mcp;
+  mcpUrl = "https://mcp.${config.homelab.baseDomain}/mcp";
+  mcpScopes = "openid groups offline_access lab:read media:read media:request home:read home:control bookmarks:read bookmarks:write documents:read documents:ingest now:read now:write";
+  mcpConnections = pkgs.writeText "open-webui-mcp.json" (
+    builtins.toJSON [
+      {
+        type = "mcp";
+        url = mcpUrl;
+        path = "";
+        auth_type = "oauth_2.1";
+        key = "";
+        config = {
+          enable = true;
+          access_grants = [
+            {
+              principal_type = "user";
+              principal_id = "*";
+              permission = "read";
+            }
+          ];
+        };
+        info = {
+          id = "leolab";
+          name = "LeoLab";
+          description = "Lab media, home devices, bookmarks, documents and Now apps";
+          oauth_scope = mcpScopes;
+          oauth_client_info = {
+            client_id = "leolab-mcp-open-webui";
+            client_name = "LeoLab MCP — Open WebUI";
+            token_endpoint_auth_method = "none";
+            redirect_uris = [
+              "https://${cfg.subdomain}.${config.homelab.baseDomain}/oauth/clients/mcp:leolab/callback"
+            ];
+            grant_types = [
+              "authorization_code"
+              "refresh_token"
+            ];
+            response_types = [ "code" ];
+            scope = mcpScopes;
+            resource = mcpUrl;
+            issuer = "${mcp.issuer}/.well-known/openid-configuration";
+            server_metadata = {
+              issuer = mcp.issuer;
+              authorization_endpoint = "${mcp.issuer}/authorize";
+              token_endpoint = "${mcp.issuer}/api/oidc/token";
+              response_types_supported = [ "code" ];
+              code_challenge_methods_supported = [ "S256" ];
+              token_endpoint_auth_methods_supported = [ "none" ];
+            };
+          };
+        };
+      }
+    ]
+  );
 in
 {
   options.homelab.apps.open-webui = {
@@ -36,6 +90,7 @@ in
       default = [ ];
       description = "Additional gateway chat model IDs exposed in the model selector";
     };
+    mcp.enable = lib.mkEnableOption "the shared LeoLab MCP connection with per-user Pocket ID consent";
     backupDir = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -45,6 +100,10 @@ in
 
   config = lib.mkIf cfg.enable {
     assertions = [
+      {
+        assertion = !cfg.mcp.enable || mcp.enable;
+        message = "Open WebUI's LeoLab connection requires the MCP service";
+      }
       {
         assertion = config.homelab.infra.aiGateway.enable;
         message = "Open WebUI requires the homelab AI gateway";
@@ -81,7 +140,18 @@ in
       containers.open-webui = {
         image = cfg.image;
         ports = [ "127.0.0.1:${toString cfg.port}:8080" ];
-        volumes = [ "${cfg.dataDir}:/app/backend/data" ];
+        volumes = [
+          "${cfg.dataDir}:/app/backend/data"
+        ]
+        ++ lib.optionals cfg.mcp.enable [
+          "${./open-webui/mcp.py}:/run/open-webui/mcp.py:ro"
+          "${mcpConnections}:/run/open-webui/mcp.json:ro"
+        ];
+        cmd = lib.optionals cfg.mcp.enable [
+          "python"
+          "/run/open-webui/mcp.py"
+          "/run/open-webui/mcp.json"
+        ];
         environment = {
           WEBUI_URL = "https://${cfg.subdomain}.${config.homelab.baseDomain}";
           CORS_ALLOW_ORIGIN = "https://${cfg.subdomain}.${config.homelab.baseDomain}";
@@ -96,6 +166,7 @@ in
           # Persist the generated signing key alongside the database and uploads.
           WEBUI_SECRET_KEY_FILE = "/app/backend/data/.webui_secret_key";
           ENABLE_PERSISTENT_CONFIG = "False";
+          ENABLE_TOOL_SERVERS = "True";
           ENABLE_OLLAMA_API = "False";
           OPENAI_API_BASE_URLS = "https://inference.internal.${config.homelab.baseDomain}/v1";
           OPENAI_API_KEYS = "unused";

@@ -205,7 +205,8 @@ in
         "127.0.0.0/8"
         "192.168.2.0/24"
         "100.64.0.0/10"
-      ];
+      ]
+      ++ lib.optional config.homelab.apps.open-webui.mcp.enable "10.88.0.0/16";
     };
     services.onepassword-secrets.secrets =
       lib.optionalAttrs bookmarkEnabled {

@@ -412,6 +412,7 @@ in
       };
       open-webui = {
         enable = true;
+        mcp.enable = true;
         extraModels = [
           "gpt-6.1-sol"
           "gpt-6.1-terra"
