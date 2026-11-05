@@ -674,6 +674,12 @@ The existing AI gateway supplies six Zen chat models plus eight OpenAI
 subscription models configured through `extraModels`, and defaults to `glm-5.3`.
 SQLite, uploads and the signing key live in `/var/lib/open-webui`; the appdata
 backup prepares a quiesced copy under `/mnt/fast/appdata/open-webui-backup`.
+`mcp.enable` declares the shared LeoLab Streamable HTTP connection. Each user
+explicitly enables it in a chat and grants their own Pocket ID OAuth access.
+Its public PKCE client is provisioned explicitly with
+`node modules/infra/mcp/provision-pocket-id.ts --open-webui`; no shared user token
+or client secret is installed. A startup wrapper encrypts the declarative client
+metadata with the existing persistent signing key.
 See the [Open WebUI runbook](../homelab/docs/open-webui.md) for configuration
 limits, service checks and recovery.
 
