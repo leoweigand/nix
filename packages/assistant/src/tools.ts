@@ -67,16 +67,22 @@ export function availableTools(
     )
     .map(([name]) => name);
 }
+export function isWriteCall(tool: string, input: Record<string, unknown>) {
+  return (
+    tool in toolRegistry &&
+    toolRegistry[tool as keyof typeof toolRegistry].write &&
+    !(
+      tool === "mcp__leolab__now_request" &&
+      ["GET", "HEAD"].includes(String(input.method ?? "GET").toUpperCase())
+    )
+  );
+}
 export function recordWrite(
   tool: string,
   input: Record<string, unknown>,
   save: (attempt: WriteAttempt) => void,
 ) {
-  if (
-    !(tool in toolRegistry) ||
-    !toolRegistry[tool as keyof typeof toolRegistry].write
-  )
-    return;
+  if (!isWriteCall(tool, input)) return;
   save({
     tool,
     ...(tool === "mcp__leolab__control_home_entities"

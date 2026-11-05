@@ -6,6 +6,7 @@ import { messageContent } from "../../src/conversation.ts";
 import { authorized } from "../../src/inbox.ts";
 import { readJson, writeJson } from "../../src/storage.ts";
 import { requestDirectory, type RuntimeRequest } from "../lib/context.ts";
+import { presentationReply } from "../../src/reply-draft.ts";
 
 export default defineChannel({
   turnPolicy: "queue",
@@ -83,10 +84,20 @@ export default defineChannel({
           status: result.status,
         }),
       );
-      const presentation = readJson<unknown>(
+      const presentation = readJson<{ buttons?: unknown[] }>(
         join(requestDirectory(eventId), "result.json"),
       );
-      const output = { ...result, presentation };
+      const recovered =
+        result.status === "completed" &&
+        !result.reply?.trim() &&
+        presentation?.buttons?.length
+          ? presentationReply(requestDirectory(eventId))
+          : undefined;
+      const output = {
+        ...result,
+        ...(recovered ? { reply: recovered } : {}),
+        presentation,
+      };
       writeJson(resultPath, output);
       return Response.json(output);
     }),

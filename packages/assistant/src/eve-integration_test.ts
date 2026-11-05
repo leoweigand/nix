@@ -94,6 +94,16 @@ for (const interruption of process.env.EVE_LIVE_TEST === "1"
             message.content.startsWith("<task_result") &&
             message.content.includes("CODER_VERIFIED"),
         );
+        const buttonPrepared = body.messages.some(
+          (message: any) =>
+            message.role === "assistant" &&
+            message.tool_calls?.some(
+              (call: any) => call.function.name === "telegram_buttons",
+            ),
+        );
+        const followup = JSON.stringify(body.messages).includes(
+          "What did the coder return?",
+        );
         if (body.model === "deepseek-v4.1-flash")
           text = "export const answer = 42; // CODER_VERIFIED";
         else if (!delegated) {
@@ -104,14 +114,36 @@ for (const interruption of process.env.EVE_LIVE_TEST === "1"
         } else if (!completed) {
           name = "eve__task_wait";
           args = {};
-        } else
+        } else if (
+          interruption === "after-reply" &&
+          !followup &&
+          !buttonPrepared
+        ) {
           text = "CODER_VERIFIED: the coding specialist returned TypeScript.";
+          name = "telegram_buttons";
+          args = {
+            buttons: [
+              { label: "Open app", url: "https://fixture.now.example/" },
+            ],
+          };
+        } else if (interruption === "after-reply" && !followup) {
+          // Reproduce text + presentation tool, followed by a successful empty stop.
+          text = "";
+        } else
+          text =
+            "CODER_VERIFIED: the coding specialist returned TypeScript." +
+            (interruption === "after-reply" &&
+            followup &&
+            JSON.stringify(body.messages).includes("HOST_DELIVERED_ONLY")
+              ? " HOST_DELIVERED_ONLY"
+              : "");
         response.writeHead(200, { "content-type": "text/event-stream" });
         const event = (delta: unknown, finish_reason: string | null = null) =>
           response.write(
             `data: ${JSON.stringify({ id: "fixture", object: "chat.completion.chunk", created: 1, model: body.model, choices: [{ index: 0, delta, finish_reason }] })}\n\n`,
           );
         event({ role: "assistant" });
+        if (text) event({ content: text });
         if (name)
           event({
             tool_calls: [
@@ -123,7 +155,6 @@ for (const interruption of process.env.EVE_LIVE_TEST === "1"
               },
             ],
           });
-        else event({ content: text });
         event({}, name ? "tool_calls" : "stop");
         response.end("data: [DONE]\n\n");
       });
@@ -249,6 +280,8 @@ for (const interruption of process.env.EVE_LIVE_TEST === "1"
         const result = await response.text();
         assert.equal(response.status, 200, `${result}\n${logs}`);
         assert.match(result, /CODER_VERIFIED/, `${result}\n${logs}`);
+        if (interruption === "after-reply")
+          assert.match(result, /fixture.now.example/);
         assert.ok(calls.some((call) => call.model === "deepseek-v4.1-flash"));
         for (const call of calls)
           assert.ok(
@@ -276,7 +309,21 @@ for (const interruption of process.env.EVE_LIVE_TEST === "1"
         };
         writeJson(
           join(directory, "eve-requests", followup.eventId, "request.json"),
-          { message: followup, ref, senderId: "123" },
+          {
+            message: followup,
+            ref,
+            senderId: "123",
+            context:
+              interruption === "after-reply"
+                ? [
+                    JSON.stringify({
+                      type: "delivery_receipt",
+                      source: "host",
+                      text: "HOST_DELIVERED_ONLY",
+                    }),
+                  ]
+                : [],
+          },
         );
         const continued = await fetch(
           `http://127.0.0.1:${port}/internal/turn`,
@@ -290,7 +337,10 @@ for (const interruption of process.env.EVE_LIVE_TEST === "1"
             signal: AbortSignal.timeout(50_000),
           },
         );
-        assert.match(await continued.text(), /CODER_VERIFIED/, logs);
+        const continuedText = await continued.text();
+        assert.match(continuedText, /CODER_VERIFIED/, logs);
+        if (interruption === "after-reply")
+          assert.match(continuedText, /HOST_DELIVERED_ONLY/);
         assert.equal(
           calls.length,
           before + 1,

@@ -176,12 +176,16 @@ export class Sessions {
   ): void {
     const manager = this.open(ref);
     if (this.events(manager).some((e) => e.eventId === eventId)) return;
-    if (!generated)
-      manager.appendCustomMessageEntry(
-        "host_reply",
-        JSON.stringify({ type: "assistant_reply", text }),
-        true,
-      );
+    manager.appendCustomMessageEntry(
+      "delivery_receipt",
+      JSON.stringify({
+        type: "delivery_receipt",
+        eventId,
+        source: generated ? "agent" : "host",
+        text,
+      }),
+      false,
+    );
     manager.appendCustomEntry(EVENT, {
       eventId,
       kind: "assistant",

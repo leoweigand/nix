@@ -801,3 +801,65 @@ test("failed attachment staging completes without inference or automatic redownl
     f.cleanup();
   }
 });
+
+test("reply failures report recorded deployments and only confirmed Telegram deliveries enter history", async () => {
+  const { AssistantFailure } = await import("./failures.ts");
+  const f = fixture();
+  let inferences = 0,
+    offline = true;
+  try {
+    f.casual();
+    const worker = new Worker({
+      ...f.options,
+      assistant: {
+        answer: async (_message, _ref, _token, onWrite) => {
+          inferences++;
+          onWrite?.({ tool: "mcp__leolab__now_deploy" });
+          throw new AssistantFailure("response", {
+            state: "recorded",
+            app: { name: "Test App", url: "https://fixture.now.example/" },
+          });
+        },
+      },
+      gateway: async (endpoint, body: any) => {
+        if (endpoint === "/v1/assistant-replies" && offline)
+          throw new Error("Telegram unavailable");
+        await f.options.gateway(endpoint, body);
+      },
+    });
+    f.inbox.enqueue(f.job(1));
+    await worker.drain();
+    const ref = f.inbox.jobs()[0].session!;
+    const receipts = () =>
+      f.sessions
+        .open(ref)
+        .getEntries()
+        .filter(
+          (e) =>
+            e.type === "custom_message" && e.customType === "delivery_receipt",
+        );
+    assert.equal(receipts().length, 0);
+    assert.equal(f.inbox.jobs()[0].done, undefined);
+    offline = false;
+    await worker.drain();
+    assert.equal(
+      inferences,
+      1,
+      "Telegram retries must reuse the saved response, not rerun the agent",
+    );
+    assert.equal(f.inbox.jobs()[0].done, true);
+    const sent = f.messages
+      .filter((m) => m.endpoint === "/v1/assistant-replies")
+      .at(-1)!.body.message;
+    assert.match(sent, /Test App was deployed/);
+    assert.doesNotMatch(sent, /uncertain|document|bookmark|library/);
+    const receipt = receipts()[0];
+    assert.ok(receipt.type === "custom_message");
+    assert.equal(JSON.parse(String(receipt.content)).text, sent);
+    assert.equal(receipts().length, 1);
+    await worker.drain();
+    assert.equal(receipts().length, 1);
+  } finally {
+    f.cleanup();
+  }
+});

@@ -14,6 +14,7 @@ import { Sessions, isCompaction } from "./sessions.ts";
 import type { EveAssistant } from "./eve.ts";
 import { decodeJwt } from "jose";
 import { randomBytes } from "node:crypto";
+import { AssistantFailure, failureReply } from "./failures.ts";
 
 type Gateway = (endpoint: string, body: unknown) => Promise<void>;
 interface Options {
@@ -23,7 +24,7 @@ interface Options {
   inbox: Inbox;
   connections: Pick<Connections, "begin" | "complete" | "token">;
   assistant: Pick<EveAssistant, "answer"> &
-    Partial<Pick<EveAssistant, "writeAttempt">>;
+    Partial<Pick<EveAssistant, "writeAttempt" | "operationState">>;
   gateway: Gateway;
   log?: Pick<Console, "info" | "error">;
   stageAttachment?: (job: Job, token: string) => Promise<string>;
@@ -400,15 +401,13 @@ export class Worker {
       // Deterministic commands do not invoke the model or consume the conversation budget.
     } else if (job.writeAttempted) {
       // A restart after a write cannot prove its result. Never replay device commands or acquisition automatically.
-      const operation =
-        job.writeOperation?.tool === "mcp__leolab__control_home_entities"
-          ? `a device command (${job.writeOperation.action ?? "control"}: ${job.writeOperation.entityIds?.join(", ") ?? "unknown target"})`
-          : job.writeOperation?.tool === "mcp__leolab__ingest_document"
-            ? "a document upload"
-            : job.writeOperation?.tool === "mcp__leolab__save_bookmark"
-              ? "a bookmark save"
-              : "a change";
-      job.reply = `I was interrupted after starting ${operation}, so I won't repeat it automatically. Ask me to check the current document ingestion, bookmark, device or library state before trying again.`;
+      job.reply = failureReply(
+        this.options.assistant.operationState?.(messageForJob(job)) ?? {
+          state: "uncertain",
+        },
+        true,
+        job.writeOperation,
+      );
     } else {
       this.prepare(job);
       const token = await this.options.connections.token(job.senderId);
@@ -506,13 +505,28 @@ export class Worker {
             job.buttonsExpireAt = Date.now() + 10 * 60 * 1000;
           }
         }
-      } catch {
+      } catch (error) {
         this.log.error(
-          JSON.stringify({ event: "assistant_failed", updateId: job.id }),
+          JSON.stringify({
+            event: "assistant_failed",
+            updateId: job.id,
+            stage:
+              error instanceof AssistantFailure ? error.kind : "generation",
+            operations:
+              error instanceof AssistantFailure
+                ? error.operations.state
+                : job.writeAttempted
+                  ? "uncertain"
+                  : "none",
+          }),
         );
-        job.reply = job.writeAttempted
-          ? "The change's result is uncertain. I won't retry it automatically; ask me to check the current document ingestion, bookmark, device or library state first."
-          : "I couldn't complete that request. Please try again shortly, or send /connect if my MCP connection needs renewing.";
+        job.reply = failureReply(
+          error instanceof AssistantFailure
+            ? error.operations
+            : { state: job.writeAttempted ? "uncertain" : "none" },
+          false,
+          job.writeOperation,
+        );
       } finally {
         clearInterval(timer);
       }

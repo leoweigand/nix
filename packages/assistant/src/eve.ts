@@ -9,6 +9,7 @@ import type { Sessions, SessionRef } from "./sessions.ts";
 import type { WriteAttempt } from "./tools.ts";
 import { readJson, writeJson } from "./storage.ts";
 import type { RuntimeResult, ToolJournal } from "../agent/lib/context.ts";
+import { AssistantFailure, operationState } from "./failures.ts";
 
 export class EveAssistant {
   stateDir: string;
@@ -26,6 +27,13 @@ export class EveAssistant {
     return readJson<ToolJournal>(
       join(this.directory(message.eventId), "tools.json"),
     )?.writeAttempt;
+  }
+  operationState(message: ConversationMessage) {
+    return operationState(
+      readJson<ToolJournal>(
+        join(this.directory(message.eventId), "tools.json"),
+      ),
+    );
   }
   async answer(
     message: ConversationMessage,
@@ -55,15 +63,32 @@ export class EveAssistant {
       forwarded?.type === "custom"
         ? Number((forwarded.data as { offset: number }).offset)
         : 0;
-    const context = entries
-      .slice(offset)
-      .filter(
-        (entry) =>
-          entry.type === "custom_message" &&
-          entry.customType === "conversation-message" &&
-          (entry.details as { kind?: string })?.kind === "notification",
+    const receiptOffset =
+      forwarded?.type === "custom"
+        ? Number(
+            (forwarded.data as { receiptOffset?: number }).receiptOffset ?? 0,
+          )
+        : 0;
+    const context = entries.flatMap((entry, index) => {
+      if (entry.type !== "custom_message") return [];
+      if (
+        index >= offset &&
+        entry.customType === "conversation-message" &&
+        (entry.details as { kind?: string })?.kind === "notification"
       )
-      .map((entry) => (entry.type === "custom_message" ? entry.content : ""));
+        return [entry.content];
+      if (index >= receiptOffset && entry.customType === "delivery_receipt")
+        return [entry.content];
+      if (index >= receiptOffset && entry.customType === "host_reply")
+        return [
+          JSON.stringify({
+            type: "delivery_receipt",
+            source: "host",
+            text: JSON.parse(String(entry.content)).text,
+          }),
+        ];
+      return [];
+    });
     const senderId = (process.env.TELEGRAM_DESTINATIONS ?? "")
       .split(",")
       .find((entry) => entry.startsWith("leo:"))
@@ -132,6 +157,7 @@ export class EveAssistant {
       };
       manager.appendCustomEntry("eve-context-forwarded", {
         offset: entries.length,
+        receiptOffset: entries.length,
       });
       const presentation =
         result.presentation ??
@@ -139,7 +165,8 @@ export class EveAssistant {
         {};
       const attempt = this.writeAttempt(message);
       if (attempt) onWriteAttempt(attempt);
-      if (result.status === "failed") throw new Error("Eve inference failed");
+      if (result.status === "failed")
+        throw new AssistantFailure("generation", this.operationState(message));
       clearInterval(reactionTimer);
       await reactionDelivery;
       await flushReaction(presentation);
@@ -147,7 +174,7 @@ export class EveAssistant {
         presentation.cards?.map(cardMarkdown).join("\n\n") ??
         result.reply?.trim();
       if (!text && !sentReaction && !presentation.needsConnection)
-        throw new Error("Eve returned no response");
+        throw new AssistantFailure("response", this.operationState(message));
       return {
         text:
           presentation.reactionOnly &&
@@ -161,6 +188,14 @@ export class EveAssistant {
         cards: presentation.cards,
         buttons: presentation.cards ? undefined : presentation.buttons,
       };
+    } catch (error) {
+      // The transport can fail after a durable tool call. Inspect its journal
+      // even when no successful engine response reached this process.
+      const attempt = this.writeAttempt(message);
+      if (attempt) onWriteAttempt(attempt);
+      throw error instanceof AssistantFailure
+        ? error
+        : new AssistantFailure("generation", this.operationState(message));
     } finally {
       clearTimeout(timer);
       clearInterval(reactionTimer);
