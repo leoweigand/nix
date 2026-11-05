@@ -79,6 +79,7 @@ in
         volumes = [ "${cfg.dataDir}:/app/backend/data" ];
         environment = {
           WEBUI_URL = "https://${cfg.subdomain}.${config.homelab.baseDomain}";
+          CORS_ALLOW_ORIGIN = "https://${cfg.subdomain}.${config.homelab.baseDomain}";
           WEBUI_AUTH_TRUSTED_EMAIL_HEADER = "Remote-Email";
           WEBUI_AUTH_TRUSTED_NAME_HEADER = "Remote-User";
           ENABLE_SIGNUP = "False";
