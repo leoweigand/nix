@@ -48,14 +48,15 @@ test("real OAuth adapter discovers models and supports an optional allow-list", 
         allowed,
         async (input, init) => {
           const upstream = new Request(input, init);
+          if (new URL(upstream.url).hostname === "registry.npmjs.org")
+            return Response.json({ version: "0.166.0" });
           assert.equal(
             upstream.headers.get("authorization"),
             "Bearer test-access",
           );
-          assert.ok(
-            upstream.url.startsWith(
-              "https://chatgpt.com/backend-api/codex/models?",
-            ),
+          assert.equal(
+            upstream.url,
+            "https://chatgpt.com/backend-api/codex/models?client_version=0.166.0",
           );
           calls++;
           return catalog();
@@ -82,6 +83,8 @@ test("real OAuth chat adapter passes effort and makes one inference attempt on f
       null,
       async (input, init) => {
         const upstream = new Request(input, init);
+        if (new URL(upstream.url).hostname === "registry.npmjs.org")
+          return Response.json({ version: "0.166.0" });
         if (upstream.method === "GET") return catalog();
         calls++;
         assert.equal(
@@ -123,6 +126,8 @@ test("real OAuth adapter cancels buffered and streaming inference", async () => 
         null,
         async (input, init) => {
           const upstream = new Request(input, init);
+          if (new URL(upstream.url).hostname === "registry.npmjs.org")
+            return Response.json({ version: "0.166.0" });
           if (upstream.method === "GET") return catalog();
           started();
           await new Promise<void>((_resolve, reject) => {

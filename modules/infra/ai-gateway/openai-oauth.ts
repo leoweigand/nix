@@ -20,7 +20,6 @@ export function createOpenAIProvider(
   const context = new AsyncLocalStorage<AbortSignal>();
   const handler = createOpenAIOAuthFetchHandler({
     authFilePath,
-    codexVersion: "0.144.1",
     requestLogger() {},
     fetch: (input, init) => {
       const signal = context.getStore();
