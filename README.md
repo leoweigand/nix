@@ -149,6 +149,9 @@ Telegram; group buttons remain browser links. The library and apps retain privat
 LAN/Tailscale reachability. Generated apps remain ordinary websites; general and
 coding guidance requires simple mobile-first interfaces and system fonts, while
 launch-button guidance belongs only to the Telegram channel.
+The host supplies launch buttons from verified live app metadata when replies
+link to those apps. Design defaults favour warm neutrals, one muted accent and
+clear spacing and hierarchy with restrained decoration.
 
 `homelab.infra.assistant` runs Pi 1.4.0 as a separate worker behind the existing
 notification gateway's Telegram webhook. It accepts Leo's DMs and explicit bot
