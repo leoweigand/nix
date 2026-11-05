@@ -401,6 +401,15 @@ in
     };
 
     apps = {
+      audiobookshelf = {
+        enable = true;
+        homepage = {
+          category = "Media";
+          name = "Audiobookshelf";
+          icon = "audiobookshelf";
+          description = "Audiobooks and podcasts";
+        };
+      };
       open-webui = {
         enable = true;
         extraModels = [

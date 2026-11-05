@@ -2,6 +2,7 @@
 
 {
   imports = [
+    ./audiobookshelf.nix
     ./esphome.nix
     ./homeassistant.nix
     ./jellyfin.nix

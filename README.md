@@ -676,3 +676,14 @@ SQLite, uploads and the signing key live in `/var/lib/open-webui`; the appdata
 backup prepares a quiesced copy under `/mnt/fast/appdata/open-webui-backup`.
 See the [Open WebUI runbook](../homelab/docs/open-webui.md) for configuration
 limits, service checks and recovery.
+
+## Audiobookshelf
+
+`homelab.apps.audiobookshelf` runs the native NixOS service behind Caddy at
+`audiobookshelf.leolab.party`, with app-managed authentication for browser and
+mobile clients. Its private mount namespace exposes only writable
+`/media/audiobooks` and `/media/podcasts` from the corresponding
+`/mnt/media/library` directories. SQLite and metadata remain on local disk at
+`/var/lib/audiobookshelf`; the appdata backup prepares a quiesced, integrity-checked
+copy under `/mnt/fast/appdata/audiobookshelf-backup`. Media files are excluded from
+that backup. See the [Audiobookshelf runbook](../homelab/services/audiobookshelf/README.md).
