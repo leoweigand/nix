@@ -163,6 +163,15 @@ conversation works without OAuth; a request needing MCP triggers a private
 Pocket ID sign-in link and resumes after authorization. `/connect` renews or
 resends the link. The public callback is on Picard, so no Mac helper is required.
 
+Eve retains parent reply text paired with successful presentation calls when a
+later model step returns no text. Confirmed Telegram replies and host errors are
+forwarded as delivery receipts on the next turn, separately from generated
+drafts. Recorded tool outcomes distinguish reply failures from unconfirmed
+operations; recovery reports known deployments without replaying writes.
+The parent researches technical unknowns and supplies concrete acceptance checks;
+the coder checks actual behaviour against expected results with its available
+tools and reports verification gaps.
+
 The worker also has an Exa Lite web search tool, available without MCP sign-in.
 It sends queries to Exa, asks for up to five results with highlights, and limits
 each message to three searches. Opnix loads the Exa API key from
