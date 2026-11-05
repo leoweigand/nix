@@ -670,7 +670,8 @@ systemctl status paperless-scheduler
 `homelab.apps.open-webui` runs the pinned v0.13.0 slim container behind the
 Pocket ID gateway at `chat.leolab.party` on Picard. Verified email and username
 headers provide automatic sign-in, with the first account becoming administrator.
-The existing AI gateway supplies six chat models and defaults to `glm-5.3`.
+The existing AI gateway supplies six Zen chat models plus eight OpenAI
+subscription models configured through `extraModels`, and defaults to `glm-5.3`.
 SQLite, uploads and the signing key live in `/var/lib/open-webui`; the appdata
 backup prepares a quiesced copy under `/mnt/fast/appdata/open-webui-backup`.
 See the [Open WebUI runbook](../homelab/docs/open-webui.md) for configuration
