@@ -48,7 +48,7 @@ export function main(args: string[]): void {
   const link = verificationLink(JSON.parse(result).html ?? '');
   if (!link) throw new Error(`No verification link found for ${email}`);
   execFileSync('/usr/bin/pbcopy', [], { input: link, timeout: 10_000 });
-  process.stdout.write(`${email}\n`);
+  process.stdout.write(`${link}\n`);
 }
 
 if (import.meta.main) {
