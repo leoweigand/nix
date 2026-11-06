@@ -47,12 +47,8 @@ export function main(args: string[]): void {
   if (!result) throw new Error(`No verification email found for ${email}`);
   const link = verificationLink(JSON.parse(result).html ?? '');
   if (!link) throw new Error(`No verification link found for ${email}`);
-  const label = `Verify ${email}`;
-  // Underlining is explicit: OSC 8 alone need not look like a link. Retain a
-  // visible URL for terminals which do not support labelled hyperlinks.
-  process.stdout.write(process.stdout.isTTY
-    ? `\x1b]8;;${link}\x1b\\\x1b[4m${label}\x1b[24m\x1b]8;;\x1b\\\n${link}\n`
-    : `${label}: ${link}\n`);
+  execFileSync('/usr/bin/pbcopy', [], { input: link, timeout: 10_000 });
+  process.stdout.write(`${email}\n`);
 }
 
 if (import.meta.main) {
