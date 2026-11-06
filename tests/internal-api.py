@@ -92,7 +92,7 @@ with tempfile.TemporaryDirectory(prefix="ai-caddy-check-") as directory:
                     connection.close()
 
             # Simulate cloudflared's trusted header as well as direct loopback calls.
-            for client_ip in [None, "127.0.0.1", "10.88.0.5", "100.64.1.2"]:
+            for client_ip in [None, "127.0.0.1", "10.88.0.5", "10.89.10.5", "100.64.1.2"]:
                 status, body = request(client_ip)
                 assert status == 200, (client_ip, status, body)
                 assert body == b'{"message":"body preserved"}'

@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  options,
   pkgs,
   ...
 }:
@@ -121,7 +122,10 @@ in
       upstream = "http://127.0.0.1:${toString cfg.port}";
       auth = false;
     };
-    homelab.infra.edge.internalAllowedClientRanges = lib.mkAfter [ "10.89.10.0/24" ];
+    # An explicit list replaces the option default, even with mkAfter.
+    homelab.infra.edge.internalAllowedClientRanges = lib.mkAfter (
+      options.homelab.infra.edge.internalAllowedClientRanges.default ++ [ "10.89.10.0/24" ]
+    );
     virtualisation.podman.enable = true;
     systemd.tmpfiles.rules = [
       "d ${cfg.dataDir} 0711 root root - -"
