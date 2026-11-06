@@ -12,6 +12,13 @@ NixOS configuration for my homelab.
 
 ## Custom automation
 
+On macOS, `verify-staging-email <email>` retrieves the latest signup verification
+email for that exact recipient from staging's `public.test_emails` table and
+prints a clickable `Verify <email>` terminal link. Piped output includes the raw
+URL. It reads `Engineering/Staging Env` Supabase credentials through the
+`elephantcompany.1password.com` account at launch and makes a read-only database
+query; clicking the link remains a separate action.
+
 Use TypeScript with Node 26 for custom automation. Native type stripping runs
 our `.ts` sources directly; constructors use explicit fields rather than
 TypeScript parameter properties. Prefer Node and Web built-ins; use Nix or

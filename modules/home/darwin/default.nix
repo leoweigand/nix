@@ -10,6 +10,7 @@
     ./omp.nix
     ./opencode.nix
     ./slimg.nix
+    ./verify-staging-email.nix
     ./zsh.nix
   ];
 
