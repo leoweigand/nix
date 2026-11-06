@@ -19,7 +19,11 @@ export function verificationLink(html: string): string | undefined {
 
 function secret(field: string): string {
   return execFileSync('op', ['read', '--account', 'elephantcompany.1password.com',
-    `op://Engineering/Staging Env/Supabase/${field}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], timeout: 120_000 }).trim();
+    `op://Engineering/Staging Env/Supabase/${field}`], {
+    encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], timeout: 120_000,
+    // macOS can block op's automatic detection of the desktop integration setting.
+    env: { ...process.env, OP_BIOMETRIC_UNLOCK_ENABLED: 'true' },
+  }).trim();
 }
 
 export function main(args: string[]): void {
@@ -44,8 +48,11 @@ export function main(args: string[]): void {
   const link = verificationLink(JSON.parse(result).html ?? '');
   if (!link) throw new Error(`No verification link found for ${email}`);
   const label = `Verify ${email}`;
-  // OSC 8 gives supporting terminals a clickable label; pipes retain the URL.
-  process.stdout.write(process.stdout.isTTY ? `\x1b]8;;${link}\x1b\\${label}\x1b]8;;\x1b\\\n` : `${label}: ${link}\n`);
+  // Underlining is explicit: OSC 8 alone need not look like a link. Retain a
+  // visible URL for terminals which do not support labelled hyperlinks.
+  process.stdout.write(process.stdout.isTTY
+    ? `\x1b]8;;${link}\x1b\\\x1b[4m${label}\x1b[24m\x1b]8;;\x1b\\\n${link}\n`
+    : `${label}: ${link}\n`);
 }
 
 if (import.meta.main) {
