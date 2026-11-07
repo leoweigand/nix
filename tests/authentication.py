@@ -178,7 +178,7 @@ def available_port():
 def websocket(port, cookies):
     with socket.create_connection(("127.0.0.1", port), timeout=10) as sock:
         key = base64.b64encode(b"test-websocket!!").decode()
-        request_headers = ["GET /socket HTTP/1.1", "Host: notes.leolab.party", "Upgrade: websocket",
+        request_headers = ["GET /socket HTTP/1.1", "Host: protected.leolab.party", "Upgrade: websocket",
                            "Connection: Upgrade", "Sec-WebSocket-Version: 13", f"Sec-WebSocket-Key: {key}",
                            "Cookie: " + "; ".join(f"{name}={value}" for name, value in cookies.items())]
         sock.sendall(("\r\n".join(request_headers) + "\r\n\r\n").encode())
@@ -219,7 +219,7 @@ def start_caddy(directory, auth_port, backend_port):
     subprocess.run(["caddy", "validate", "--config", str(path), "--adapter", "caddyfile"], check=True)
     log = (directory / "caddy.log").open("w+")
     process = subprocess.Popen(["caddy", "run", "--config", str(path), "--adapter", "caddyfile"], stdout=log, stderr=log)
-    wait_http(process, port, "notes.leolab.party")
+    wait_http(process, port, "protected.leolab.party")
     return process, port
 
 
@@ -228,7 +228,7 @@ def stop(process):
     process.wait(timeout=10)
 
 
-def login(caddy_port, idp_port, original, host="notes.leolab.party"):
+def login(caddy_port, idp_port, original, host="protected.leolab.party"):
     cookies = {}
     url = "https://" + host + original
     for _ in range(12):
@@ -260,23 +260,21 @@ with tempfile.TemporaryDirectory() as temp:
     caddy, caddy_port = start_caddy(directory, auth.server_port, backend.server_port)
     try:
         before = len(backend_requests)
-        assert request(caddy_port, "notes.leolab.party", "/private")[0] == 401
+        assert request(caddy_port, "protected.leolab.party", "/private")[0] == 401
         assert len(backend_requests) == before, "Unauthenticated request reached backend"
-        for host, path in [("notes", "/service_worker.js"), ("notes", "/.client/app.js"),
-                           ("prowlarr", "/api/v1/status"), ("prowlarr", "/123/api")]:
+        for host, path in [("prowlarr", "/api/v1/status"), ("prowlarr", "/123/api")]:
             assert request(caddy_port, host + ".leolab.party", path)[0] == 200
-        assert request(caddy_port, "notes.leolab.party", "/.client-other")[0] == 401
         assert request(caddy_port, "prowlarr.leolab.party", "/api/v2/status")[0] == 401
 
         auth_state["status"] = 202
         path = "/save?first=a%26b&next=%2Fpath&rd=https%3A%2F%2Fevil.example"
-        status, headers, body = request(caddy_port, "notes.leolab.party", path, "POST", "keep this body", {
+        status, headers, body = request(caddy_port, "protected.leolab.party", path, "POST", "keep this body", {
             "Remote-User": "attacker", "X-Auth-Request-Redirect": "https://evil.example/",
         })
         assert status == 200
         received = json.loads(body)
         assert received == {"method": "POST", "path": path, "body": "keep this body", "user": None, "email": None}, received
-        assert auth_requests[-1]["X-Auth-Request-Redirect"] == "https://notes.leolab.party" + path
+        assert auth_requests[-1]["X-Auth-Request-Redirect"] == "https://protected.leolab.party" + path
         assert auth_requests[-1]["X-Forwarded-Method"] == "POST"
         assert len([value for name, value in headers if name.lower() == "set-cookie"]) == 2
         assert json.loads(request(caddy_port, "identity.leolab.party", "/", headers={"Remote-User": "attacker"})[2])["user"] == "leo"
@@ -285,16 +283,16 @@ with tempfile.TemporaryDirectory() as temp:
         assert received["subject"] == "subject-leo-123", received
         auth_state["status"] = 503
         before = len(backend_requests)
-        assert request(caddy_port, "notes.leolab.party", "/private")[0] == 503
+        assert request(caddy_port, "protected.leolab.party", "/private")[0] == 503
         assert len(backend_requests) == before
         auth.shutdown()
         auth.server_close()
-        assert request(caddy_port, "notes.leolab.party", "/private")[0] == 502
+        assert request(caddy_port, "protected.leolab.party", "/private")[0] == 502
         assert len(backend_requests) == before
     finally:
         stop(caddy)
 
-    assert {"notes", "prowlarr"} <= set(fixture["protectedRoutes"])
+    assert {"prowlarr"} <= set(fixture["protectedRoutes"])
     expected_denials = {
         f"Protected edge route {name} requires its oauth2-proxy authentication gateway to be enabled"
         for name in fixture["protectedRoutes"]
@@ -320,7 +318,7 @@ with tempfile.TemporaryDirectory() as temp:
             original = "/private?term=a%26b&next=%2Ffoo%3Fbar%3D1&rd=https%3A%2F%2Fidentity.leolab.party%2Fother"
             status, body, cookies, url = login(caddy_port, idp.server_port, original)
             assert status == 200, (status, body)
-            assert url == "https://notes.leolab.party" + original, url
+            assert url == "https://protected.leolab.party" + original, url
             assert json.loads(body)["path"] == original
             assert "__Secure-leolab_gateway" in cookies
             websocket(caddy_port, cookies)
