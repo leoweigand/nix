@@ -28,9 +28,6 @@ let
       "${mounts.fast}/photos"
       "${mounts.fast}/photography"
     ];
-    notes = [
-      "${mounts.fast}/notes"
-    ];
     postgres = [
       "${mounts.fast}/backup/postgres"
     ];
@@ -357,16 +354,6 @@ in
             ];
           };
 
-          notes = {
-            schedule = "*-*-* 04:00:00"; # Daily at 4:00 AM
-            paths = backupPaths.notes;
-            pruneOpts = [
-              "--keep-daily 7"
-              "--keep-weekly 4"
-              "--keep-monthly 3"
-            ];
-          };
-
           immich = {
             schedule = "*-*-* 04:30:00"; # Daily at 4:30 AM (large library, last to run)
             paths = backupPaths.immich;
@@ -607,18 +594,6 @@ in
           name = "Linkding";
           icon = "mdi-bookmark-multiple-outline";
           description = "Bookmark manager";
-        };
-      };
-
-      silverbullet = {
-        enable = true;
-        subdomain = "notes";
-        spaceDir = "${mounts.fast}/notes";
-        homepage = {
-          category = "Productivity";
-          name = "SilverBullet";
-          icon = "mdi-notebook-outline";
-          description = "Markdown notes and knowledge base";
         };
       };
 

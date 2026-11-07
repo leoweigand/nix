@@ -465,8 +465,8 @@ have automatic account creation disabled. Pingvin keeps its separate existing
 Pocket ID client and native login.
 
 Protected edge routes use OAuth2 Proxy and reject configurations with the
-gateway disabled. SilverBullet's PWA paths and Prowlarr's API-key paths retain
-their explicit bypasses. `checks.x86_64-linux.authentication` exercises the
+gateway disabled. Prowlarr's API-key paths retain their explicit
+bypasses. `checks.x86_64-linux.authentication` exercises the
 actual generated gates, OIDC, PKCE, group denial, cookie renewal, WebSockets,
 POST bodies, spoofed headers, exact bypasses and SQLite backups. Changing Pocket
 ID's hostname requires enrolling passkeys again at the new address.
@@ -604,7 +604,6 @@ Picard job URLs:
 | `postgres` | `s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/postgres` |
 | `appdata` | `s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/appdata` |
 | `paperless` | `s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/paperless` |
-| `notes` | `s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/notes` |
 | `immich` | `s3:s3.eu-central-003.backblazeb2.com/leolab-backup-picard/immich` |
 
 Service data mapping (all covered by `appdata` job):

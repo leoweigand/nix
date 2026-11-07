@@ -77,7 +77,6 @@ All jobs run daily and prune on the first of each month. Retention: 7 daily, 4 w
 | `postgres` | 1:30 AM | `/mnt/fast/backup/postgres` |
 | `appdata` | 3:00 AM | `/mnt/fast/appdata` |
 | `paperless` | 3:30 AM | `/mnt/fast/documents/paperless/library` |
-| `notes` | 4:00 AM | `/mnt/fast/notes` |
 | `immich` | 4:30 AM | `/mnt/fast/photos` |
 
 Excludes are configured per job for regenerable paths (thumbnails, cache, temp files).

@@ -15,7 +15,6 @@
     ./prowlarr.nix
     ./radarr.nix
     ./seerr.nix
-    ./silverbullet.nix
     ./sonarr.nix
     ./syncthing.nix
     ./zigbee2mqtt.nix
