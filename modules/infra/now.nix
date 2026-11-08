@@ -147,7 +147,7 @@ in
         "leolab-now-keys.service"
         "leolab-now-store.service"
       ];
-      path = [ pkgs.esbuild ];
+      path = [ package.esbuild ];
       environment = {
         CELLD_WATCH = "/var/lib/leolab-now-runtime";
         CELLD_NODE = "picard-now";
@@ -211,7 +211,7 @@ in
       ];
       environment = {
         NOW_CONFIG = toString policy;
-        ESBUILD_BINARY_PATH = "${pkgs.esbuild}/bin/esbuild";
+        ESBUILD_BINARY_PATH = "${package.esbuild}/bin/esbuild";
         SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
       };
       path = [ package.nodejs ];

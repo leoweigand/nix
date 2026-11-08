@@ -8,7 +8,7 @@ pkgs.runCommand "now-runtime-check"
     nativeBuildInputs = [
       package.nodejs
       pkgs.seaweedfs
-      pkgs.esbuild
+      package.esbuild
       pkgs.python3
     ];
   }
@@ -35,7 +35,7 @@ pkgs.runCommand "now-runtime-check"
     export CELLD_BUCKET=s3://now S3_ENDPOINT=http://127.0.0.1:18333
     export CELLD_WATCH="$PWD/runtime" CELLD_NODE=fixture CELLD_IDLE_EVICT_S=2
     export CELLD_MAX_RESIDENT_CELLS=8 CELLD_MAX_RSS_MB=384 CELLD_V8_HEAP_LIMIT_MB=64
-    export ESBUILD_BINARY_PATH=${pkgs.esbuild}/bin/esbuild
+    export ESBUILD_BINARY_PATH=${package.esbuild}/bin/esbuild
     export NOW_TEST_COMPILE_SANDBOX=${builder.compile}
     ready=false
     for attempt in {1..60}; do
