@@ -71,7 +71,7 @@ in
     };
     mongoImage = lib.mkOption {
       type = lib.types.str;
-      default = "docker.io/library/mongo:8.0.20@sha256:972a9fa5d0f06418faa85d3f831ebba14e203a55dee5cd2dbcaf09490d2eff31";
+      default = "docker.io/library/mongo:8.0.34@sha256:1d7a2d487c6465ea022474b90b65d6c91bb600b421b65880d8c6e141d6122200";
     };
     port = lib.mkOption {
       type = lib.types.port;

@@ -8,10 +8,10 @@
 }:
 stdenv.mkDerivation {
   pname = "celld";
-  version = "0.6.2";
+  version = "0.6.3";
   src = fetchurl {
-    url = "https://github.com/denoland/celld/releases/download/v0.6.2/celld-x86_64-unknown-linux-gnu.gz";
-    hash = "sha256-zg7jVSzI1V3eOZjcOxsMj1R7vLS8gD0qlIQjaLBHZGw=";
+    url = "https://github.com/denoland/celld/releases/download/v0.6.3/celld-x86_64-unknown-linux-gnu.gz";
+    hash = "sha256-UISgg0cs8DZVGn6sY/ok0iu5pWMjxRf2MgVyTBJ4MEc=";
   };
   nativeBuildInputs = [ autoPatchelfHook ];
   buildInputs = [

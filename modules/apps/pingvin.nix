@@ -38,7 +38,7 @@ in
 
     image = lib.mkOption {
       type = lib.types.str;
-      default = "ghcr.io/smp46/pingvin-share-x:v2.1.0@sha256:0b3e52a50d233957d8a05632ee13554ad775ee9af757591c36c885973deb590d";
+      default = "ghcr.io/smp46/pingvin-share-x:v2.1.1@sha256:7b3a70a6f016eb63dab0b7bda8431373fc8b0c5120a58d9572cb5ffdae241739";
       description = "Pingvin Share X container image, pinned to a release and digest";
     };
 
