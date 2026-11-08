@@ -17,7 +17,7 @@
     "@modelcontextprotocol/node": "2.1.2",
     "@modelcontextprotocol/server": "2.4.0",
     "@std/xml": "npm:@jsr/std__xml@0.2.0",
-    "jose": "6.2.14",
+    "jose": "6.2.16",
     "openai-oauth": "2.0.0",
     "zod": "4.6.7"
   },
@@ -25,5 +25,8 @@
     "@types/node": "^26.0.0",
     "prettier": "^3.6.0",
     "typescript": "^6.0.0"
+  },
+  "overrides": {
+    "@ai-sdk/provider-utils": "4.0.65"
   }
 }

@@ -19,7 +19,7 @@ buildNpmPackage {
       (lib.fileset.fileFilter (file: file.hasExt "ts") ../../modules)
     ];
   };
-  npmDepsHash = "sha256-SBaHOonkyc2ttoB5xhHDrl3CeIhm4C2Y2d1hmsQ5ii4=";
+  npmDepsHash = "sha256-CtzDxRcvAckPz+gTFyIaiv67C6EMLJbaqwRAYmAYDZs=";
   # The upstream chat adapter otherwise retries inference and omits cancellation.
   postConfigure = "patch -p1 < ${./openai-oauth.patch}";
   dontNpmBuild = true;

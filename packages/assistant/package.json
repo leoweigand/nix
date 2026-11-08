@@ -4,13 +4,13 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@ai-sdk/openai-compatible": "3.0.84",
-    "@earendil-works/pi-coding-agent": "1.4.0",
-    "@earendil-works/pi-mcp": "1.4.0",
-    "ai": "7.0.162",
+    "@ai-sdk/openai-compatible": "3.0.87",
+    "@earendil-works/pi-coding-agent": "1.5.0",
+    "@earendil-works/pi-mcp": "1.5.0",
+    "ai": "7.0.165",
     "eve": "1.0.0-rc.2",
-    "jose": "6.2.14",
-    "typebox": "1.4.3",
+    "jose": "6.2.16",
+    "typebox": "1.4.6",
     "zod": "4.6.7"
   },
   "devDependencies": {
@@ -19,8 +19,8 @@
     "typescript": "6.0.3"
   },
   "overrides": {
-    "undici": "8.12.3",
-    "minimatch": "11.0.3"
+    "undici": "8.12.4",
+    "minimatch": "11.0.5"
   },
   "scripts": {
     "postinstall": "node scripts/patch-eve.ts",
