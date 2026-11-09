@@ -14,9 +14,9 @@ NixOS configuration for my homelab.
 
 On macOS, `verify-staging-email <email>` retrieves the latest signup verification
 email for that exact recipient from staging's `public.test_emails` table and
-prints an underlined, clickable `Verify <email>` terminal link and copies its URL
-to the macOS clipboard with `pbcopy`, with a confirmation beside the link.
-Piped output is the URL.
+prints `To verify <email>:` followed by the verification URL, a blank line and
+`Link was copied to the clipboard.` It copies the URL to the macOS clipboard
+with `pbcopy`. Terminal and piped output use the same format.
 It explicitly enables 1Password desktop
 integration for its `op` calls, avoiding reliance on automatic detection of the
 app setting (which macOS privacy permissions can block). It reads
