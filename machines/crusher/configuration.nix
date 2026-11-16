@@ -90,6 +90,9 @@
 
   # Combined install/cleanup ignores the MAS exclusion environment variable.
   system.activationScripts.homebrew.text = lib.mkAfter ''
+    # $? is the status of nix-darwin's preceding `brew bundle` block, which we
+    # can't wrap in an `if`; only clean up when that install succeeded.
+    # shellcheck disable=SC2181
     if [ "$?" -eq 0 ] && [ -x /opt/homebrew/bin/brew ]; then
       sudo --user=leo --set-home /opt/homebrew/bin/brew bundle cleanup \
         --file='${pkgs.writeText "Brewfile" config.homebrew.brewfile}' \
