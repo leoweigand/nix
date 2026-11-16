@@ -34,6 +34,10 @@
         fpath+=${pkgs.zsh-completions}/share/zsh/site-functions
       '')
       ''
+        # Rex prepends its CLI folder to PATH when it starts a shell, but
+        # nix-darwin's /etc/zshenv rebuilds PATH from scratch and drops it.
+        [[ -n $REX_BIN_DIR && -d $REX_BIN_DIR ]] && path=("$REX_BIN_DIR" $path)
+
         zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
         zstyle ':completion:*' menu select
         zstyle ':completion:*' group-name ""
