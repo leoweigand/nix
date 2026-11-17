@@ -8,6 +8,7 @@
 {
   imports = [
     ../../modules/darwin/common.nix
+    ./opentofu.nix
     ./usage4claude.nix
   ];
 
