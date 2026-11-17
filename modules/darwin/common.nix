@@ -59,16 +59,8 @@ in
 
   users.users.leo.home = "/Users/leo";
 
-  homebrew.taps = [
-    {
-      name = "abue-ammar/tinycast";
-      trusted = true;
-    }
-  ];
-
   homebrew.casks = [
     "1password"
-    "abue-ammar/tinycast/tinycast"
     "cap"
     "firefox@nightly"
     "google-chrome@canary"
@@ -78,6 +70,7 @@ in
     "opencode-desktop"
     "tailscale-app"
     "tidal"
+    "tinycast"
     "vlc"
     "zed"
     "zen"
