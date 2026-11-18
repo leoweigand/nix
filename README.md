@@ -336,6 +336,19 @@ backs up a manually installed `/Applications/Rex Beta.app` under
 the managed copy in `/Applications/Nix Apps`. Calibre's first managed installation
 replaces its older manual app bundle; its library and preferences stay in place.
 
+## Interactive shell
+
+Home Manager configures Nushell and Starship for Leo on Picard, Ro, and
+Crusher. An interactive Zsh session with a terminal hands off to Nushell after
+loading the session environment. Zsh remains the account shell, so SSH commands
+and applications that call the account shell with `-c` continue to use Zsh syntax.
+Starship keeps the same prompt settings in both shells.
+
+From Nushell, use `^env KEEP_ZSH=1 zsh -l` for a Zsh session. Ro's fnm and
+Crusher's nvm directory-change hooks run in Zsh. The Node version selected
+during startup is inherited by Nushell. On the Macs, `llm` is an executable
+available in either shell.
+
 ## Edge Routing Model
 
 - Shared edge settings live in `modules/infra/reverse-proxy.nix`.

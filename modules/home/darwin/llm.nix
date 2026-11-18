@@ -79,7 +79,8 @@ let
     pairs;
 in
 {
-  programs.zsh.initContent = ''
+  home.packages = [ (pkgs.writeScriptBin "llm" ''
+    #!${pkgs.zsh}/bin/zsh
     typeset -gA _llm_specs
     _llm_specs=(
     ${specEntries}
@@ -131,5 +132,6 @@ in
 
       command env ''${(z)_llm_specs[$spec]} "$@"
     }
-  '';
+    llm "$@"
+  '') ];
 }

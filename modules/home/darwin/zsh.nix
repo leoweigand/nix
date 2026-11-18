@@ -84,7 +84,16 @@
     ];
   };
 
-  home.packages = lib.optional (machineName != "crusher") pkgs.fnm;
+  programs.nushell.shellAliases = {
+    o = "^open .";
+    oprun = "op run --env-file=./.env";
+  };
+
+  # The pinned Rust setup requests system zstd via pkg-config.
+  home.packages = lib.optional (machineName != "crusher") (pkgs.fnm.overrideAttrs (old: {
+    nativeBuildInputs = old.nativeBuildInputs ++ [ pkgs.pkg-config ];
+    buildInputs = (old.buildInputs or [ ]) ++ [ pkgs.zstd ];
+  }));
 
   home.sessionPath = [
     "$HOME/.lmstudio/bin"
