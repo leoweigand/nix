@@ -294,7 +294,8 @@ in
         ]
         ++ lib.optional (cfg.internalProxies != { }) "*.internal.${domain}";
         dnsProvider = "cloudflare";
-        dnsPropagationCheck = true;
+        dnsAuthoritativePropagationCheck = true;
+        dnsRecursivePropagationCheck = true;
         dnsResolver = "1.1.1.1:53";
         # Lego reads the raw token through a private systemd credential file.
         credentialFiles.CF_DNS_API_TOKEN_FILE =

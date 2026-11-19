@@ -10,7 +10,8 @@ in
     inherit domain;
     extraDomainNames = [ "*.${domain}" ];
     dnsProvider = "cloudflare";
-    dnsPropagationCheck = true;
+    dnsAuthoritativePropagationCheck = true;
+    dnsRecursivePropagationCheck = true;
     dnsResolver = "1.1.1.1:53";
     credentialFiles.CF_DNS_API_TOKEN_FILE =
       config.services.onepassword-secrets.secretPaths.cloudflareAcmeToken;
