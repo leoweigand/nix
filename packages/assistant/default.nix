@@ -21,7 +21,7 @@ buildNpmPackage {
       ./patches
     ];
   };
-  npmDepsHash = "sha256-JzH76vLJU6BsSmS3X6fRy5r8KwGcyQO2UjmjsNhl16Q=";
+  npmDepsHash = "sha256-7vRyB5UsMyHP88+8Ui+OlhX4B9LTo0UH4oP1x04Oe10=";
   npmFlags = [ "--ignore-scripts" ];
   buildPhase = ''
     runHook preBuild
