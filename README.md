@@ -185,7 +185,7 @@ The host supplies launch buttons from verified live app metadata when replies
 link to those apps. Design defaults favour warm neutrals, one muted accent and
 clear spacing and hierarchy with restrained decoration.
 
-`homelab.infra.assistant` runs Pi 1.5.0 as a separate worker behind the existing
+`homelab.infra.assistant` runs Pi 1.5.2 as a separate worker behind the existing
 notification gateway's Telegram webhook. It accepts Leo's DMs and explicit bot
 mentions in configured groups, persists accepted jobs, and keeps Pi sessions
 separate by chat/sender/topic. Replies preserve their original message and topic.
@@ -692,7 +692,7 @@ systemctl status paperless-scheduler
 ## LibreChat
 
 `homelab.apps.librechat` runs the digest-pinned official LibreChat container and
-MongoDB 8.0.34 on a dedicated Podman bridge. Picard publishes it privately at
+MongoDB 8.0.38 on a dedicated Podman bridge. Picard publishes it privately at
 `chat.leolab.party`, with native Pocket ID PKCE sign-in restricted to `admins`.
 The existing AI gateway supplies six Zen and eight OpenAI subscription models.
 `extraModels` declares the subscription model IDs; `mcp.enable` adds the LeoLab
